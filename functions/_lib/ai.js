@@ -30,6 +30,16 @@ export function aiEnabled(env) {
   return true;
 }
 
+/** 匿名访客是否可触发「生成」（消耗模型额度）。
+ *  默认允许（保持原有公开摘要体验）；设置 BLOG_AI_PUBLIC=0/false/off 后，
+ *  生成类接口要求作者会话，避免被任意站点脚本刷走 Workers AI 免费额度。
+ *  只读接口（读取已缓存摘要 / ping）不受影响。 */
+export function aiPublicGenerate(env) {
+  const flag = env && env.BLOG_AI_PUBLIC;
+  if (flag === '0' || flag === 'false' || flag === 'off') return false;
+  return true;
+}
+
 /** 调用模型；失败返回 ''（调用方负责 502 提示） */
 export async function aiChat(env, messages, opts) {
   if (!aiEnabled(env)) return '';
@@ -43,16 +53,33 @@ export async function aiChat(env, messages, opts) {
   }
 }
 
-/** KV 计数限流（prefix:key → 窗口内计数）；KV 缺失静默放行 */
-export async function aiRate(env, prefix, key, limit, windowSec) {
-  if (!env || !env.BLOG) return { ok: true };
+/** KV 计数限流（prefix:key → 窗口内计数）。
+ *  opts.failClosed=true：KV 缺失或读取异常时 **拒绝**（用于全站每日额度这类
+ *  一旦放行就会真金白银烧模型配额的计数）。默认 fail-open，用于每 IP 频控，
+ *  避免 KV 抖动把正常用户挡在门外。
+ *  注意：KV 最终一致，计数为「尽力而为」，可被并发绕过；真正的成本兜底是
+ *  每日总额度 + 鉴权，不能只依赖本函数。 */
+export async function aiRate(env, prefix, key, limit, windowSec, opts) {
+  const failClosed = !!(opts && opts.failClosed);
+  const deny = { ok: false, reason: 'blocked' };
+  if (!env || !env.BLOG) {
+    if (failClosed) {
+      console.warn('[ai] env.BLOG(KV) 未绑定，全站 AI 额度计数不可用 → 按 fail-closed 拒绝');
+      return deny;
+    }
+    return { ok: true };
+  }
   const k = 'ai:' + prefix + ':' + key;
   try {
     const cnt = Number((await env.BLOG.get(k)) || 0);
-    if (cnt >= limit) return { ok: false };
+    if (cnt >= limit) return deny;
     await env.BLOG.put(k, String(cnt + 1), { expirationTtl: windowSec });
     return { ok: true };
   } catch (e) {
+    if (failClosed) {
+      console.warn('[ai] 额度计数读写失败，按 fail-closed 拒绝:', e && e.message);
+      return deny;
+    }
     return { ok: true };
   }
 }

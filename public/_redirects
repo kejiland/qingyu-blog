@@ -1,5 +1,11 @@
 # Qingyu'Blog · Cloudflare Pages 路由
-# 优先级：functions/ 下的 API 函数先于 _redirects 匹配，因此 /api/* 不受影响。
+# 优先级：functions/ 下的 API 函数先于 _redirects 匹配。
+#
+# 注意·/api/* 的兜底：只有「存在对应函数文件」的 /api 路径才会被 Functions 接管。
+# 没有函数文件的 /api 路径（如 /api/music/upload-url —— 音乐上传仅在 worker.js 实现，
+# functions/api/music/ 目录不存在）不会命中 Functions，会被下方 SPA 回退规则
+# `/* /index.html 200` 兜成 HTML 200，让调用方拿到 HTML 而非 JSON。
+# 该问题已由 functions/api/[[path]].js 兜底解决：未注册的 /api/* 一律返回 JSON 404。
 
 # 1) 老部署遗留：/public/ 前缀统一 301 到根（消除 /public）
 /public/* /:splat 301

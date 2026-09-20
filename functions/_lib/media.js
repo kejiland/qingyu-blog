@@ -19,16 +19,26 @@ const IMAGE_EXTS = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', we
 const MAX_SIZE = 10 * 1024 * 1024; // 单图 ≤ 10MB
 
 export function r2Configured(env) {
-  return !!(env && env.R2_MEDIA_BUCKET && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT);
+  // 必须同时配置公开访问地址：否则能签发上传 URL 却拿不到 publicUrl，
+  // 客户端传完对象后无法登记有效 URL，最终在桶里留下无法回收的孤儿对象。
+  return !!(env && env.R2_MEDIA_BUCKET && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT && env.R2_MEDIA_PUBLIC_BASE);
 }
 function randomId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
-/** 从公开 URL 提取媒体对象 key（仅本站 media/ 前缀；非本站 URL 返回空串不删 R2） */
-export function extractMediaR2Key(publicUrl) {
+/** 从公开 URL 提取媒体对象 key（仅本站 media/ 前缀；非本站 URL 返回空串不删 R2）。
+ *  除路径前缀外还校验 origin 必须等于 R2_MEDIA_PUBLIC_BASE，
+ *  避免外链 `https://evil.example/media/x` 被当作桶内对象去签删除请求。 */
+export function extractMediaR2Key(publicUrl, env) {
   try {
-    const p = new URL(String(publicUrl || '')).pathname;
-    if (p.indexOf('/media/') === 0) return p.slice(1);
+    const u = new URL(String(publicUrl || ''));
+    const base = String((env && env.R2_MEDIA_PUBLIC_BASE) || '').replace(/\/+$/, '');
+    if (base) {
+      let baseOrigin = '';
+      try { baseOrigin = new URL(base).origin; } catch (e) { baseOrigin = ''; }
+      if (baseOrigin && u.origin !== baseOrigin) return '';
+    }
+    if (u.pathname.indexOf('/media/') === 0) return u.pathname.slice(1);
   } catch (e) { /* ignore */ }
   return '';
 }
@@ -57,7 +67,9 @@ export async function handleMediaUploadUrl(request, env) {
 
   const key = 'media/' + randomId() + '.' + ext;
   const contentType = IMAGE_EXTS[ext];
-  const uploadUrl = await presignPut(env, key, 3600, env.R2_MEDIA_BUCKET);   // 媒体专用桶
+  // 把 Content-Length 纳入签名：R2 会在边缘拒绝超过该长度的 PUT，
+  // 防止客户端谎报 size 后直传超大对象（此前 size 仅由客户端提供，形同虚设）。
+  const uploadUrl = await presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, MAX_SIZE);
   const publicBase = String(env.R2_MEDIA_PUBLIC_BASE || '').replace(/\/+$/, '');
   const publicUrl = publicBase ? publicBase + '/' + key : '';
 
@@ -66,7 +78,7 @@ export async function handleMediaUploadUrl(request, env) {
 
 /** 删除媒体：先删 R2 对象（若 url 是本站 media/ 前缀，媒体专用桶），再删 D1 元数据 */
 export async function deleteMediaObject(env, url) {
-  const key = extractMediaR2Key(url);
+  const key = extractMediaR2Key(url, env);
   if (key) {
     try { await r2DeleteObject(env, key, env.R2_MEDIA_BUCKET); } catch (e) { /* R2 删除失败不阻塞元数据删除（避免幽灵记录） */ }
   }

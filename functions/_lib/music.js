@@ -55,24 +55,30 @@ async function signS3(env, method, path, canonicalQuery, canonicalHeaders, signe
   return { params: p, signature };
 }
 /** 生成 R2 S3 兼容的预签名 PUT URL（有效期 1 小时，UNSIGNED-PAYLOAD）
- *  bucket 可选：缺省用 env.R2_BUCKET（音乐桶）；媒体桶传入独立 bucket 名（如 qingyu-media） */
-export async function presignPut(env, key, expiresSec, bucket) {
+ *  bucket 可选：缺省用 env.R2_BUCKET（音乐桶）；媒体桶传入独立 bucket 名（如 qingyu-media）
+ *  maxBytes 可选：把 Content-Length 纳入签名。此前只签 host，R2 无法校验上传体积，
+ *  客户端把 body.size 报成 1 字节即可 PUT 任意大小的对象（体积限制形同虚设）。
+ *  纳入签名后 R2 会在边缘按签名中的 content-length 校验，超限直接拒绝。 */
+export async function presignPut(env, key, expiresSec, bucket, maxBytes) {
   expiresSec = expiresSec || 3600;
   const b = bucket || env.R2_BUCKET;
   const p = await r2SignParams(env);
   const path = '/' + b + '/' + key;
+  const hasLen = Number.isFinite(Number(maxBytes)) && Number(maxBytes) > 0;
   const qp = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': env.R2_ACCESS_KEY_ID + '/' + p.scope,
     'X-Amz-Date': p.amzDate,
     'X-Amz-Expires': String(expiresSec),
-    'X-Amz-SignedHeaders': 'host'
+    'X-Amz-SignedHeaders': hasLen ? 'content-length;host' : 'host'
   };
   const canonicalQuery = Object.keys(qp).sort()
     .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(qp[k]); })
     .join('&');
-  const canonicalHeaders = 'host:' + p.host + '\n';
-  const s = await signS3(env, 'PUT', path, canonicalQuery, canonicalHeaders, 'host');
+  const canonicalHeaders = hasLen
+    ? 'content-length:' + String(Number(maxBytes)) + '\n' + 'host:' + p.host + '\n'
+    : 'host:' + p.host + '\n';
+  const s = await signS3(env, 'PUT', path, canonicalQuery, canonicalHeaders, qp['X-Amz-SignedHeaders']);
   return p.endpoint + path + '?' + canonicalQuery + '&X-Amz-Signature=' + s.signature;
 }
 
@@ -81,7 +87,9 @@ const AUDIO_EXTS = { mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', oga:
 const MAX_SIZE = 30 * 1024 * 1024; // 单曲 ≤ 30MB
 
 function r2Configured(env) {
-  return !!(env && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT && env.R2_BUCKET);
+  // 同时要求 PUBLIC_BASE：否则签发得出上传 URL 却拼不出 publicUrl，
+  // 上传完成后无法登记有效地址，只在桶里留下孤儿对象。
+  return !!(env && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT && env.R2_BUCKET && env.R2_PUBLIC_BASE);
 }
 function randomId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -122,11 +130,20 @@ export async function r2DeleteObject(env, key, bucket) {
   }
   return true;
 }
-/** 从公开 URL 提取对象 key（仅本站 music/ 前缀的上传对象；外链返回空串不删） */
-export function extractR2Key(publicUrl) {
+/** 从公开 URL 提取对象 key（仅本站 music/ 前缀的上传对象；外链返回空串不删）。
+ *  env 可选：传入后会校验 URL 的 origin 必须等于配置的 R2_PUBLIC_BASE，
+ *  否则 `https://evil.example/music/xxx` 这类外链也会被当成桶内对象去签删除请求
+ *  （删的是**我们自己的桶**里同名 key）。 */
+export function extractR2Key(publicUrl, env) {
   try {
-    const p = new URL(String(publicUrl || '')).pathname;
-    if (p.indexOf('/music/') === 0) return p.slice(1);
+    const u = new URL(String(publicUrl || ''));
+    const base = String((env && env.R2_PUBLIC_BASE) || '').replace(/\/+$/, '');
+    if (base) {
+      let baseOrigin = '';
+      try { baseOrigin = new URL(base).origin; } catch (e) { baseOrigin = ''; }
+      if (baseOrigin && u.origin !== baseOrigin) return '';
+    }
+    if (u.pathname.indexOf('/music/') === 0) return u.pathname.slice(1);
   } catch (e) { /* ignore */ }
   return '';
 }
@@ -196,7 +213,8 @@ export async function handleMusicUploadUrl(request, env) {
 
   const key = 'music/' + randomId() + '.' + ext;
   const contentType = AUDIO_EXTS[ext];
-  const uploadUrl = await presignPut(env, key, 3600);
+  // 把 Content-Length 纳入签名：R2 在边缘拒绝超长 PUT，防止谎报 size 直传超大对象。
+  const uploadUrl = await presignPut(env, key, 3600, null, MAX_SIZE);
   const publicBase = String(env.R2_PUBLIC_BASE || '').replace(/\/+$/, '');
   const publicUrl = publicBase ? publicBase + '/' + key : '';
 
@@ -234,7 +252,7 @@ export async function handleMusicId(request, env, id) {
     // 与 R2 同步删除：先删对象，成功后再删元数据（避免留下孤儿对象/幽灵曲目）
     const row = await dbFirst(env.DB, 'SELECT url FROM music WHERE id = ?', id);
     if (row && row.url) {
-      const key = extractR2Key(row.url);
+      const key = extractR2Key(row.url, env);
       if (key && r2Configured(env)) {
         try {
           await r2DeleteObject(env, key);

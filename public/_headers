@@ -1,8 +1,22 @@
 # Qingyu'Blog · Cloudflare Pages 响应头
 # 静态资源 URL 已带版本号（?v=），可放心长缓存；字体/图标不变时勿频繁改版本
+#
+# ── CSP 说明（与 functions/_lib/api-core.js 的 securityHeaders() 保持同源策略）──
+# Worker 部署路径由 worker.js 注入安全头；Pages 纯静态路径下 HTML 由 Pages 直接返回，
+# 不经过任何函数，因此必须在此显式声明，否则文档层完全没有 CSP。
+# 本策略需同时满足：
+#   · 广告（adsbygoogle.js + AdSense 广告 iframe）
+#   · R2 预签名直传（XHR PUT 到任意 R2 自定义域名，见 admin.js uploadUrl）
+#   · data:/blob: 图片与音频（本地预览、导出下载）
+#   · 大量内联脚本/样式（站点为「零构建 + 内联」架构，无法使用 nonce）
+# 故 script-src/style-src 保留 'unsafe-inline'（与后端策略一致），
+# 重点收紧：禁 object/plugin、禁 frame 嵌套（防点击劫持）、限制 form 提交目标。
 /
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: SAMEORIGIN
+  Cross-Origin-Opener-Policy: same-origin
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://pagead2.googlesyndication.com; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; img-src 'self' data: blob: https:; media-src 'self' blob: https:; font-src 'self' data: https://cdn.jsdelivr.net; connect-src 'self' https:; frame-src 'self' https:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'
 
 /style.css*
   Cache-Control: public, max-age=31536000, immutable

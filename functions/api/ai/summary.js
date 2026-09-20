@@ -3,7 +3,7 @@
  *  body: { slug, lang?, force? }   force 需作者会话（防止刷掉缓存） */
 import { json, corsPreflight, isWriteAuthed } from '../../_lib/api-core.js';
 import {
-  aiEnabled, aiChat, aiRate, aiCacheGet, aiCachePut,
+  aiEnabled, aiChat, aiRate, aiCacheGet, aiCachePut, aiPublicGenerate,
   buildSummaryMessages, normalizeLang, clientIp
 } from '../../_lib/ai.js';
 
@@ -40,6 +40,12 @@ export async function onRequest(context) {
     if (cached) return json({ ok: true, summary: cached, cached: true }, 200, request, env, { 'Cache-Control': 'public, max-age=86400' });
   }
 
+  // 匿名生成闸门：BLOG_AI_PUBLIC=0 时，未登录访客不能触发模型调用
+  //（仍可读取上方已缓存摘要，前端照样显示结果）。防止任意站点脚本刷走额度。
+  if (!aiPublicGenerate(env) && !(await isWriteAuthed(request, env))) {
+    return json({ error: 'AI 生成仅限作者使用' }, 401, request, env);
+  }
+
   const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(slug).first().catch(() => null);
   if (!post || !post.content) return json({ error: '未找到该内容' }, 404, request, env);
   // 加密/受保护文章内容不外泄给模型
@@ -49,9 +55,12 @@ export async function onRequest(context) {
   if (force && !(await isWriteAuthed(request, env))) return json({ error: '未授权：请先登录' }, 401, request, env);
 
   const ip = clientIp(request);
+  // 每 IP 频控：fail-open（KV 抖动不应挡住正常访客）
   const r1 = await aiRate(env, 'sum:ip', ip, IP_LIMIT, IP_WINDOW);
   if (!r1.ok) return json({ error: 'AI 摘要请求太频繁，请稍后再试' }, 429, request, env);
-  const r2 = await aiRate(env, 'sum:day', 'g', DAY_LIMIT, DAY_WINDOW);
+  // 全站每日额度：fail-closed——这是防「刷爆免费额度」的最后一道闸，
+  // 计数不可用时宁可拒绝生成，也不放任无限调用模型。
+  const r2 = await aiRate(env, 'sum:day', 'g', DAY_LIMIT, DAY_WINDOW, { failClosed: true });
   if (!r2.ok) return json({ error: 'AI 摘要今日用量已达上限' }, 429, request, env);
 
   const text = await aiChat(env, buildSummaryMessages(post.content, lang));

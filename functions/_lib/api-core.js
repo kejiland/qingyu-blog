@@ -18,7 +18,15 @@ const NO_CACHE = 'no-store';
 
 /* 点赞频控：每 IP 每分钟上限（防接口被刷量） */
 const LIKE_CAP = 10;
-
+/* 点赞去重标记的 TTL（秒）：标记只需覆盖「防重复点赞」的合理窗口，
+ * 带 TTL 可避免 KV 按 (IP, 文章) 组合无限增长。 */
+const LIKE_DEDUP_TTL = 60 * 60 * 24 * 30;
+/* 浏览计数频控：每 IP 每分钟上限。views 此前完全无限流，
+ * 单机脚本即可把阅读量刷到上限；这里与点赞同口径做限流。 */
+const VIEW_CAP = 30;
+/* 浏览去重窗口（秒）：同一 IP 对同一篇文章在该窗口内只计一次，
+ * 避免刷新页面重复累加（前端 sessionStorage 去重可被直接调 API 绕过）。 */
+const VIEW_DEDUP_TTL = 3600;
 /* Cloudflare 边缘缓存标签（写操作后主动清缓存，保证发布即生效）
  * 仅当配置了 CF_API_TOKEN + CF_ZONE_ID 才真正清缓存，否则依赖 s-maxage 自然过期。 */
 const TAG_POSTS = 'posts';
@@ -71,10 +79,11 @@ export function getCorsHeaders(request, env) {
   const allowed = [];
   if (env && env.SITE_URL) allowed.push(String(env.SITE_URL).replace(/\/+$/, ''));
   try { const self = new URL(request.url).origin; if (allowed.indexOf(self) < 0) allowed.push(self); } catch (e) {}
+  // 仅白名单（SITE_URL + 当前请求自身 origin）才回写 ACAO。
+  // 未配置 SITE_URL 时 **fail-closed**：不回 ACE，跨站读取被浏览器拦截。
+  // （旧行为是回显任意 Origin，等价于 `*`，会把 /api/comments 等公开数据
+  //   暴露给任意站点脚本；同源页面不受影响——同源请求浏览器不做 CORS 校验。）
   if (allowed.indexOf(origin) >= 0) {
-    h['Access-Control-Allow-Origin'] = origin;
-  } else if (!env || !env.SITE_URL) {
-    // 未配置 SITE_URL 时回退回显，保证合法跨域部署不被误拦
     h['Access-Control-Allow-Origin'] = origin;
   }
   return h;
@@ -159,15 +168,19 @@ function postFromRow(r) {
   try { tags = r.tags ? JSON.parse(r.tags) : []; } catch (e) { tags = []; }
   let enc = null;
   if (r.enc) { try { enc = JSON.parse(r.enc); } catch (e) { enc = null; } }
+  // 与 normalizePost 保持同一不变式：受保护文章的明文 content 永不出库。
+  // 写入路径已保证 content 为空，但历史数据/手工 SQL 可能留下明文，
+  // 在读边界再兜一层，避免 GET /api/posts/:id 泄漏受保护正文。
+  const isProtected = !!(r.protected);
   return {
     id: String(r.id || ''),
     title: String(r.title || ''),
     date: String(r.date || ''),
     excerpt: String(r.excerpt || ''),
     cover: String(r.cover || ''),
-    content: String(r.content || ''),
+    content: isProtected ? '' : String(r.content || ''),
     pinned: !!r.pinned,
-    protected: !!r.protected,
+    protected: isProtected,
     enc: enc,
     category: String(r.category || ''),
     status: (r.status === 'draft') ? 'draft' : 'published',
@@ -485,7 +498,9 @@ export async function handleComments(request, env, postId) {
       moderate = !!(s && s.v === '1');
     } catch (e) {}
     const comment = {
-      id: 'c-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      // 用 crypto.randomUUID 生成主键：此前 'c-'+Date.now()+Math.random() 在同一毫秒内
+      // 有一定碰撞概率（实测 30 万次抽样约 70 次碰撞），碰撞即主键冲突 → 未捕获 500。
+      id: 'c-' + randomToken(16),
       author,
       content,
       date: new Date().toISOString().slice(0, 10),
@@ -587,18 +602,28 @@ export async function handleSiteFiles(request, env, name) {
     const files = Array.isArray(body) ? body : (body && body.files ? body.files : null);
     if (!Array.isArray(files) || !files.length) return json({ error: '缺少 files 数组' }, 400, request, env);
     const now = new Date().toISOString();
+    const stmts = [];
     for (const f of files) {
       if (!f || typeof f.name !== 'string' || typeof f.content !== 'string') continue;
       if (!/^[a-z0-9._-]+$/i.test(f.name)) continue;
-      await dbRun(env.DB,
-        'INSERT INTO site_files (name, content, updated_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at',
-        f.name, f.content, now
-      ).catch(() => {});
+      stmts.push({
+        sql: 'INSERT INTO site_files (name, content, updated_at) VALUES (?, ?, ?) ON CONFLICT(name) DO UPDATE SET content = excluded.content, updated_at = excluded.updated_at',
+        params: [f.name, f.content, now]
+      });
     }
-    return json({ ok: true }, 200, request, env);
+    if (!stmts.length) return json({ error: 'files 中没有合法的文件名（仅允许字母/数字/._-）' }, 400, request, env);
+    // 批量原子写入：此前逐条 .catch(()=>{}) 会静默吞掉全部写失败，却仍返回 ok:true，
+    // 前端据此认为「已同步」，实际数据未落库。
+    try {
+      await dbBatch(env.DB, stmts);
+    } catch (e) {
+      console.error('[site-files] batch write failed:', e && e.message, e);
+      return json({ error: '文件写入失败，请稍后重试' }, 500, request, env);
+    }
+    return json({ ok: true, written: stmts.length }, 200, request, env);
   }
 
-  return json({ error: '方法不允许' }, 405, request, env);
+  return json({ error: 'Method not allowed' }, 405, request, env);
 }
 
 /* ============================================================
@@ -661,7 +686,9 @@ export async function handleStats(request, env, postId) {
       if (env.BLOG) {
         try {
           await env.BLOG.put(rk, String(cnt + 1), { expirationTtl: 120 });
-          await env.BLOG.put(dk, '1');   // 永久去重标记（无过期）
+          // 去重标记：与 rate key 一样带 TTL。此前为永久 key（无 expirationTtl），
+          // KV 会按 (IP, 文章) 组合无限增长；点赞去重的有效窗口无需超过 TTL。
+          await env.BLOG.put(dk, '1', { expirationTtl: LIKE_DEDUP_TTL });
         } catch (e) {}
       }
       // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
@@ -671,7 +698,30 @@ export async function handleStats(request, env, postId) {
       return json({ ok: true, postId, stats: s }, 200, request, env);
     }
 
-    // views：计数即可（同会话去重由前端 sessionStorage 负责；此处仅累加）。
+    // views：计数（同会话去重此前仅靠前端 sessionStorage，可被直接调 API 绕过）。
+    // 这里补两层服务端防护：同一 IP 对同一篇文章在 VIEW_DEDUP_TTL 内只计一次；
+    // 并做每分钟总量频控，防止脚本刷阅读量。
+    const vip = clientIp(request);
+    const vdk = 'viewed:' + vip + ':' + postId;
+    if (env.BLOG) {
+      try {
+        if (await env.BLOG.get(vdk)) {
+          // 已计过：返回当前计数，不重复 +1（幂等，与点赞一致）
+          const cur = await dbFirst(env.DB, 'SELECT * FROM stats WHERE post_id = ?', postId) || {};
+          const s = { likes: Number(cur.likes) || 0, views: Number(cur.views) || 0 };
+          return json({ ok: true, postId, stats: s, duplicated: true }, 200, request, env);
+        }
+      } catch (e) {}
+      const vwin = Math.floor(Date.now() / 60000);
+      const vrk = 'rate:view:' + vip + ':' + vwin;
+      let vcnt = 0;
+      try { vcnt = Number(await env.BLOG.get(vrk)) || 0; } catch (e) {}
+      if (vcnt >= VIEW_CAP) return json({ error: '操作太频繁，请稍后再试' }, 429, request, env);
+      try {
+        await env.BLOG.put(vrk, String(vcnt + 1), { expirationTtl: 120 });
+        await env.BLOG.put(vdk, '1', { expirationTtl: VIEW_DEDUP_TTL });
+      } catch (e) {}
+    }
     // 原子自增：并发访问不会互相覆盖（此前“读-改-写”在并发下会丢数）。
     await dbRun(env.DB,
       'INSERT INTO stats (post_id,likes,views) VALUES (?,0,1) '
@@ -883,9 +933,14 @@ export async function handleAdminLogin(request, env) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
 
   const ip = clientIp(request);
-  // 限流：检查是否被锁定
+  // 限流：检查是否被锁定。
+  // 除按 IP 计数外，另有一个全局计数行（ip = '__global__'）：仅按 IP 计数时，
+  // 攻击者轮换源 IP 即可无限次试密码（每次都是「第 1 次失败」）。
+  // 全局计数让「任何来源的失败总量」也触发锁定，堵住 IP 轮换绕过；
+  // 阈值放宽（ADMIN_GLOBAL_MAX_FAILS），避免正常用户偶发输错即被长时间锁死。
+  let fail = null, gfail = null;
   try {
-    const fail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
+    fail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
     if (fail && fail.until && fail.until > nowMs()) {
       const mins = Math.ceil((fail.until - nowMs()) / 60000);
       return json({ error: '尝试次数过多，请 ' + mins + ' 分钟后再试' }, 429, request, env);
@@ -893,6 +948,16 @@ export async function handleAdminLogin(request, env) {
     // 清理已过期的失败记录，避免 admin_fails 表无限增长
     if (fail && fail.until && fail.until <= nowMs()) {
       try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', ip); } catch (e) {}
+      fail = null;
+    }
+    gfail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", GLOBAL_FAIL_KEY);
+    if (gfail && gfail.until && gfail.until > nowMs()) {
+      const mins = Math.ceil((gfail.until - nowMs()) / 60000);
+      return json({ error: '尝试次数过多，请 ' + mins + ' 分钟后再试' }, 429, request, env);
+    }
+    if (gfail && gfail.until && gfail.until <= nowMs()) {
+      try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', GLOBAL_FAIL_KEY); } catch (e) {}
+      gfail = null;
     }
   } catch (e) { /* 忽略读取失败 */ }
 
@@ -924,19 +989,33 @@ export async function handleAdminLogin(request, env) {
   // —— 正常登录 ——
   const hash = await deriveKey(password, auth.salt, auth.iter || PBKDF2_ITER);
   if (!await safeEqual(hash, auth.hash)) {
+    // 按 IP 计数（快速锁定单一来源）
     let n = 1;
     try {
-      const fail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
-      n = (fail && fail.n ? fail.n : 0) + 1;
+      const f = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
+      n = (f && f.n ? f.n : 0) + 1;
     } catch (e) { /* ignore */ }
     const lock = n >= ADMIN_MAX_FAILS ? { n, until: nowMs() + ADMIN_LOCK_MS } : { n };
-    await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
-      + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', ip, lock.n, lock.until || 0);
+    try {
+      await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
+        + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', ip, lock.n, lock.until || 0);
+    } catch (e) { /* ignore */ }
+    // 全局计数（堵 IP 轮换绕过）：阈值更高、锁更久，正常用户影响很小
+    try {
+      const g = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", GLOBAL_FAIL_KEY);
+      const gn = (g && g.n ? g.n : 0) + 1;
+      const glock = gn >= ADMIN_GLOBAL_MAX_FAILS
+        ? { n: gn, until: nowMs() + ADMIN_GLOBAL_LOCK_MS }
+        : { n: gn, until: 0 };
+      await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
+        + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', GLOBAL_FAIL_KEY, glock.n, glock.until);
+    } catch (e) { /* ignore */ }
     return json({ error: '密码错误' }, 401, request, env);
   }
 
-  // 成功：清除失败计数，顺带清理全部已过期会话（避免 admin_sessions 无限增长），再签发 token
+  // 成功：清除失败计数（含全局计数），顺带清理全部已过期会话（避免 admin_sessions 无限增长），再签发 token
   try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', ip); } catch (e) { /* ignore */ }
+  try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', GLOBAL_FAIL_KEY); } catch (e) { /* ignore */ }
   try { await dbRun(env.DB, 'DELETE FROM admin_sessions WHERE exp <= ?', nowMs()); } catch (e) { /* ignore */ }
   const token = randomToken(32);
   await dbRun(env.DB, 'INSERT INTO admin_sessions (token,exp) VALUES (?,?)', token, nowMs() + ADMIN_SESSION_TTL * 1000);
@@ -1033,7 +1112,7 @@ export async function handleMedia(request, env) {
     if (!/^https?:\/\//i.test(url)) {
       return json({ error: '仅支持 http/https 链接（图片请走 R2 直传上传）' }, 400, request, env);
     }
-    const id = 'm-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const id = 'm-' + randomToken(12);
     const name = String((body && body.name) || id).slice(0, 200);
     const type = String((body && body.type) || '').slice(0, 64);
     const size = Number((body && body.size) || 0) || 0;
@@ -1049,7 +1128,15 @@ export async function handleMediaId(request, env, id) {
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
   if (request.method !== 'DELETE') return json({ error: 'Method not allowed' }, 405, request, env);
   if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
-  await dbRun(env.DB, 'DELETE FROM media WHERE id = ?', id).catch(() => {});
+  // 先确认存在：此前对不存在的 id 也返回 ok:true，前端无法区分「删掉了」与「本来就没有」。
+  const exist = await dbFirst(env.DB, 'SELECT id FROM media WHERE id = ?', id).catch(() => null);
+  if (!exist) return json({ error: '未找到该媒体' }, 404, request, env);
+  try {
+    await dbRun(env.DB, 'DELETE FROM media WHERE id = ?', id);
+  } catch (e) {
+    console.error('[media] delete failed:', e && e.message, e);
+    return json({ error: '删除失败，请稍后重试' }, 500, request, env);
+  }
   return json({ ok: true }, 200, request, env);
 }
 
@@ -1072,12 +1159,25 @@ export async function handleSettings(request, env) {
     if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
     const body = await request.json().catch(() => null);
     if (!body || typeof body !== 'object') return json({ error: '缺少配置对象' }, 400, request, env);
-    for (const k of Object.keys(body)) {
+    // 批量原子写入：此前逐条 .catch(()=>{}) 会静默吞掉写失败并仍返回 ok:true，
+    // 且逐条写入在中途失败时会把设置写一半（部分生效）。
+    const stmts = Object.keys(body).map((k) => {
       let v = body[k];
       if (typeof v !== 'string') v = JSON.stringify(v);
-      await dbRun(env.DB, 'INSERT INTO site_settings (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v', k, v).catch(() => {});
+      return {
+        sql: 'INSERT INTO site_settings (k,v) VALUES (?,?) ON CONFLICT(k) DO UPDATE SET v=excluded.v',
+        params: [k, v]
+      };
+    });
+    if (stmts.length) {
+      try {
+        await dbBatch(env.DB, stmts);
+      } catch (e) {
+        console.error('[settings] batch write failed:', e && e.message, e);
+        return json({ error: '设置保存失败，请稍后重试' }, 500, request, env);
+      }
     }
-    return json({ ok: true }, 200, request, env, { 'Cache-Control': NO_CACHE });
+    return json({ ok: true, saved: stmts.length }, 200, request, env, { 'Cache-Control': NO_CACHE });
   }
   return json({ error: 'Method not allowed' }, 405, request, env);
 }

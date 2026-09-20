@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.6.6';
+var BLOG_VERSION = '2.7.0';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -4023,10 +4023,18 @@ function bindBackTop() {
 }
 function updateBackTop() {
   var bt = _backTopEl || document.querySelector('#backTop');
-  if (!bt || !bt.classList || !bt.classList.add) return;
   var y = (typeof window !== 'undefined' && typeof window.scrollY === 'number')
     ? window.scrollY
     : ((typeof window !== 'undefined' && typeof window.pageYOffset === 'number') ? window.pageYOffset : 0);
+  // 顶栏滚动阴影：页面下滚后给 body 打 .scrolled（style.css 据此加强顶栏投影）。
+  // 与回到顶部按钮共用同一个 rAF 节流的 scroll 处理器，不额外增加监听。
+  try {
+    var b = document.body;
+    if (b && b.classList) {
+      if (y > 8) b.classList.add('scrolled'); else b.classList.remove('scrolled');
+    }
+  } catch (e) { /* ignore */ }
+  if (!bt || !bt.classList || !bt.classList.add) return;
   if (y > 300) bt.classList.add('show'); else bt.classList.remove('show');
 }
 

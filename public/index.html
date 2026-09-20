@@ -98,12 +98,12 @@
       .boot-name { color: #a89b8e; }
     }
   </style>
-  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.6.6" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="style.min.css?v=2.6.6"></noscript>
+  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.7.0" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="style.min.css?v=2.7.0"></noscript>
   <!-- 字体策略：前台全部改走系统宋体/仿宋栈，不再加载任何 webfont，PageSpeed 网络负载大幅下降 -->
-  <script defer src="config.min.js?v=2.6.6"></script>
-  <script defer src="posts.min.js?v=2.6.6"></script>
-  <script defer src="i18n.min.js?v=2.6.6"></script>
+  <script defer src="config.min.js?v=2.7.0"></script>
+  <script defer src="posts.min.js?v=2.7.0"></script>
+  <script defer src="i18n.min.js?v=2.7.0"></script>
 </head>
 <body>
   <div id="app">
@@ -113,14 +113,14 @@
       <div class="boot-name">Qingyu'Blog · 加载中</div>
     </div>
   </div>
-  <script defer src="app.min.js?v=2.6.6"></script>
+  <script defer src="app.min.js?v=2.7.0"></script>
   <script>
   // 非首屏脚本改为「空闲/按需」加载：先保证首页渲染与核心交互，
   // 再在浏览器空闲时拉取播放器与背景动画；触屏设备默认不预载背景动画。
   (function () {
     function loadJs(src) {
       var s = document.createElement('script');
-      s.src = src + '?v=2.6.6';
+      s.src = src + '?v=2.7.0';
       s.defer = true;
       document.body.appendChild(s);
       return s;

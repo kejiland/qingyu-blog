@@ -713,3 +713,124 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-ai-result { border: 1px solid var(--ab-border); border-radius: var(--ab-radius-sm); background: var(--ab-card-solid); padding: 9px 11px; margin-top: 2px; }
 .ab-ai-result pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.6; max-height: 220px; overflow: auto; }
 .ab-ai-card { border: 1px solid var(--ab-border); border-left: 3px solid var(--ab-primary); border-radius: var(--ab-radius-sm); background: var(--ab-card-solid); padding: 13px 15px; }
+
+/* ============================================================
+ * 视觉精修层（后台）
+ * ------------------------------------------------------------
+ * 纯增量：统一交互反馈的时长/缓动，补齐 hover/active/focus 细节。
+ * 不改变任何既有布局与 DOM 结构。
+ * ============================================================ */
+
+/* ---------- 统一动效令牌 ---------- */
+:root {
+  --ab-dur-fast: .14s;
+  --ab-dur: .22s;
+  --ab-ease: cubic-bezier(.22, 1, .36, 1);
+}
+
+/* ---------- 侧栏导航：滑动指示条 + 悬浮位移 ---------- */
+.ab-nav-item {
+  position: relative;
+  transition: background var(--ab-dur-fast) var(--ab-ease),
+              color var(--ab-dur-fast) var(--ab-ease),
+              transform var(--ab-dur-fast) var(--ab-ease);
+}
+/* 活动项左侧指示条：从中间展开（比整块变色更精致） */
+.ab-nav-item::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  width: 3px; height: 0;
+  border-radius: 0 3px 3px 0;
+  background: var(--ab-primary);
+  transform: translateY(-50%);
+  transition: height var(--ab-dur) var(--ab-ease);
+}
+.ab-nav-item.active::before { height: 20px; }
+.ab-nav-item:not(.active):hover { transform: translateX(2px); }
+
+/* ---------- 卡片：悬浮浮起更细腻 ---------- */
+.ab-card {
+  transition: box-shadow var(--ab-dur) var(--ab-ease),
+              transform var(--ab-dur) var(--ab-ease),
+              border-color var(--ab-dur) var(--ab-ease);
+}
+.ab-card:hover { transform: translateY(-2px); }
+
+/* 统计卡：标签内的图标随卡片悬浮轻微放大，强化"活"的感觉。
+ * 注：实际 DOM 为 .ab-stat-label > svg（.ab-stat-ico 是历史遗留、已无 JS 引用）。 */
+.ab-stat .ab-stat-label svg { transition: transform var(--ab-dur) var(--ab-ease); }
+.ab-stat:hover .ab-stat-label svg { transform: scale(1.12); }
+
+/* ---------- 按钮：统一缓动与按下反馈 ---------- */
+.ab-btn {
+  transition: background var(--ab-dur-fast) var(--ab-ease),
+              border-color var(--ab-dur-fast) var(--ab-ease),
+              color var(--ab-dur-fast) var(--ab-ease),
+              box-shadow var(--ab-dur-fast) var(--ab-ease),
+              filter var(--ab-dur-fast) var(--ab-ease),
+              transform .1s var(--ab-ease);
+}
+.ab-btn:not(:disabled):hover { transform: translateY(-1px); }
+.ab-btn:not(:disabled):active { transform: translateY(0) scale(.98); }
+
+/* ---------- 表格：行 hover 左侧主题色提示条 ---------- */
+.ab-table tbody tr { position: relative; }
+.ab-table tbody tr td:first-child { position: relative; }
+.ab-table tbody tr td:first-child::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--ab-primary), color-mix(in srgb, var(--ab-primary) 45%, transparent));
+  opacity: 0;
+  transition: opacity var(--ab-dur-fast) var(--ab-ease);
+}
+.ab-table tbody tr:hover td:first-child::before { opacity: 1; }
+
+/* 行内操作按钮：统一缓动 */
+.ab-row-act {
+  transition: background var(--ab-dur-fast) var(--ab-ease),
+              color var(--ab-dur-fast) var(--ab-ease),
+              transform var(--ab-dur-fast) var(--ab-ease);
+}
+.ab-row-act:hover { transform: scale(1.08); }
+
+/* ---------- 表单控件：聚焦描边统一 ---------- */
+.ab-input, .ab-select, .ab-textarea {
+  transition: border-color var(--ab-dur-fast) var(--ab-ease),
+              box-shadow var(--ab-dur-fast) var(--ab-ease),
+              background-color var(--ab-dur-fast) var(--ab-ease);
+}
+
+/* ---------- 模态：入场动画 ---------- */
+.ab-modal-mask { animation: abMaskIn var(--ab-dur) var(--ab-ease); }
+@keyframes abMaskIn { from { opacity: 0; } to { opacity: 1; } }
+.ab-modal { animation: abModalIn var(--ab-dur) var(--ab-ease); }
+@keyframes abModalIn {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- Toast：入场动画 ---------- */
+.ab-toast { animation: abToastIn var(--ab-dur) var(--ab-ease); }
+@keyframes abToastIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- 图表柱：悬浮更明显的强调 ---------- */
+.ab-chart .bar { transition: opacity var(--ab-dur-fast) var(--ab-ease); }
+
+/* ---------- 动效降级（尊重系统偏好） ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .ab-root *, .ab-root *::before, .ab-root *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+  .ab-card:hover,
+  .ab-btn:not(:disabled):hover,
+  .ab-nav-item:not(.active):hover,
+  .ab-row-act:hover { transform: none !important; }
+}

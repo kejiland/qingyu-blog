@@ -23,6 +23,12 @@
   --accent-2: #e28a56;
   --accent-fg: #fff;
   --code-bg: #f3f0ea;
+  /* --text / --danger 语义别名：多处遗留代码引用了这两个名字，
+     但从未定义（var() 无回退值时整条声明失效 → 颜色落回继承值，
+     在深色模式下对比度不足）。这里显式补上，保持历史引用可用。 */
+  --text: var(--fg);
+  --danger: #c0392b;
+  --danger-soft: #fdeceb;
   --shadow: 0 1px 2px rgba(35, 32, 27, 0.05), 0 4px 14px rgba(35, 32, 27, 0.06);
   --shadow-hover: 0 2px 4px rgba(35, 32, 27, 0.06), 0 12px 28px rgba(35, 32, 27, 0.10);
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 24%, transparent);
@@ -71,6 +77,10 @@ html[data-theme="dark"] {
   --accent-2: #d97d4a;
   --accent-fg: #fff;
   --code-bg: #2a2621;
+  /* 深色模式下的语义别名（与浅色同源，仅跟随主题变量） */
+  --text: var(--fg);
+  --danger: #ff7b72;
+  --danger-soft: #3a2320;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 14px rgba(0, 0, 0, 0.35);
   --shadow-hover: 0 2px 5px rgba(0, 0, 0, 0.35), 0 14px 30px rgba(0, 0, 0, 0.45);
   --ring: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent);
@@ -3041,4 +3051,272 @@ html[data-theme="dark"] .smoji {
   --smoji-tab-ink: var(--fg, #fff) !important;
   --smoji-focus: var(--accent, #e08a63) !important;
   --smoji-accent: var(--accent, #e08a63) !important;
+}
+
+/* ============================================================
+ * 视觉精修层（Visual polish）
+ * ------------------------------------------------------------
+ * 纯增量美化：只增强质感与层次，不改变既有 DOM 结构与布局规则。
+ * 结构：
+ *   1. 设计令牌补充（圆角/时长/缓动/描边渐变）
+ *   2. 顶栏玻璃质感与滚动阴影
+ *   3. 文章卡片 / 缩略图 / 悬浮态精修
+ *   4. 按钮与表单控件统一质感
+ *   5. 评论区 / 精选 / 归档 / 标签 细节
+ *   6. 管理后台侧栏与内容区精修
+ *   7. 动效降级（prefers-reduced-motion）
+ * ============================================================ */
+
+/* ---------- 1. 设计令牌补充 ---------- */
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --dur-fast: 0.14s;
+  --dur: 0.22s;
+  --dur-slow: 0.36s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* 悬浮时的柔和浮起阴影（比 --shadow-hover 更细腻，双层扩散） */
+  --shadow-float:
+    0 1px 2px rgba(35, 32, 27, 0.04),
+    0 8px 20px -6px rgba(35, 32, 27, 0.10),
+    0 22px 44px -18px rgba(35, 32, 27, 0.12);
+  /* 卡片顶部内高光：模拟纸张受光，提升"书卷"质感 */
+  --card-sheen: linear-gradient(180deg, color-mix(in srgb, #fff 55%, transparent), transparent 42%);
+}
+html[data-theme="dark"] {
+  --shadow-float:
+    0 1px 2px rgba(0, 0, 0, 0.4),
+    0 10px 24px -8px rgba(0, 0, 0, 0.5),
+    0 26px 50px -20px rgba(0, 0, 0, 0.55);
+  --card-sheen: linear-gradient(180deg, color-mix(in srgb, #fff 6%, transparent), transparent 46%);
+}
+
+/* ---------- 2. 顶栏：更强玻璃质感 + 滚动后浮现阴影 ---------- */
+.topbar {
+  transition: box-shadow var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out);
+}
+/* app.js 在滚动时给 body 打 .scrolled；无该状态时也保持可见描边 */
+body.scrolled .topbar {
+  background: color-mix(in srgb, var(--bg) 78%, transparent);
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent),
+              0 6px 24px -12px rgba(35, 32, 27, 0.18);
+}
+html[data-theme="dark"] body.scrolled .topbar {
+  box-shadow: 0 1px 0 color-mix(in srgb, var(--border) 70%, transparent),
+              0 6px 24px -12px rgba(0, 0, 0, 0.6);
+}
+/* 品牌：hover 时主题色渐变文字，强化识别度 */
+.brand { transition: color var(--dur) var(--ease-out); }
+.brand:hover { color: var(--accent); }
+
+/* 导航项：底部指示条（当前页），比纯文字变色更清晰 */
+.main-nav .nav-link { position: relative; }
+.main-nav .nav-link::after {
+  content: '';
+  position: absolute;
+  left: 12px; right: 12px; bottom: 2px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transform: scaleX(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+.main-nav .nav-link:hover::after { transform: scaleX(0.55); opacity: 0.5; }
+.main-nav .nav-link.active::after { transform: scaleX(1); opacity: 1; }
+/* 含二级菜单的项已有 ▾ 标记，其下划线略收窄避免与箭头重叠 */
+.has-sub > .nav-link.active::after { right: 20px; }
+
+/* 顶栏圆形图标按钮：统一描边与悬浮态 */
+.icon-btn {
+  transition: background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.icon-btn:hover { transform: translateY(-1px); }
+.icon-btn:active { transform: translateY(0); }
+
+/* ---------- 3. 文章卡片精修 ---------- */
+/* 顶部内高光（纸张受光感）：用 ::before 叠加，不干扰既有 ::after 左侧色条 */
+.post-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--card-sheen);
+  opacity: 0.9;
+  pointer-events: none;
+}
+.post-card {
+  transition: transform var(--dur) var(--ease-out),
+              border-color var(--dur) var(--ease-out),
+              box-shadow var(--dur) var(--ease-out),
+              background-color var(--dur) var(--ease-out);
+}
+.post-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-float);
+}
+/* 左侧色条：hover 时从顶部滑入 */
+.post-card::after {
+  transform: translateY(-100%);
+  transition: transform var(--dur) var(--ease-out), opacity var(--dur) var(--ease-out);
+}
+.post-card:hover::after { transform: translateY(0); }
+
+/* 缩略图：hover 时轻微放大 + 描边染色 */
+.post-thumb { transition: border-color var(--dur) var(--ease-out); }
+.post-thumb img { transition: opacity var(--dur-slow) var(--ease-out), transform var(--dur-slow) var(--ease-out); }
+.post-card:hover .post-thumb { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+.post-card:hover .post-thumb img { transform: scale(1.045); }
+
+/* 卡片标题：hover 时主题色，字距微调更精致 */
+.post-card h2 { transition: color var(--dur-fast) var(--ease-out); }
+
+/* 标签胶囊：hover 时轻微上浮 */
+.post-card .mini-tags span { transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+.post-card .mini-tags span:hover { transform: translateY(-1px); }
+
+/* 空状态：加一个柔和图标底盘，避免大片留白显得荒芜 */
+.empty .big { display: inline-block; filter: saturate(0.9); }
+
+/* ---------- 4. 按钮统一质感 ---------- */
+.btn {
+  transition: background-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              box-shadow var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.btn:hover { transform: translateY(-1px); }
+.btn:active { transform: translateY(0); box-shadow: none; }
+/* 主按钮：渐变 + 悬浮时光晕 */
+.btn.primary, .btn-primary, .btn.primary-btn {
+  background-image: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 72%, var(--accent-2)));
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.btn.primary:hover, .btn-primary:hover, .btn.primary-btn:hover {
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+
+/* 翻页器：hover 描边染色 */
+.pager a, .pager button { transition: background-color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out); }
+
+/* ---------- 5. 内容细节 ---------- */
+/* 正文标题：层级更清晰（H2 左侧短色条） */
+.post-body h2, .md-body h2 { position: relative; }
+/* 评论输入区：聚焦时整体描边染色（表单容器级反馈） */
+.comment-form { transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.comment-form:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border));
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 8%, transparent);
+}
+/* 评论卡片：hover 上浮更轻微，避免长列表跳动 */
+.comment { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out); }
+
+/* 精选卡片：hover 时主题色描边 + 轻浮起 */
+.featured-card { transition: border-color var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out), transform var(--dur) var(--ease-out), background-color var(--dur) var(--ease-out); }
+.featured-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: var(--shadow-float);
+  transform: translateY(-2px);
+  background: color-mix(in srgb, var(--bg-soft) 80%, var(--accent-soft));
+}
+
+/* 归档月份标题：加一条渐变细线，强化时间轴感 */
+.archive-group h3 { position: relative; }
+
+/* 标签云：hover 上浮 + 描边 */
+.tag-cloud a, .tag-item {
+  transition: background-color var(--dur-fast) var(--ease-out),
+              border-color var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.tag-cloud a:hover, .tag-item:hover { transform: translateY(-2px); }
+
+/* ---------- 6. 管理后台精修 ---------- */
+/* 侧栏：更强的层次与悬浮提示 */
+.admin-nav-item {
+  transition: background var(--dur-fast) var(--ease-out),
+              color var(--dur-fast) var(--ease-out),
+              transform var(--dur-fast) var(--ease-out);
+}
+.admin-nav-item:hover { transform: translateX(2px); }
+.admin-nav-item.active::before { transition: height var(--dur) var(--ease-out); }
+/* 品牌徽章：渐变 + 柔和投影（已有，补 hover 亮度） */
+.admin-brand-badge { transition: transform var(--dur) var(--ease-out), box-shadow var(--dur) var(--ease-out); }
+.admin-sidebar-brand:hover .admin-brand-badge {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow: 0 4px 12px -3px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+/* 列表表格：行 hover 高亮更柔和 */
+.admin-table tbody tr { transition: background-color var(--dur-fast) var(--ease-out); }
+/* 统计卡：数字用等宽字形，避免位数变化时抖动 */
+.admin-stat b, .admin-stat strong, .stat-num { font-variant-numeric: tabular-nums; }
+
+/* 编辑器 / 预览双栏：聚焦栏高亮（写作时视线聚焦） */
+.editor-area:focus-within { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+
+/* 门禁（登录）卡片：更隆重的入场与徽章光晕 */
+.gate-card { animation: gateIn var(--dur-slow) var(--ease-out); }
+@keyframes gateIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.gate-badge {
+  position: relative;
+  transition: transform var(--dur) var(--ease-out);
+  box-shadow: 0 6px 18px -8px color-mix(in srgb, var(--accent) 60%, transparent);
+}
+.gate-badge::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  animation: gatePulse 3s var(--ease-in-out) infinite;
+}
+@keyframes gatePulse {
+  0%, 100% { transform: scale(1); opacity: 0.7; }
+  50%      { transform: scale(1.08); opacity: 0.25; }
+}
+.gate-form input { transition: border-color var(--dur-fast) var(--ease-out), box-shadow var(--dur-fast) var(--ease-out); }
+
+/* 模态（首次登录密码框）：入场动画 */
+.flp-modal { animation: flpIn var(--dur) var(--ease-out); }
+@keyframes flpIn {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ---------- 7. 动效降级 ----------
+ * 尊重系统「减少动态效果」偏好：关闭位移/缩放类动画，仅保留颜色过渡，
+ * 避免前庭敏感用户不适，同时不影响信息传达。 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .post-card:hover,
+  .featured-card:hover,
+  .btn:hover,
+  .icon-btn:hover,
+  .tag-cloud a:hover,
+  .tag-item:hover,
+  .admin-nav-item:hover { transform: none !important; }
+  .post-card:hover .post-thumb img { transform: none !important; }
+}
+
+/* 触屏设备：无 hover，去掉依赖 hover 的位移，避免点按后状态残留 */
+@media (hover: none) {
+  .post-card:hover { transform: none; }
+  .post-card:hover::after { transform: translateY(-100%); }
 }
