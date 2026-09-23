@@ -16,7 +16,7 @@
   --bg-soft: #f1efeb;
   --card: #ffffff;
   --fg: #23201b;
-  --muted: #7d776b;
+  --muted: #6b655c;
   --border: #e6e2da;
   --accent: #c25e3a;
   --accent-soft: #f6e6df;
@@ -2661,7 +2661,7 @@ textarea { resize: none; }
 .mp-root {
   --mp-bg: var(--card, #fff);
   --mp-fg: var(--fg, #23201b);
-  --mp-muted: var(--muted, #7d776b);
+  --mp-muted: var(--muted, #6b655c);
   --mp-border: var(--border, #e6e2da);
   --mp-accent: var(--accent, #c25e3a);
   --mp-soft: var(--accent-soft, #f6e6df);
@@ -3028,7 +3028,7 @@ textarea { resize: none; }
 .smoji {
   --smoji-surface: var(--card, #ffffff) !important;
   --smoji-ink: var(--fg, #23201b) !important;
-  --smoji-mute: var(--muted, #7d776b) !important;
+  --smoji-mute: var(--muted, #6b655c) !important;
   --smoji-border: var(--border, #e6e2da) !important;
   --smoji-subtle: var(--border, #e6e2da) !important;
   --smoji-shadow: 0 16px 48px rgba(35,32,27,0.10) !important;
