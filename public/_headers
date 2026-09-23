@@ -87,3 +87,13 @@
 
 /sitemap.xml
   Cache-Control: public, max-age=3600
+
+/.well-known/ard.json
+  Content-Type: application/json; charset=utf-8
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Origin: *
+
+/.well-known/ai-catalog.json
+  Content-Type: application/ai-catalog+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+  Access-Control-Allow-Origin: *

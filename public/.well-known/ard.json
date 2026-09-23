@@ -1,0 +1,102 @@
+{
+  "specVersion": "1.0",
+  "host": {
+    "displayName": "Qingyu'Blog",
+    "identifier": "https://www.2024921.xyz",
+    "documentationUrl": "https://docs.2024921.xyz/"
+  },
+  "entries": [
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:2024921.xyz:guide:overview",
+      "displayName": "Qingyu'Blog Site Guide",
+      "type": "text/plain",
+      "url": "https://www.2024921.xyz/llms.txt",
+      "description": "Machine-readable overview of Qingyu'Blog, its key pages, features, and public feeds.",
+      "tags": [
+        "blog",
+        "documentation",
+        "site-guide",
+        "llms-txt"
+      ],
+      "capabilities": [
+        "SiteOverview",
+        "DocumentationIndex"
+      ],
+      "representativeQueries": [
+        "What is Qingyu'Blog about?",
+        "Which pages and resources are available on Qingyu'Blog?",
+        "Give me a concise overview of the Qingyu'Blog site."
+      ]
+    },
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:2024921.xyz:feed:articles",
+      "displayName": "Qingyu'Blog Article Feed",
+      "type": "application/rss+xml",
+      "url": "https://www.2024921.xyz/feed.xml",
+      "description": "RSS feed containing recent public articles published on Qingyu'Blog.",
+      "tags": [
+        "blog",
+        "articles",
+        "rss",
+        "feed"
+      ],
+      "capabilities": [
+        "LatestArticles",
+        "ArticleFeed"
+      ],
+      "representativeQueries": [
+        "What are the latest articles on Qingyu'Blog?",
+        "Get the newest blog posts from Qingyu'Blog.",
+        "Find recent updates from the Qingyu'Blog RSS feed."
+      ]
+    },
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:2024921.xyz:index:sitemap",
+      "displayName": "Qingyu'Blog Sitemap",
+      "type": "application/xml",
+      "url": "https://www.2024921.xyz/sitemap.xml",
+      "description": "XML sitemap listing the canonical public pages and published articles on Qingyu'Blog.",
+      "tags": [
+        "blog",
+        "sitemap",
+        "pages",
+        "articles"
+      ],
+      "capabilities": [
+        "CanonicalPageIndex",
+        "ArticleIndex"
+      ],
+      "representativeQueries": [
+        "List the public pages indexed by Qingyu'Blog.",
+        "Where can I find all published Qingyu'Blog URLs?",
+        "Discover the site structure of Qingyu'Blog."
+      ]
+    },
+    {
+      "@context": "https://agenticresourcediscovery.org/context/v1",
+      "identifier": "urn:air:2024921.xyz:api:posts",
+      "displayName": "Qingyu'Blog Posts API",
+      "type": "application/json",
+      "url": "https://www.2024921.xyz/api/posts",
+      "description": "Read-only JSON endpoint returning the public article list, including metadata and search fields; protected and encrypted posts are excluded.",
+      "tags": [
+        "blog",
+        "articles",
+        "json-api",
+        "public-content"
+      ],
+      "capabilities": [
+        "ListArticles",
+        "BrowseArticles"
+      ],
+      "representativeQueries": [
+        "List the public articles published on Qingyu'Blog.",
+        "Find article metadata from Qingyu'Blog.",
+        "Browse the available posts on Qingyu'Blog."
+      ]
+    }
+  ]
+}

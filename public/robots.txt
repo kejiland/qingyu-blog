@@ -4,4 +4,6 @@ Disallow: /admin
 Disallow: /write
 Disallow: /posts/*/edit
 
+Agentmap: https://www.2024921.xyz/.well-known/ard.json
+
 Sitemap: https://www.2024921.xyz/sitemap.xml

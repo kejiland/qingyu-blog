@@ -29,5 +29,7 @@
 
 - 仓库：https://github.com/kejiland/qingyu-blog
 - 文档：https://docs.2024921.xyz/
+- ARD 清单：https://www.2024921.xyz/.well-known/ard.json
+- AI Catalog（兼容）：https://www.2024921.xyz/.well-known/ai-catalog.json
 - Sitemap：https://www.2024921.xyz/sitemap.xml
 - RSS：https://www.2024921.xyz/feed.xml
