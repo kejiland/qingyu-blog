@@ -22,6 +22,7 @@ const files = [
   ['bg-anim.js', 'bg-anim.min.js', 'js'],
   ['admin.js', 'admin.min.js', 'js'],
   ['style.css', 'style.min.css', 'css'],
+  ['music-player.css', 'music-player.min.css', 'css'],
   ['admin.css', 'admin.min.css', 'css'],
 ];
 

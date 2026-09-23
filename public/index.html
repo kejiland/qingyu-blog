@@ -74,6 +74,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'><path d='M73.44768 958.112526S286.575881 57.38067 917.281057 2.410953c0 0-20.734192 341.390875-202.03782 479.297358 0 0-33.753335 45.808098 73.292956 31.824573 0 0-12.536953 153.336579-201.555629 192.8762 0 0-28.93143 28.93143 54.969717 31.824573 0 0-88.723052 137.424293-311.977254 63.649146 0 0 89.687433-216.985725 165.391341-289.3143a2209.396876 2209.396876 0 0 0-385.7524 431.078308s-15.430096 35.199907-36.164288 14.465715z' fill='%239B9A9A'/></svg>">
   <style>
     /* 首屏加载动画：在 app.js 接管前显示，主题色与暖色调一致 */
+    .mp-root { display: none; }
     .boot-load {
       position: fixed; inset: 0;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
@@ -101,8 +102,8 @@
       .boot-name { color: #a89b8e; }
     }
   </style>
-  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.7.1" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="style.min.css?v=2.7.1"></noscript>
+  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.7.2" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="style.min.css?v=2.7.2"></noscript>
   <!-- 字体策略：前台全部改走系统宋体/仿宋栈，不再加载任何 webfont，PageSpeed 网络负载大幅下降 -->
   <script defer src="config.min.js?v=2.7.0"></script>
   <script defer src="posts.min.js?v=2.7.0"></script>
@@ -128,6 +129,13 @@
       document.body.appendChild(s);
       return s;
     }
+    function loadCss(href) {
+      var l = document.createElement('link');
+      l.rel = 'stylesheet';
+      l.href = href + '?v=2.7.0';
+      document.head.appendChild(l);
+      return l;
+    }
     function idle(fn) {
       try {
         if ('requestIdleCallback' in window) { requestIdleCallback(fn, { timeout: 2500 }); return; }
@@ -142,7 +150,7 @@
     var p = '';
     try { p = location.pathname || ''; } catch (e) {}
     if (p.indexOf('/admin') !== 0 && p !== '/write' && !/^\/posts\/[^/]+\/(edit)$/.test(p)) {
-      idle(function () { loadJs('music-player.min.js'); });
+      idle(function () { loadCss('music-player.min.css'); loadJs('music-player.min.js'); });
     }
   })();
   </script>

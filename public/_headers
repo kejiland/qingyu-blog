@@ -36,6 +36,12 @@
 /music-player.min.js*
   Cache-Control: public, max-age=31536000, immutable
 
+/music-player.css*
+  Cache-Control: public, max-age=31536000, immutable
+
+/music-player.min.css*
+  Cache-Control: public, max-age=31536000, immutable
+
 /bg-anim.js*
   Cache-Control: public, max-age=31536000, immutable
 
