@@ -893,6 +893,56 @@ tests.push(['安全加固：媒体 URL 白名单 / clientIp 忽略伪造 XFF / �
   assert.ok(String(resp.headers.get('Referrer-Policy') || '') === 'strict-origin-when-cross-origin', 'Referrer-Policy');
 }]);
 
+tests.push(['R2 直传：预签名 Content-Length 使用真实文件大小（媒体 / 音乐）', async () => {
+  const media = await import('./functions/_lib/media.js');
+  const music = await import('./functions/_lib/music.js');
+  const env = Object.assign(mockEnv(), {
+    BLOG_WRITE_TOKEN: 'upload-test-token',
+    R2_ACCESS_KEY_ID: 'test-access-key',
+    R2_SECRET_ACCESS_KEY: 'test-secret-key',
+    R2_ENDPOINT: 'https://account.r2.cloudflarestorage.com',
+    R2_BUCKET: 'test-music',
+    R2_PUBLIC_BASE: 'https://music.example.com',
+    R2_MEDIA_BUCKET: 'test-media',
+    R2_MEDIA_PUBLIC_BASE: 'https://media.example.com'
+  });
+  const RealDate = global.Date;
+  const realRandom = Math.random;
+  const fixedNow = new RealDate('2026-09-24T00:00:00.000Z');
+  global.Date = class extends RealDate {
+    constructor(...args) { super(...(args.length ? args : [fixedNow])); }
+    static now() { return fixedNow.getTime(); }
+  };
+  Math.random = () => 0.123456789;
+
+  const uploadUrl = async (handler, filename, size) => {
+    const response = await handler(new Request('http://t/api/upload-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer upload-test-token' },
+      body: JSON.stringify({ filename, size })
+    }), env);
+    assert.strictEqual(response.status, 200);
+    const data = await response.json();
+    return new URL(data.uploadUrl);
+  };
+  const signature = (url) => url.searchParams.get('X-Amz-Signature');
+
+  try {
+    const mediaSmall = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 12345);
+    const mediaLarge = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 67890);
+    assert.strictEqual(mediaSmall.searchParams.get('X-Amz-SignedHeaders'), 'content-length;host');
+    assert.notStrictEqual(signature(mediaSmall), signature(mediaLarge), '媒体上传签名随真实文件大小变化');
+
+    const musicSmall = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 12345);
+    const musicLarge = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 67890);
+    assert.strictEqual(musicSmall.searchParams.get('X-Amz-SignedHeaders'), 'content-length;host');
+    assert.notStrictEqual(signature(musicSmall), signature(musicLarge), '音乐上传签名随真实文件大小变化');
+  } finally {
+    global.Date = RealDate;
+    Math.random = realRandom;
+  }
+}]);
+
 tests.push(['写作页：字数统计 / 保存状态 / 快捷键提示齐全', async () => {
   const w = await bootWrite({ 'window.BLOG_CONFIG': { mode: 'static', adminPwd: 't' } });
   assert.ok(w.html.includes('wordCount'), '字数统计元素');

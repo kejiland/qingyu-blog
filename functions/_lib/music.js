@@ -56,15 +56,14 @@ async function signS3(env, method, path, canonicalQuery, canonicalHeaders, signe
 }
 /** 生成 R2 S3 兼容的预签名 PUT URL（有效期 1 小时，UNSIGNED-PAYLOAD）
  *  bucket 可选：缺省用 env.R2_BUCKET（音乐桶）；媒体桶传入独立 bucket 名（如 qingyu-media）
- *  maxBytes 可选：把 Content-Length 纳入签名。此前只签 host，R2 无法校验上传体积，
- *  客户端把 body.size 报成 1 字节即可 PUT 任意大小的对象（体积限制形同虚设）。
- *  纳入签名后 R2 会在边缘按签名中的 content-length 校验，超限直接拒绝。 */
-export async function presignPut(env, key, expiresSec, bucket, maxBytes) {
+ *  contentLength 可选：把真实 Content-Length 纳入签名。R2 会要求请求头与该值完全一致，
+ *  因此调用方必须先校验大小上限，再传入声明的文件大小；客户端谎报大小或超限都会被拒绝。 */
+export async function presignPut(env, key, expiresSec, bucket, contentLength) {
   expiresSec = expiresSec || 3600;
   const b = bucket || env.R2_BUCKET;
   const p = await r2SignParams(env);
   const path = '/' + b + '/' + key;
-  const hasLen = Number.isFinite(Number(maxBytes)) && Number(maxBytes) > 0;
+  const hasLen = Number.isFinite(Number(contentLength)) && Number(contentLength) > 0;
   const qp = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
     'X-Amz-Credential': env.R2_ACCESS_KEY_ID + '/' + p.scope,
@@ -76,7 +75,7 @@ export async function presignPut(env, key, expiresSec, bucket, maxBytes) {
     .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(qp[k]); })
     .join('&');
   const canonicalHeaders = hasLen
-    ? 'content-length:' + String(Number(maxBytes)) + '\n' + 'host:' + p.host + '\n'
+    ? 'content-length:' + String(Number(contentLength)) + '\n' + 'host:' + p.host + '\n'
     : 'host:' + p.host + '\n';
   const s = await signS3(env, 'PUT', path, canonicalQuery, canonicalHeaders, qp['X-Amz-SignedHeaders']);
   return p.endpoint + path + '?' + canonicalQuery + '&X-Amz-Signature=' + s.signature;
@@ -213,8 +212,8 @@ export async function handleMusicUploadUrl(request, env) {
 
   const key = 'music/' + randomId() + '.' + ext;
   const contentType = AUDIO_EXTS[ext];
-  // 把 Content-Length 纳入签名：R2 在边缘拒绝超长 PUT，防止谎报 size 直传超大对象。
-  const uploadUrl = await presignPut(env, key, 3600, null, MAX_SIZE);
+  // 签名必须使用真实文件大小；若固定签 MAX_SIZE，正常文件会因请求头不匹配而被 R2 拒绝。
+  const uploadUrl = await presignPut(env, key, 3600, null, size);
   const publicBase = String(env.R2_PUBLIC_BASE || '').replace(/\/+$/, '');
   const publicUrl = publicBase ? publicBase + '/' + key : '';
 
