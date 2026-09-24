@@ -669,7 +669,7 @@ A manual trigger runs an extra `wrangler whoami` step, which makes credential pr
 | Order | Step | Typical reason for failure |
 | --- | --- | --- |
 | 1 | Checkout + Setup Node 24 + install wrangler (`3.90.0` by default; `4.x` when `BLOG_RATE_LIMIT_BINDING` is set) | — |
-| 2 | Run three test suites: `smoke-test.js`(77) / `gb-verify.js`(18) / `search-verify.js`(13) | You broke the code; after a test failure the workflow **does not** proceed to the deploy |
+| 2 | Run three test suites: `smoke-test.js`(78) / `gb-verify.js`(18) / `search-verify.js`(13) | You broke the code; after a test failure the workflow **does not** proceed to the deploy |
 | 3 | Validate that the required Secrets are all present | They were put under Variables, the name is misspelt, or the value has leading/trailing spaces |
 | 4 | Validate `BLOG_KV_ID` (32 hexadecimal characters) and `BLOG_D1_ID` (UUID), replace the `{env.*}` placeholders with the real values and generate `wrangler.workers.ci.toml` | A database name was used, or the two kinds of ID were mixed up |
 | 5 | Run the D1 migrations in `migrations/*.sql` order (three-layer idempotency protection) | The token lacks the D1 permission, or the D1 ID is wrong |

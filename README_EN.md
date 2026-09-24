@@ -169,7 +169,7 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 Push to `main` (or run the workflow manually) and GitHub Actions will:
 
 1. ✅ Install the Wrangler CLI
-2. ✅ Run three test suites (`smoke-test.js` 77 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
+2. ✅ Run three test suites (`smoke-test.js` 78 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
 3. ✅ Validate the required secrets and ID formats
 4. ✅ Apply D1 migrations (three-layer idempotency: `schema_migrations` ledger + column pre-check + tolerant error matching)
 5. ✅ Deploy the Worker
@@ -376,7 +376,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 ├── index.html                         # Root redirect (opens public/index.html)
 ├── wrangler.toml                      # Cloudflare Pages config
 ├── wrangler.workers.toml              # Cloudflare Workers config (used for deploys)
-├── smoke-test.js                      # Smoke tests (77 cases)
+├── smoke-test.js                      # Smoke tests (78 cases)
 ├── gb-verify.js                       # Guestbook verification (18 cases)
 ├── search-verify.js                   # Search verification (13 cases)
 ├── README.md                          # 中文说明
@@ -614,7 +614,7 @@ The step-by-step dashboard walkthrough is in section 9 of the **[Cloudflare setu
 ## 🧪 Tests
 
 ```bash
-node smoke-test.js      # Smoke tests: 77 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
+node smoke-test.js      # Smoke tests: 78 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
 node gb-verify.js       # Guestbook verification: 18 cases
 node search-verify.js   # Search verification: 13 cases
 ```

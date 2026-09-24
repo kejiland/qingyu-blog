@@ -153,7 +153,7 @@ npx wrangler kv namespace create BLOG
 推送代码或手动运行 Actions，工作流会自动：
 
 1. ✅ 安装 Wrangler CLI
-2. ✅ 运行三套测试（`smoke-test.js` 77 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
+2. ✅ 运行三套测试（`smoke-test.js` 78 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
 3. ✅ 校验必要 Secrets 与 ID 格式
 4. ✅ 执行 D1 迁移（`schema_migrations` 记账表 + 列预检 + 报错兜底，三层幂等）
 5. ✅ 部署 Worker 到 Cloudflare
@@ -360,7 +360,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── index.html                         # 根跳转页（自动跳 public/index.html）
 ├── wrangler.toml                      # Cloudflare Pages 配置
 ├── wrangler.workers.toml              # Cloudflare Workers 配置（部署使用）
-├── smoke-test.js                      # 冒烟测试（77 例）
+├── smoke-test.js                      # 冒烟测试（78 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
 ├── search-verify.js                   # 搜索专项验证（13 例）
 ├── README.md                          # 中文说明（本文件）
@@ -597,7 +597,7 @@ window.BLOG_CONFIG = {
 ## 🧪 测试
 
 ```bash
-node smoke-test.js      # 冒烟测试 77 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
+node smoke-test.js      # 冒烟测试 78 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
 node gb-verify.js       # 留言板专项验证 18 例
 node search-verify.js   # 搜索专项验证 13 例
 ```

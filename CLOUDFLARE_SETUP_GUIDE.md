@@ -669,7 +669,7 @@ git push origin main
 | 顺序 | 步骤 | 失败的典型原因 |
 | --- | --- | --- |
 | 1 | Checkout + Setup Node 24 + 安装 wrangler（默认 `3.90.0`；配了 `BLOG_RATE_LIMIT_BINDING` 时改用 `4.x`） | — |
-| 2 | 跑三套测试：`smoke-test.js`(77) / `gb-verify.js`(18) / `search-verify.js`(13) | 代码改坏了；测试失败**不会**继续部署 |
+| 2 | 跑三套测试：`smoke-test.js`(78) / `gb-verify.js`(18) / `search-verify.js`(13) | 代码改坏了；测试失败**不会**继续部署 |
 | 3 | 校验必要的 Secrets 是否齐全 | 填到了 Variables、名称拼错、值前后有空格 |
 | 4 | 校验 `BLOG_KV_ID`（32 位十六进制）与 `BLOG_D1_ID`（UUID），并把 `{env.*}` 占位符替换成真实值，生成 `wrangler.workers.ci.toml` | 填成了数据库名 / 混用了两种 ID |
 | 5 | 按 `migrations/*.sql` 顺序执行 D1 迁移（三层幂等保护） | Token 缺 D1 权限、D1 ID 填错 |
