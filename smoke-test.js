@@ -893,7 +893,7 @@ tests.push(['安全加固：媒体 URL 白名单 / clientIp 忽略伪造 XFF / �
   assert.ok(String(resp.headers.get('Referrer-Policy') || '') === 'strict-origin-when-cross-origin', 'Referrer-Policy');
 }]);
 
-tests.push(['R2 直传：预签名 Content-Length 使用真实文件大小（媒体 / 音乐）', async () => {
+tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', async () => {
   const media = await import('./functions/_lib/media.js');
   const music = await import('./functions/_lib/music.js');
   const env = Object.assign(mockEnv(), {
@@ -928,15 +928,16 @@ tests.push(['R2 直传：预签名 Content-Length 使用真实文件大小（媒
   const signature = (url) => url.searchParams.get('X-Amz-Signature');
 
   try {
-    const mediaSmall = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 12345);
-    const mediaLarge = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 67890);
-    assert.strictEqual(mediaSmall.searchParams.get('X-Amz-SignedHeaders'), 'content-length;host');
-    assert.notStrictEqual(signature(mediaSmall), signature(mediaLarge), '媒体上传签名随真实文件大小变化');
+    const mediaUpload = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 12345);
+    assert.strictEqual(mediaUpload.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
 
-    const musicSmall = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 12345);
-    const musicLarge = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 67890);
-    assert.strictEqual(musicSmall.searchParams.get('X-Amz-SignedHeaders'), 'content-length;host');
-    assert.notStrictEqual(signature(musicSmall), signature(musicLarge), '音乐上传签名随真实文件大小变化');
+    const musicUpload = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 12345);
+    assert.strictEqual(musicUpload.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
+
+    const key = 'media/fixed-object.png';
+    const pngUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/png'));
+    const jpegUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/jpeg'));
+    assert.notStrictEqual(signature(pngUrl), signature(jpegUrl), '同一对象使用不同 Content-Type 时签名必须变化');
   } finally {
     global.Date = RealDate;
     Math.random = realRandom;

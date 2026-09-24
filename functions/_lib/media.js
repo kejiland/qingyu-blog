@@ -67,8 +67,7 @@ export async function handleMediaUploadUrl(request, env) {
 
   const key = 'media/' + randomId() + '.' + ext;
   const contentType = IMAGE_EXTS[ext];
-  // 签名必须使用真实文件大小；固定签上限会让所有非上限大小的图片因请求头不匹配而被 R2 拒绝。
-  const uploadUrl = await presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, size);
+  const uploadUrl = await presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, contentType);
   const publicBase = String(env.R2_MEDIA_PUBLIC_BASE || '').replace(/\/+$/, '');
   const publicUrl = publicBase ? publicBase + '/' + key : '';
 
