@@ -8,9 +8,11 @@
  * 环境变量（wrangler secret / CI secret）：
  *   · R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY / R2_ENDPOINT
  *       （Cloudflare 控制台 → R2 → 管理 API 令牌，S3 兼容凭据）
- *   · R2_BUCKET        存储桶名（如 qingyu-music）
- *   · R2_PUBLIC_BASE   公开读取基址（桶绑定的自定义域名，如
- *       https://music.example.com；末尾不带斜杠）
+ *   · R2_BUCKET / R2_PUBLIC_BASE
+ *       音乐专用桶名 + 公开读取基址（如 https://music.example.com；末尾不带斜杠）
+ *   · R2_MEDIA_BUCKET / R2_MEDIA_PUBLIC_BASE
+ *       可选：媒体桶。若当前 R2 凭据只对媒体桶有写权限，音乐对象会优先写入媒体桶，
+ *       公开地址使用媒体域名；未配置时回退 R2_BUCKET / R2_PUBLIC_BASE。
  * 降级：未配置 R2 凭据时，读取播放列表仍可用（D1），上传返回 503。
  * ============================================================ */
 import { getCorsHeaders, json, corsPreflight, isWriteAuthed, unauthorized, dbAll, dbFirst, dbRun } from './api-core.js';
@@ -65,7 +67,7 @@ async function signS3(env, method, path, canonicalQuery, canonicalHeaders, signe
   return { params: p, signature };
 }
 /** 生成 R2 S3 兼容的预签名 PUT URL（有效期 1 小时，UNSIGNED-PAYLOAD）
- *  bucket 可选：缺省用 env.R2_BUCKET（音乐桶）；媒体桶传入独立 bucket 名（如 qingyu-media）
+ *  bucket 可选：缺省用 env.R2_BUCKET；媒体桶传入独立 bucket 名（如 qingyu-media）
  *  contentType 可选：把 Content-Type 纳入签名，防止上传后被改写为其他 MIME 类型。
  *  Content-Length 由浏览器自动生成，不能纳入签名；规范化差异会导致 R2 返回无 CORS 头的 403。 */
 export async function presignPut(env, key, expiresSec, bucket, contentType) {
@@ -99,10 +101,29 @@ export async function presignPut(env, key, expiresSec, bucket, contentType) {
 const AUDIO_EXTS = { mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', oga: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac', opus: 'audio/ogg', flac: 'audio/flac' };
 const MAX_SIZE = 30 * 1024 * 1024; // 单曲 ≤ 30MB
 
+function trimBase(value) {
+  return String(value || '').replace(/\/+$/, '');
+}
+function originOf(value) {
+  try { return new URL(trimBase(value)).origin; } catch (e) { return ''; }
+}
+/** 音乐上传存储：媒体桶可用时优先使用，避免共享凭据缺少音乐桶写权限导致上传失败。 */
+function musicStorage(env) {
+  const mediaBucket = String((env && env.R2_MEDIA_BUCKET) || '').trim();
+  const mediaBase = trimBase(env && env.R2_MEDIA_PUBLIC_BASE);
+  if (mediaBucket && mediaBase) {
+    return { bucket: mediaBucket, publicBase: mediaBase, origin: originOf(mediaBase) };
+  }
+  const bucket = String((env && env.R2_BUCKET) || '').trim();
+  const publicBase = trimBase(env && env.R2_PUBLIC_BASE);
+  return { bucket: bucket, publicBase: publicBase, origin: originOf(publicBase) };
+}
+
 function r2Configured(env) {
   // 同时要求 PUBLIC_BASE：否则签发得出上传 URL 却拼不出 publicUrl，
   // 上传完成后无法登记有效地址，只在桶里留下孤儿对象。
-  return !!(env && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT && env.R2_BUCKET && env.R2_PUBLIC_BASE);
+  const storage = musicStorage(env);
+  return !!(env && env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT && storage.bucket && storage.publicBase);
 }
 function randomId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -143,22 +164,31 @@ export async function r2DeleteObject(env, key, bucket) {
   }
   return true;
 }
-/** 从公开 URL 提取对象 key（仅本站 music/ 前缀的上传对象；外链返回空串不删）。
- *  env 可选：传入后会校验 URL 的 origin 必须等于配置的 R2_PUBLIC_BASE，
- *  否则 `https://evil.example/music/xxx` 这类外链也会被当成桶内对象去签删除请求
- *  （删的是**我们自己的桶**里同名 key）。 */
-export function extractR2Key(publicUrl, env) {
+/** 解析本站音乐对象：返回对象 key 与所属桶，外链返回 null。
+ *  同时识别媒体桶与音乐桶公开域名，兼容切换上传目标前后的历史记录。 */
+export function resolveR2Object(publicUrl, env) {
   try {
     const u = new URL(String(publicUrl || ''));
-    const base = String((env && env.R2_PUBLIC_BASE) || '').replace(/\/+$/, '');
-    if (base) {
-      let baseOrigin = '';
-      try { baseOrigin = new URL(base).origin; } catch (e) { baseOrigin = ''; }
-      if (baseOrigin && u.origin !== baseOrigin) return '';
+    if (u.pathname.indexOf('/music/') !== 0) return null;
+    const key = u.pathname.slice(1);
+    const candidates = [];
+    const mediaBucket = String((env && env.R2_MEDIA_BUCKET) || '').trim();
+    const mediaOrigin = originOf(env && env.R2_MEDIA_PUBLIC_BASE);
+    if (mediaBucket && mediaOrigin) candidates.push({ bucket: mediaBucket, origin: mediaOrigin });
+    const musicBucket = String((env && env.R2_BUCKET) || '').trim();
+    const musicOrigin = originOf(env && env.R2_PUBLIC_BASE);
+    if (musicBucket && musicOrigin) candidates.push({ bucket: musicBucket, origin: musicOrigin });
+    if (!candidates.length) return { key: key, bucket: '' };
+    for (let i = 0; i < candidates.length; i++) {
+      if (u.origin === candidates[i].origin) return { key: key, bucket: candidates[i].bucket };
     }
-    if (u.pathname.indexOf('/music/') === 0) return u.pathname.slice(1);
   } catch (e) { /* ignore */ }
-  return '';
+  return null;
+}
+/** 从公开 URL 提取对象 key（兼容旧调用；仅本站 music/ 前缀，外链返回空串不删）。 */
+export function extractR2Key(publicUrl, env) {
+  const object = resolveR2Object(publicUrl, env);
+  return object ? object.key : '';
 }
 function normalizeTrack(row) {
   return {
@@ -226,9 +256,9 @@ export async function handleMusicUploadUrl(request, env) {
 
   const key = 'music/' + randomId() + '.' + ext;
   const contentType = AUDIO_EXTS[ext];
-  const uploadUrl = await presignPut(env, key, 3600, null, contentType);
-  const publicBase = String(env.R2_PUBLIC_BASE || '').replace(/\/+$/, '');
-  const publicUrl = publicBase ? publicBase + '/' + key : '';
+  const storage = musicStorage(env);
+  const uploadUrl = await presignPut(env, key, 3600, storage.bucket, contentType);
+  const publicUrl = storage.publicBase ? storage.publicBase + '/' + key : '';
 
   return json({ ok: true, uploadUrl, publicUrl, key, contentType, expiresIn: 3600 }, 200, request, env, { 'Cache-Control': 'no-store' });
 }
@@ -264,10 +294,10 @@ export async function handleMusicId(request, env, id) {
     // 与 R2 同步删除：先删对象，成功后再删元数据（避免留下孤儿对象/幽灵曲目）
     const row = await dbFirst(env.DB, 'SELECT url FROM music WHERE id = ?', id);
     if (row && row.url) {
-      const key = extractR2Key(row.url, env);
-      if (key && r2Configured(env)) {
+      const object = resolveR2Object(row.url, env);
+      if (object && object.key && object.bucket && r2Configured(env)) {
         try {
-          await r2DeleteObject(env, key);
+          await r2DeleteObject(env, object.key, object.bucket);
         } catch (e) {
           return json({ error: 'R2 对象删除失败，请稍后重试' }, 502, request, env, { 'Cache-Control': 'no-store' });
         }

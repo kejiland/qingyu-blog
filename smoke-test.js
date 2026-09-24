@@ -915,7 +915,7 @@ tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', asy
   };
   Math.random = () => 0.123456789;
 
-  const uploadUrl = async (handler, filename, size) => {
+  const uploadResult = async (handler, filename, size) => {
     const response = await handler(new Request('http://t/api/upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer upload-test-token' },
@@ -923,16 +923,22 @@ tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', asy
     }), env);
     assert.strictEqual(response.status, 200);
     const data = await response.json();
-    return new URL(data.uploadUrl);
+    return { url: new URL(data.uploadUrl), data: data };
   };
   const signature = (url) => url.searchParams.get('X-Amz-Signature');
 
   try {
-    const mediaUpload = await uploadUrl(media.handleMediaUploadUrl, 'photo.png', 12345);
-    assert.strictEqual(mediaUpload.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
+    const mediaUpload = await uploadResult(media.handleMediaUploadUrl, 'photo.png', 12345);
+    assert.strictEqual(mediaUpload.url.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
 
-    const musicUpload = await uploadUrl(music.handleMusicUploadUrl, 'song.mp3', 12345);
-    assert.strictEqual(musicUpload.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
+    const musicUpload = await uploadResult(music.handleMusicUploadUrl, 'song.mp3', 12345);
+    assert.strictEqual(musicUpload.url.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
+    assert.ok(musicUpload.url.pathname.startsWith('/test-media/music/'), '媒体桶可用时音乐应写入媒体桶：' + musicUpload.url.pathname);
+    assert.ok(musicUpload.data.publicUrl.startsWith('https://media.example.com/music/'), '音乐公开地址应使用媒体域名：' + musicUpload.data.publicUrl);
+
+    assert.strictEqual(music.extractR2Key('https://media.example.com/music/new.mp3', env), 'music/new.mp3');
+    assert.strictEqual(music.extractR2Key('https://music.example.com/music/old.mp3', env), 'music/old.mp3');
+    assert.strictEqual(music.extractR2Key('https://evil.example/music/foreign.mp3', env), '');
 
     const key = 'media/fixed-object.png';
     const pngUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/png'));
