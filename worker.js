@@ -202,6 +202,16 @@ export default {
           const realBody = await realRes.text().catch(() => '');
           try { await r2DeleteObject(env, realKey, null); } catch (e) {}
           signedRoundTrip.musicPrefixProbe = { putStatus: realRes.status, putBody: realBody.slice(0, 300) };
+          // 对照：音乐桶不签 content-type 的 PUT（SignedHeaders 仅 host）。
+          // 若同样 403 AccessDenied → 与 content-type/签名头无关，是桶级写入权限；
+          // 若变 200 → 说明是带 content-type 的签名头被 R2 拒绝。
+          const noCtUrl = await presignPut(env, 'music/_diag/noct-' + Date.now() + '.txt', 300, null, '');
+          const noCtRes = await fetch(noCtUrl, { method: 'PUT', body: 'diag' });
+          signedRoundTrip.musicNoContentTypeProbe = {
+            putStatus: noCtRes.status,
+            signedHeaders: (() => { try { return new URL(noCtUrl).searchParams.get('X-Amz-SignedHeaders'); } catch (e) { return ''; } })(),
+            putBody: (await noCtRes.text().catch(() => '')).slice(0, 300)
+          };
           // 同一凭据对媒体桶也测一次：区分「整个令牌无写权限」与「仅音乐桶权限特殊」
           if (env.R2_MEDIA_BUCKET) {
             const mk = 'media/_diag/probe-' + Date.now() + '.txt';
