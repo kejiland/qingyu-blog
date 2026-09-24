@@ -326,7 +326,7 @@
   "admin.music.uploading": "Uploading…",
   "admin.music.uploadOk": "Uploaded",
   "admin.music.uploadFail": "Upload failed",
-  "admin.music.putFail": "Upload failed: check the R2 bucket CORS policy (allow PUT and content-type header from your site domain) and your network",
+  "admin.music.putFail": "R2 upload failed",
   "player.none": "Nothing playing",
   "player.playlist": "Playlist",
   "player.empty": "No music yet",

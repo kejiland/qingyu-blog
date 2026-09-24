@@ -326,7 +326,7 @@
   "admin.music.uploading": "上传中…",
   "admin.music.uploadOk": "上传成功",
   "admin.music.uploadFail": "上传失败",
-  "admin.music.putFail": "上传失败：请检查 R2 桶 CORS 规则（允许本站域名的 PUT 与 content-type 请求头）及网络连接",
+  "admin.music.putFail": "上传到 R2 失败",
   "player.none": "未播放",
   "player.playlist": "播放列表",
   "player.empty": "暂无音乐",

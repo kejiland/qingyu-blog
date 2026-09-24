@@ -31,6 +31,18 @@
   function go(path) { if (window.navigate) window.navigate(path); }
   function link(path) { return window.href ? window.href(path) : path; }
 
+  /* 从 R2 / S3 的 XML 错误响应里提取 <Code>/<Message>，用于把上传失败原因显示给管理员。
+   * 浏览器跨域直传 R2 时，只有桶的 CORS 规则允许才读得到响应体；读不到就返回空串。 */
+  function r2Detail(xhr) {
+    try {
+      var body = String(xhr.responseText || '');
+      var code = (/<Code>([^<]+)<\/Code>/.exec(body) || [])[1] || '';
+      var message = (/<Message>([^<]+)<\/Message>/.exec(body) || [])[1] || '';
+      var detail = [code, message].filter(Boolean).join(': ');
+      return detail ? '：' + detail : '';
+    } catch (e) { return ''; }
+  }
+
   function fmtDate(s) {
     s = String(s || '');
     if (!s) return '';
@@ -1509,8 +1521,11 @@
           var xhr = new XMLHttpRequest();
           xhr.open('PUT', u.uploadUrl);
           xhr.setRequestHeader('Content-Type', u.contentType || file.type || 'application/octet-stream');
-          xhr.onload = function () { (xhr.status >= 200 && xhr.status < 300) ? resolve(true) : reject(new Error('HTTP ' + xhr.status)); };
-          xhr.onerror = function () { reject(new Error(t('admin.media.uploadFail'))); };
+          xhr.onload = function () {
+            if (xhr.status >= 200 && xhr.status < 300) { resolve(true); return; }
+            reject(new Error('HTTP ' + xhr.status + r2Detail(xhr)));
+          };
+          xhr.onerror = function () { reject(new Error('HTTP 0：预检被拦截 / CORS 或网络中断')); };
           xhr.send(file);
         });
         await api('api/media', { method: 'POST', body: JSON.stringify({ name: file.name, url: u.publicUrl, type: u.contentType || file.type, size: file.size }) });
@@ -1730,8 +1745,13 @@
         xhr.open('PUT', u.uploadUrl);
         xhr.setRequestHeader('Content-Type', u.contentType || 'audio/mpeg');
         xhr.upload.onprogress = function (e) { if (e.lengthComputable && fill) fill.style.width = Math.round(e.loaded / e.total * 100) + '%'; };
-        xhr.onload = function () { (xhr.status >= 200 && xhr.status < 300) ? resolve(true) : reject(new Error('HTTP ' + xhr.status)); };
-        xhr.onerror = function () { reject(new Error(t('admin.music.putFail'))); };
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) { resolve(true); return; }
+          reject(new Error(t('admin.music.putFail') + '（HTTP ' + xhr.status + '）' + r2Detail(xhr)));
+        };
+        xhr.onerror = function () {
+          reject(new Error(t('admin.music.putFail') + '（HTTP 0：预检被拦截 / CORS 或网络中断）'));
+        };
         xhr.send(file);
       });
       await api('api/music', { method: 'POST', body: JSON.stringify({ title: title, artist: artist, url: u.publicUrl, size: file.size }) });

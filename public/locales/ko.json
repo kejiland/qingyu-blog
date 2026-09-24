@@ -326,7 +326,7 @@
   "admin.music.uploading": "업로드 중…",
   "admin.music.uploadOk": "업로드 완료",
   "admin.music.uploadFail": "업로드 실패",
-  "admin.music.putFail": "업로드 실패: R2 버킷 CORS 규칙(사이트 도메인의 PUT 및 content-type 헤더 허용)과 네트워크를 확인하세요",
+  "admin.music.putFail": "R2 업로드 실패",
   "player.none": "재생 중 아님",
   "player.playlist": "재생 목록",
   "player.empty": "음악이 없습니다",

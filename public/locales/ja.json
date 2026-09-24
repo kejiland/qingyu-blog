@@ -326,7 +326,7 @@
   "admin.music.uploading": "アップロード中…",
   "admin.music.uploadOk": "アップロード完了",
   "admin.music.uploadFail": "アップロード失敗",
-  "admin.music.putFail": "アップロード失敗：R2 バケットの CORS 設定（サイトドメインからの PUT と content-type ヘッダー許可）とネットワークを確認してください",
+  "admin.music.putFail": "R2 へのアップロードに失敗しました",
   "player.none": "再生なし",
   "player.playlist": "プレイリスト",
   "player.empty": "音楽がありません",

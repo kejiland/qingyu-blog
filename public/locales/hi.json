@@ -326,7 +326,7 @@
   "admin.music.uploading": "अपलोड हो रहा है…",
   "admin.music.uploadOk": "अपलोड सफल",
   "admin.music.uploadFail": "अपलोड विफल",
-  "admin.music.putFail": "अपलोड विफल: R2 बकेट CORS नियम (साइट डोमेन से PUT और content-type हेडर की अनुमति) और नेटवर्क जाँचें",
+  "admin.music.putFail": "R2 पर अपलोड विफल रहा",
   "player.none": "कुछ नहीं चल रहा",
   "player.playlist": "प्लेलिस्ट",
   "player.empty": "अभी कोई संगीत नहीं",

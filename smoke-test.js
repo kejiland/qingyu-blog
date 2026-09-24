@@ -938,6 +938,13 @@ tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', asy
     const pngUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/png'));
     const jpegUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/jpeg'));
     assert.notStrictEqual(signature(pngUrl), signature(jpegUrl), '同一对象使用不同 Content-Type 时签名必须变化');
+
+    // canonical URI 必须按 S3 规则编码：含空格/中文/+ 的 key 若原样进签名，
+    // R2 重新编码后比对失败 → 403 SignatureDoesNotMatch（且无 CORS 头，前端只见 onerror）。
+    const unicodeKey = 'music/测试 歌曲+remix.mp3';
+    const unicodeUrl = await music.presignPut(env, unicodeKey, 3600, null, 'audio/mpeg');
+    assert.ok(unicodeUrl.includes('/music/%E6%B5%8B%E8%AF%95%20%E6%AD%8C%E6%9B%B2%2Bremix.mp3'), 'key 路径段需 RFC3986 编码：' + unicodeUrl);
+    assert.ok(!/[\u4e00-\u9fa5 ]/.test(unicodeUrl), '签名 URL 不得残留未编码的中文/空格');
   } finally {
     global.Date = RealDate;
     Math.random = realRandom;

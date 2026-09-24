@@ -34,6 +34,16 @@ async function signingKey(secret, dateStamp, region, service) {
   const sk = await hmac(rk, service);
   return hmac(sk, 'aws4_request');
 }
+/** S3 canonical URI 编码：逐段编码路径，保留 `/` 分隔符。
+ *  AWS SigV4 要求 canonical URI 按 RFC 3986 编码（`/` 除外），
+ *  且最终请求 URL 与签名用的路径必须完全一致，否则 R2 返回 SignatureDoesNotMatch。 */
+function s3Path(rawPath) {
+  return String(rawPath).split('/').map(function (seg) {
+    return encodeURIComponent(seg).replace(/[!'()*]/g, function (ch) {
+      return '%' + ch.charCodeAt(0).toString(16).toUpperCase();
+    });
+  }).join('/');
+}
 /* 公共签名参数：endpoint 规范化 / host / amzDate / scope（presign 与 Authorization 头共用） */
 async function r2SignParams(env) {
   const endpoint = String(env.R2_ENDPOINT || '').replace(/\/+$/, '');
@@ -62,7 +72,11 @@ export async function presignPut(env, key, expiresSec, bucket, contentType) {
   expiresSec = expiresSec || 3600;
   const b = bucket || env.R2_BUCKET;
   const p = await r2SignParams(env);
-  const path = '/' + b + '/' + key;
+  // 签名与最终 URL 必须共用同一条「已按 S3 规则编码」的路径：
+  // R2 收到请求后会按 RFC 3986 重新编码比对 canonical URI，若这里写入原始 key
+  // （含空格/中文/`+` 等），签名与 R2 的推算结果不一致 → 403 SignatureDoesNotMatch，
+  // 且 403 响应不带 CORS 头，浏览器只能看到 xhr.onerror。
+  const path = s3Path('/' + b + '/' + key);
   const type = String(contentType || '').trim();
   const qp = {
     'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
@@ -113,7 +127,7 @@ export async function sigv4AuthHeader(env, method, path) {
 export async function r2DeleteObject(env, key, bucket) {
   const b = bucket || env.R2_BUCKET;
   const endpoint = String(env.R2_ENDPOINT || '').replace(/\/+$/, '');
-  const path = '/' + b + '/' + key;
+  const path = s3Path('/' + b + '/' + key);
   const sig = await sigv4AuthHeader(env, 'DELETE', path);
   const res = await fetch(endpoint + path, {
     method: 'DELETE',

@@ -19,7 +19,7 @@
 
   var DEFAULT_LANG = 'zh-CN';
   /* 语言 JSON 缓存版本：修改 locales/*.json 后递增，强制浏览器拉新文件 */
-  var I18N_VER = '7';
+  var I18N_VER = '8';
   var _locale = DEFAULT_LANG;
   var _translations = {};
 
@@ -451,7 +451,7 @@
     "admin.music.uploading": "上传中…",
     "admin.music.uploadOk": "上传成功",
     "admin.music.uploadFail": "上传失败",
-    "admin.music.putFail": "上传失败：请检查 R2 桶 CORS 规则（允许本站域名的 PUT 与 content-type 请求头）及网络连接",
+    "admin.music.putFail": "上传到 R2 失败",
     "admin.music.chooseFile": "选择音频文件",
     "admin.music.dropHint": "拖拽音频文件到此处上传，或点击选择文件；文件名按「歌曲名-歌手」自动识别填写",
     "admin.music.r2Hint": "音频直传 Cloudflare R2（预签名上传，不经服务端中转）",
