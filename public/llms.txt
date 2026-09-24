@@ -1,35 +1,36 @@
 # Qingyu'Blog
 
 > 零后端依赖的轻量博客系统，原生 HTML/CSS/JS + Cloudflare Workers/D1。支持文章、评论、标签、归档、后台写作、Smoji 表情、多语言切换。
+> A lightweight blog system with no framework and no build step — vanilla HTML/CSS/JS plus Cloudflare Workers/D1. Posts, comments, tags, archive, an in-browser editor, Smoji emoji and a multilingual UI.
 
-## 关键页面
+## 关键页面 / Key pages
 
-- [首页](/)
-- [归档](/archive)
-- [标签](/tags)
-- [关于](/about)
-- [文章](/posts/)
-- [后台](/admin)
+- [首页 / Home](/)
+- [归档 / Archive](/archive)
+- [标签 / Tags](/tags)
+- [关于 / About](/about)
+- [文章 / Posts](/posts/)
+- [后台 / Admin](/admin)
 
-## 功能与说明
+## 功能与说明 / Features
 
-- 文章编辑内置选择器，发表后正文、评论、留言板均可插入 Smoji 表情。
-- 顶部与底部导航、友情链接可在后台「设置」中维护，改动即时生效。
-- 支持简体中文、English、日本語、한국어、हिन्दी 多语言界面。
-- 文章列表支持分页与标签筛选；评论与留言板带审核与 AI 辅助能力。
-- 本地 `file://` 双击 `public/index.html` 即可离线预览，无需构建。
+- 文章编辑器内置表情选择器，发表后正文、评论、留言板均可插入 Smoji 表情。 / A Smoji emoji picker is built into the editor; emoji can also be inserted in post bodies, comments and the guestbook.
+- 顶部与底部导航、友情链接可在后台「设置」中维护，改动即时生效。 / Header and footer navigation plus friend links are maintained in the admin settings and take effect immediately.
+- 支持简体中文、English、日本語、한국어、हिन्दी 多语言界面。 / The UI ships in Simplified Chinese, English, 日本語, 한국어 and हिन्दी.
+- 文章列表支持分页与标签筛选；评论与留言板带审核与 AI 辅助能力。 / The post list supports pagination and tag filtering; comments and the guestbook support moderation and optional AI assistance.
+- 本地 `file://` 双击 `public/index.html` 即可离线预览，无需构建。 / Opening `public/index.html` directly from disk (`file://`) works offline — no build step required.
 
-## 技术栈
+## 技术栈 / Tech stack
 
-- 前端：原生 HTML / CSS / JavaScript（无框架、无构建步骤）
-- 后端：Cloudflare Workers / Pages Functions + D1 / KV
-- 数据：文章、评论、留言、设置均持久化到 Cloudflare D1
+- 前端：原生 HTML / CSS / JavaScript（无框架、无构建步骤） / Frontend: vanilla HTML / CSS / JavaScript (no framework, no build step)
+- 后端：Cloudflare Workers / Pages Functions + D1 / KV / Backend: Cloudflare Workers / Pages Functions + D1 / KV
+- 数据：文章、评论、留言、设置均持久化到 Cloudflare D1 / Data: posts, comments, guestbook entries and settings all persist in Cloudflare D1
 
-## 链接
+## 链接 / Links
 
-- 仓库：https://github.com/kejiland/qingyu-blog
-- 文档：https://docs.2024921.xyz/
-- ARD 清单：https://www.2024921.xyz/.well-known/ard.json
-- AI Catalog（兼容）：https://www.2024921.xyz/.well-known/ai-catalog.json
-- Sitemap：https://www.2024921.xyz/sitemap.xml
-- RSS：https://www.2024921.xyz/feed.xml
+- 仓库 / Repository: https://github.com/kejiland/qingyu-blog
+- 文档 / Docs: https://docs.2024921.xyz/
+- ARD 清单 / ARD manifest: https://www.2024921.xyz/.well-known/ard.json
+- AI Catalog（兼容）/ AI Catalog (compatible): https://www.2024921.xyz/.well-known/ai-catalog.json
+- Sitemap: https://www.2024921.xyz/sitemap.xml
+- RSS: https://www.2024921.xyz/feed.xml

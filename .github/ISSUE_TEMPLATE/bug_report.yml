@@ -13,7 +13,7 @@ body:
     id: browser
     attributes:
       label: 浏览器 / Browser
-      description: 你使用的浏览器及版本
+      description: 你使用的浏览器及版本 / The browser and version you are using
       placeholder: e.g. Chrome 125, Firefox 128, Safari 18
     validations:
       required: true
@@ -30,11 +30,11 @@ body:
     id: steps
     attributes:
       label: 复现步骤 / Steps to Reproduce
-      description: 请描述如何触发这个 Bug
+      description: 请描述如何触发这个 Bug / Describe how to trigger the bug
       placeholder: |
-        1. 打开 ...
-        2. 点击 ...
-        3. 看到错误 ...
+        1. 打开 ... / Open ...
+        2. 点击 ... / Click ...
+        3. 看到错误 ... / See the error ...
     validations:
       required: true
 
@@ -42,7 +42,7 @@ body:
     id: expected
     attributes:
       label: 预期行为 / Expected Behavior
-      description: 你期望会发生什么？
+      description: 你期望会发生什么？ / What did you expect to happen?
     validations:
       required: true
 
@@ -50,7 +50,7 @@ body:
     id: actual
     attributes:
       label: 实际行为 / Actual Behavior
-      description: 实际发生了什么？
+      description: 实际发生了什么？ / What actually happened?
     validations:
       required: true
 
@@ -58,10 +58,10 @@ body:
     id: screenshots
     attributes:
       label: 截图 / Screenshots
-      description: 如果有截图或控制台报错，请粘贴在这里
+      description: 如果有截图或控制台报错，请粘贴在这里 / Paste screenshots or console errors here if you have any
 
   - type: textarea
     id: additional
     attributes:
       label: 补充信息 / Additional Context
-      description: 其他有助于理解问题的信息
+      description: 其他有助于理解问题的信息 / Anything else that helps us understand the issue

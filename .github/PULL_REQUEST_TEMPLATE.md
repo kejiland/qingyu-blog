@@ -19,10 +19,10 @@
 
 <!-- 描述你如何测试了这些更改 / Describe how you tested your changes -->
 
-- [ ] 双击 `public/index.html` 测试通过
-- [ ] 管理后台功能正常
-- [ ] 深色/浅色主题正常
-- [ ] 移动端响应式正常
+- [ ] 双击 `public/index.html` 测试通过 / Double-clicking `public/index.html` works
+- [ ] 管理后台功能正常 / Admin panel works
+- [ ] 深色/浅色主题正常 / Dark and light themes work
+- [ ] 移动端响应式正常 / Mobile responsive layout works
 
 ## 截图 / Screenshots
 

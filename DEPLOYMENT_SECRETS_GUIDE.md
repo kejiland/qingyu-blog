@@ -1,6 +1,11 @@
+> 🌐 **中文** · [English](DEPLOYMENT_SECRETS_GUIDE_EN.md)
+
 # GitHub Actions Secrets 与 R2 配置指南
 
 本文面向第一次部署本项目的用户，说明 GitHub Actions 中每个 Secret 在哪里获取、应该如何填写，以及 `qingyu-music`、`qingyu-media` 两个 R2 桶使用共用 Token 或单独 Token 时的区别。
+
+> 📘 **更完整的新手教程**：账号注册、D1 / KV 创建、API Token 权限勾选、R2 CORS 与自定义域名、Workers AI、绑定域名、部署后自检、故障排查速查表、免费额度，都在
+> **[CLOUDFLARE_SETUP_GUIDE.md](CLOUDFLARE_SETUP_GUIDE.md)**。本文可视为其中「Secrets 与 R2 令牌」这一部分的详解。
 
 > 结论先说：当前版本只需要一组 R2 S3 凭据。新手最稳妥的做法是创建一个同时拥有两个桶“对象读和写”权限的共用 Token。当前工作流和签名代码尚未读取两套独立的 R2 凭据。
 
@@ -82,6 +87,19 @@
 | `CF_ZONE_ID` | 可选 | 站点域名所在 Cloudflare Zone 的 ID；要和 `CLOUDFLARE_API_TOKEN` 的 Cache Purge 权限一起使用 |
 | `PAGES_PROJECT_NAME` | 可选 | 实际含义是 Worker 名称。不填时使用仓库默认名称 `kejiland`。随意改名可能部署成另一个 Worker，新手建议不填 |
 | `BLOG_WRITE_TOKEN` | 可选 | 旧式写入令牌。新部署通常不需要填写 |
+| `BLOG_RATE_LIMIT_BINDING` | 可选 | 一个正整数（如 `1001`）。填了会启用 Worker 内的边缘登录限流，并让部署改用 wrangler 4.x（该绑定要求 ≥ 4.36）。账户不支持该绑定时删除此 Secret 重新部署即可恢复 |
+
+### 5.1 部署后需要关心的三个运行时变量
+
+这三个**不是 GitHub Secret**，但和上面那张表很容易混：
+
+| 变量 | 谁写入 | 作用 | 不设置时 |
+| --- | --- | --- | --- |
+| `CF_API_TOKEN` | **工作流自动写入**（值取 `CLOUDFLARE_API_TOKEN`） | 发布文章后调 Cloudflare Cache Purge 接口清边缘缓存 | 不做缓存清除（功能不受影响，只是新内容可能延迟 1~5 分钟生效） |
+| `BLOG_AI_ENABLED` | **需要你手动设置**（控制台 → Worker → Settings → Variables and Secrets，或 `npx wrangler secret put BLOG_AI_ENABLED --name kejiland`） | 设为 `0` / `false` / `off` 可整体关闭 AI | 绑定了 Workers AI 且 D1 存在时视为开启 |
+| `BLOG_AI_PUBLIC` | 同上，手动设置 | 设为 `0` / `false` / `off` 可禁止匿名访客生成 AI 摘要（登录后仍可用） | 允许匿名生成 |
+
+> 只有 `CF_API_TOKEN` 是工作流自动写的。另外两个不写也没问题：只要部署成功、`/api/ai/ping` 返回 `{"ok":true}`，就说明 AI 已可用。
 
 ## 6. R2 桶准备
 
@@ -289,20 +307,22 @@ R2_MEDIA_PUBLIC_BASE=https://media.example.com
 | 修改 Secret 后线上没变化 | 没有重新运行部署工作流 |
 | 音乐仍写入媒体桶 | 检查 `R2_BUCKET`、`R2_PUBLIC_BASE` 是否都填写；音乐桶配置不完整时会回退媒体桶 |
 
-## 13. 针对当前截图配置的判断
+## 13. 常见困惑：我该用哪一组 R2 令牌？
 
-根据已有截图：
+很多人在 Cloudflare 里会创建出多个 R2 令牌，然后不确定该把哪一个填进 GitHub。判断方法很简单：
 
-- `blog` 是用于 Cloudflare 部署的 Account API Token，对应 GitHub 的 `CLOUDFLARE_API_TOKEN`。
-- `R2 User Token` 最初仅授权 `qingyu-media`，现已改为同时授权 `qingyu-media` 和 `qingyu-music`，权限是对象读和写。
-- `qingyu-music` Token 是另一组仅授权 `qingyu-music` 的凭据，当前共用凭据方案不需要使用它。
-- GitHub 中已经存在本指南列出的全部 R2 Secret 名称。
+| 情况 | 该填哪一个 |
+| --- | --- |
+| 你只创建了一个 R2 令牌，权限是「对象读和写」且同时覆盖两个桶 | ✅ 就填它，这是最推荐的方案 |
+| 你创建了两个令牌，各自只授权一个桶 | ⚠️ 当前版本**只支持一组凭据**，无法分别填写。请改为创建一个同时授权两个桶的令牌（见第 8 节） |
+| 你有一个只授权 `qingyu-media` 的旧令牌 | ⚠️ 它会让音乐上传 403。要么把它的权限改成同时覆盖两个桶，要么新建一个共用令牌 |
+| 你有一个只授权 `qingyu-music` 的令牌 | ❌ 与本项目的共用凭据方案不匹配，不要填 |
 
-因此：
+填写与更新规则：
 
-- 如果 `R2_ACCESS_KEY_ID` 和 `R2_SECRET_ACCESS_KEY` 填的是已同时授权两个桶的 `R2 User Token`，音乐会上传到 `qingyu-music`，图片会上传到 `qingyu-media`。
-- 如果更新过 Access Key ID 或 Secret Access Key，需要同步替换 GitHub 中的 `R2_ACCESS_KEY_ID` 和 `R2_SECRET_ACCESS_KEY`，并重新运行部署。
-- 如果希望两套 Token 各自独立生效，必须先完成第 10 节所述的代码和工作流改造。
+- 音乐会上传到 `R2_BUCKET`（须同时配置 `R2_PUBLIC_BASE`），图片会上传到 `R2_MEDIA_BUCKET`；
+- 任何一项 Access Key ID / Secret Access Key 发生变化，都要**同步更新** GitHub 的 `R2_ACCESS_KEY_ID` 与 `R2_SECRET_ACCESS_KEY`，并**重新运行一次部署工作流**；
+- 如果确实想让两个桶各自使用独立令牌，必须先完成第 10 节所述的代码与工作流改造，目前尚未支持。
 
 ## 14. 新手推荐配置清单
 

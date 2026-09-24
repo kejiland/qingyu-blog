@@ -1,3 +1,5 @@
+> 🌐 **中文** · [English](SECURITY_EN.md)
+
 # 安全策略 Security Policy
 
 ## 报告漏洞
@@ -24,10 +26,4 @@
 
 ---
 
-## Reporting a Vulnerability
-
-**Please do NOT report security vulnerabilities through public GitHub issues.**
-
-Instead, please contact the maintainer directly via GitHub: [@kejiland](https://github.com/kejiland).
-
-We will respond as quickly as possible and coordinate a fix before public disclosure.
+> 英文版本见 [SECURITY_EN.md](SECURITY_EN.md)。

@@ -1,3 +1,5 @@
+> 🌐 **中文** · [English](ABOUT_EN.md)
+
 # 轻语博客 · Qingyu'Blog
 
 > **零框架 · 零构建 · 零依赖 —— 双击 index.html 就能用的个人博客**
