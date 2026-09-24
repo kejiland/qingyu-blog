@@ -11,8 +11,8 @@
  *   · R2_BUCKET / R2_PUBLIC_BASE
  *       音乐专用桶名 + 公开读取基址（如 https://music.example.com；末尾不带斜杠）
  *   · R2_MEDIA_BUCKET / R2_MEDIA_PUBLIC_BASE
- *       可选：媒体桶。若当前 R2 凭据只对媒体桶有写权限，音乐对象会优先写入媒体桶，
- *       公开地址使用媒体域名；未配置时回退 R2_BUCKET / R2_PUBLIC_BASE。
+ *       可选：媒体桶。音乐优先写入 R2_BUCKET / R2_PUBLIC_BASE；
+ *       仅音乐桶配置不完整时回退媒体桶，兼容仅授予媒体桶写权限的旧凭据。
  * 降级：未配置 R2 凭据时，读取播放列表仍可用（D1），上传返回 503。
  * ============================================================ */
 import { getCorsHeaders, json, corsPreflight, isWriteAuthed, unauthorized, dbAll, dbFirst, dbRun } from './api-core.js';
@@ -107,16 +107,16 @@ function trimBase(value) {
 function originOf(value) {
   try { return new URL(trimBase(value)).origin; } catch (e) { return ''; }
 }
-/** 音乐上传存储：媒体桶可用时优先使用，避免共享凭据缺少音乐桶写权限导致上传失败。 */
+/** 音乐上传存储：优先使用音乐桶；旧凭据未授予音乐桶权限时回退媒体桶。 */
 function musicStorage(env) {
-  const mediaBucket = String((env && env.R2_MEDIA_BUCKET) || '').trim();
-  const mediaBase = trimBase(env && env.R2_MEDIA_PUBLIC_BASE);
-  if (mediaBucket && mediaBase) {
-    return { bucket: mediaBucket, publicBase: mediaBase, origin: originOf(mediaBase) };
-  }
   const bucket = String((env && env.R2_BUCKET) || '').trim();
   const publicBase = trimBase(env && env.R2_PUBLIC_BASE);
-  return { bucket: bucket, publicBase: publicBase, origin: originOf(publicBase) };
+  if (bucket && publicBase) {
+    return { bucket: bucket, publicBase: publicBase, origin: originOf(publicBase) };
+  }
+  const mediaBucket = String((env && env.R2_MEDIA_BUCKET) || '').trim();
+  const mediaBase = trimBase(env && env.R2_MEDIA_PUBLIC_BASE);
+  return { bucket: mediaBucket, publicBase: mediaBase, origin: originOf(mediaBase) };
 }
 
 function r2Configured(env) {

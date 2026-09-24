@@ -125,6 +125,8 @@ npx wrangler kv namespace create BLOG
 
 在仓库 Settings → Secrets and variables → Actions 中添加：
 
+> 第一次部署时不确定每个 Secret 在哪里获取、两个 R2 桶应该共用还是拆分 Token，请先阅读 [GitHub Actions Secrets 与 R2 配置指南](DEPLOYMENT_SECRETS_GUIDE.md)。
+
 **必填（部署必需）：**
 
 | Secret | 说明 |
@@ -148,7 +150,7 @@ npx wrangler kv namespace create BLOG
 | --- | --- |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3 兼容凭据（音乐与媒体**共用**） |
 | `R2_BUCKET` / `R2_PUBLIC_BASE` | **音乐专用桶**：桶名 + R2 自定义域名（播放器拉流地址） |
-| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **媒体专用桶**：桶名 + 自定义域名；配置后音乐上传也会优先使用该桶，兼容共享凭据仅授予媒体桶写权限的情况 |
+| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **媒体专用桶**：桶名 + 自定义域名；音乐使用音乐桶，图片使用媒体桶。仅音乐桶未配置时，音乐上传才回退媒体桶 |
 
 #### 4. 部署
 
@@ -384,7 +386,7 @@ D1 是 Cloudflare 的边缘 SQLite 数据库，本项目的**主存储**：
 
 ### R2（对象存储：音乐 + 媒体图片）
 
-R2 用于存放**音乐音频**与**媒体图片本体**（元数据在 D1，`url` 指向 R2 公开地址）。默认使用音乐桶与媒体桶；当共享凭据只有媒体桶写权限时，音乐对象会优先写入媒体桶，播放与同步删除会按公开域名自动选择对应桶：
+R2 用于存放**音乐音频**与**媒体图片本体**（元数据在 D1，`url` 指向 R2 公开地址）。音乐优先写入音乐桶，图片写入媒体桶；仅当音乐桶配置不完整时，音乐才回退媒体桶。播放与同步删除会按公开域名自动选择对应桶：
 
 | 能力 | 说明 |
 | --- | --- |
