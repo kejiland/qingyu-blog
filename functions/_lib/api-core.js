@@ -62,12 +62,13 @@ export async function dbBatch(db, stmts) {
   await db.batch(stmts.map((s) => db.prepare(s.sql).bind(...(s.params || []))));
 }
 
-/* ---------- CORS：仅回显本站自身来源，杜绝任意跨站读取 ----------
+/* ---------- CORS：仅放行本站来源，未配置时 fail-closed ----------
  * 同源请求（无 Origin 头）不加 ACAO；跨站请求：
- *   · 若配置了 SITE_URL（推荐），仅当来源命中外站域名白名单才回写 ACAO，其余一律拦截；
- *   · 若未配置 SITE_URL（如未设置的跨域部署），回退为「回显请求源」（等价于 *，但更精确），
- *     避免自定义域名这类合法跨域被误拦截。
- * 配合 Bearer Token（非凭据请求），即便回显源也不会泄露凭据。 */
+ *   · 白名单 = SITE_URL（配置时）+ 当前请求自身 origin；
+ *   · 只有白名单命中的来源才回写 ACAO，否则不返回 ACAO——**未配置 SITE_URL 时同样
+ *     fail-closed**，绝不回显任意来源（旧行为等价于 *，会把 /api/comments 等
+ *     公开数据暴露给任意站点脚本；同源页面不受影响，同源请求浏览器不做 CORS 校验）。
+ * 配合 Bearer Token（非凭据请求），即便跨站也无法携带会话。 */
 export function getCorsHeaders(request, env) {
   const h = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',

@@ -15,7 +15,7 @@
 #   · CLOUDFLARE_API_TOKEN / CLOUDFLARE_ACCOUNT_ID → wrangler 部署凭证
 #   · SITE_URL  （可选，强烈建议）站点对外域名 https://你的域名，用于收紧 CORS 为仅允许本站
 #   · CF_ZONE_ID（可选）自定义域名的 Zone ID，配合 CF_API_TOKEN 实现「发布即清边缘缓存」
-#       （两者均缺失时自动降级为空，不影响部署；SITE_URL 缺失时 CORS 回退为回显来源）
+#       （两者均缺失时自动降级为空，不影响部署；SITE_URL 缺失时 CORS 为 fail-closed——不返回 ACAO）
 # 触发：push 到 main / 手动运行。
 # ============================================================
 name: Deploy to Cloudflare Workers

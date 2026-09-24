@@ -198,7 +198,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | 卡片式列表 | 封面缩略图（自动取 cover 或正文首图）、置顶徽章、标签贴底、加载骨架屏、分页（`?page=`） |
 | **深色 / 浅色主题** | 一键切换，跟随系统偏好，无首屏闪白；顶栏会随滚动加深阴影 |
 | **主题色切换** | **4 种强调色**：赭橙（terra）/ 黛蓝（indigo）/ 竹青（bamboo）/ 凝夜紫（dusk）。桌面为图标按钮 + 色板弹层，手机端为原生下拉；每种配色会连带调整背景与边框色 |
-| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 494 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
+| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 498 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
 | **背景动画** | canvas 手绘四季粒子（春樱 / 夏光 / 秋叶 / 冬雪），仅首页运行、页面隐藏时暂停；桌面默认开、触屏默认关，顶栏可一键开关，尊重 `prefers-reduced-motion` |
 | **Smoji 表情** | 评论、留言板、编辑器三处都内置表情选择器，按需懒加载，支持正文内联渲染 |
 | **AI 文章摘要** | 文章页一键生成内容摘要（单篇缓存 30 天）；AI 不可用时入口自动隐藏 |
@@ -290,7 +290,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── bg-anim.js / bg-anim.min.js    # 四季 canvas 背景动画
 │   ├── i18n.js / i18n.min.js          # 国际化模块（中/英/日/韩/印地，内置中文兜底）
 │   ├── posts.js / posts.min.js        # 静态模式文章数据（由「导出 posts.js」生成）
-│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 494 键）
+│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 498 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
 │   ├── fonts/dreamserif/              # ⚠️ 历史遗留的本地衬线字体分片（当前版本不再加载，见「已知限制」）
@@ -556,7 +556,7 @@ window.BLOG_CONFIG = {
 
 ### 多语言（i18n）
 
-`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **494 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
+`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **498 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
 
 ---
 
