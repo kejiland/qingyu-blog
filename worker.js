@@ -194,6 +194,14 @@ export default {
             signedPath: (() => { try { return new URL(signedUrl).pathname; } catch (e) { return ''; } })(),
             signedHeaders: (() => { try { return new URL(signedUrl).searchParams.get('X-Amz-SignedHeaders'); } catch (e) { return ''; } })()
           };
+          // 再用与真实音乐上传完全相同的 key 前缀（music/…flac）测一次其中一条对照组，
+          // 以排除「仅 music/ 前缀被拒」或桶级前缀策略的可能。
+          const realKey = 'music/probe-' + Date.now() + '.flac';
+          const realUrl = await presignPut(env, realKey, 300, null, 'audio/flac');
+          const realRes = await fetch(realUrl, { method: 'PUT', headers: { 'Content-Type': 'audio/flac' }, body: 'diag' });
+          const realBody = await realRes.text().catch(() => '');
+          try { await r2DeleteObject(env, realKey, null); } catch (e) {}
+          signedRoundTrip.musicPrefixProbe = { putStatus: realRes.status, putBody: realBody.slice(0, 300) };
           // 同一凭据对媒体桶也测一次：区分「整个令牌无写权限」与「仅音乐桶权限特殊」
           if (env.R2_MEDIA_BUCKET) {
             const mk = 'media/_diag/probe-' + Date.now() + '.txt';
