@@ -194,6 +194,15 @@ export default {
             signedPath: (() => { try { return new URL(signedUrl).pathname; } catch (e) { return ''; } })(),
             signedHeaders: (() => { try { return new URL(signedUrl).searchParams.get('X-Amz-SignedHeaders'); } catch (e) { return ''; } })()
           };
+          // 同一凭据对媒体桶也测一次：区分「整个令牌无写权限」与「仅音乐桶权限特殊」
+          if (env.R2_MEDIA_BUCKET) {
+            const mk = 'media/_diag/probe-' + Date.now() + '.txt';
+            const mUrl = await presignPut(env, mk, 300, env.R2_MEDIA_BUCKET, probeType);
+            const mRes = await fetch(mUrl, { method: 'PUT', headers: { 'Content-Type': probeType }, body: 'diag' });
+            const mBody = await mRes.text().catch(() => '');
+            try { await r2DeleteObject(env, mk, env.R2_MEDIA_BUCKET); } catch (e) {}
+            signedRoundTrip.mediaProbe = { putStatus: mRes.status, putBody: mBody.slice(0, 300) };
+          }
         } catch (e) {
           signedRoundTrip = { error: String((e && e.message) || e) };
         }
