@@ -19,7 +19,7 @@
 
   var DEFAULT_LANG = 'zh-CN';
   /* 语言 JSON 缓存版本：修改 locales/*.json 后递增，强制浏览器拉新文件 */
-  var I18N_VER = '8';
+  var I18N_VER = '9';
   var _locale = DEFAULT_LANG;
   var _translations = {};
 
@@ -211,6 +211,10 @@
     "admin.setupKeyLabel": "安装密钥",
     "admin.gotoCloudSetup": "首次部署？使用安装密钥初始化",
     "admin.backToLogin": "← 返回登录",
+    "admin.breakGlassLink": "被限流？用安装密钥登录",
+    "admin.breakGlassKeyLabel": "安装密钥（X-Setup-Key）",
+    "admin.breakGlassHint": "填入安装密钥可立即跳过登录限流（仍需密码正确）",
+    "admin.gateThrottled": "尝试次数过多，已展开「安装密钥」入口",
     "admin.firstLoginTitle": "欢迎，首次登录",
     "admin.firstLoginDesc": "系统已为你生成随机默认密码，请在修改前记下或复制它：",
     "admin.copyPwd": "复制密码",

@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.7.1';
+var BLOG_VERSION = '2.7.2';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1160,16 +1160,27 @@ async function tryAdmin(pwd) {
   if (hashed === target) { _setAdminSession(true); return true; }
   return false;
 }
-/** 云端登录：POST /api/admin/login，成功存 token；返回 { ok, message, mustChange, defaultPassword } */
-async function cloudLogin(pwd) {
+/** 云端登录：POST /api/admin/login，成功存 token；返回 { ok, message, status, mustChange, defaultPassword }。
+ *  setupKey（可选）：应急通道——服务端收到正确安装密钥（BLOG_ADMIN_SETUP_KEY）即跳过登录限流，
+ *  但**不会跳过密码校验**。用于「被爆破波及、冷却中也要立刻进后台」的场景。 */
+async function cloudLogin(pwd, setupKey) {
   try {
-    var data = await apiFetch('api/admin/login', { method: 'POST', body: JSON.stringify({ password: String(pwd || '') }) });
-    if (!data || !data.token) return { ok: false, message: (data && data.error) || t('admin.loginFail') };
+    var data = await apiFetch('api/admin/login', {
+      method: 'POST',
+      headers: setupKey ? { 'X-Setup-Key': String(setupKey) } : undefined,
+      body: JSON.stringify({ password: String(pwd || '') })
+    });
+    if (!data || !data.token) return { ok: false, status: 0, message: (data && data.error) || t('admin.loginFail') };
     _setSessionToken(data.token);
     _setAdminSession(true);
     return { ok: true, mustChange: !!data.mustChange, defaultPassword: data.defaultPassword || '' };
   } catch (e) {
-    return { ok: false, message: t('admin.loginFail') + '（HTTP ' + (e && e.message ? e.message.replace('HTTP ', '') : '') + '）' };
+    var status = (e && e.status) || 0;
+    var msg = String((e && e.message) || '');
+    // apiFetch 会优先透传后端 error 文案（如「尝试次数过多，请 10 秒后再试」），
+    // 此时不要再包一层「登录失败（HTTP …）」；只有拿不到文案时才回退到状态码提示。
+    if (msg && msg.indexOf('HTTP ') !== 0) return { ok: false, status: status, message: msg };
+    return { ok: false, status: status, message: t('admin.loginFail') + '（' + (msg || '') + '）' };
   }
 }
 /** 云端登出：调用 /api/admin/logout 并清除本地 token */
@@ -1191,8 +1202,8 @@ async function cloudSetupAdmin(pwd, setupKey) {
       body: JSON.stringify({ password: String(pwd || '') })
     });
     if (!data || !data.ok) return { ok: false, message: (data && data.error) || t('admin.loginFail') };
-    // 设置成功 → 自动登录
-    return await cloudLogin(pwd);
+    // 设置成功 → 自动登录（带上安装密钥，避免此时恰好被登录限流挡住）
+    return await cloudLogin(pwd, setupKey);
   } catch (e) {
     return { ok: false, message: t('admin.loginFail') + '（HTTP ' + (e && e.message ? e.message.replace('HTTP ', '') : '') + '）' };
   }

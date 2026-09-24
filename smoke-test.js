@@ -518,6 +518,10 @@ function makeD1() {
       t.admin_fails.set(ip, { ip, n, until }); return { success: true };
     }
     if (s === 'DELETE FROM admin_fails WHERE ip = ?') { t.admin_fails.delete(params[0]); return { success: true }; }
+    if (s === 'DELETE FROM admin_fails WHERE until <= ?') {
+      for (const [k, r] of [...t.admin_fails]) if ((Number(r.until) || 0) <= params[0]) t.admin_fails.delete(k);
+      return { success: true };
+    }
     /* media */
     if (/^INSERT INTO media/.test(s)) {
       const [id, name, url, type, size, created_at] = params;
@@ -891,6 +895,93 @@ tests.push(['安全加固：媒体 URL 白名单 / clientIp 忽略伪造 XFF / �
   assert.ok(String(resp.headers.get('Content-Security-Policy') || '').includes("object-src 'none'"), 'CSP 禁 object');
   assert.ok(resp.headers.get('X-Frame-Options') === 'SAMEORIGIN', 'X-Frame-Options');
   assert.ok(String(resp.headers.get('Referrer-Policy') || '') === 'strict-origin-when-cross-origin', 'Referrer-Policy');
+}]);
+
+tests.push(['登录限流：三层维度 / 短冷却不锁死站长 / 安装密钥应急通道 / 锁定期间不写库', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const PWD = 'strong-pass-123';
+  const SETUP = 'setup-key-123';
+  const ipHdr = (ip) => ({ 'CF-Connecting-IP': ip });
+  const loginReq = (env, pwd, headers) => core.handleAdminLogin(new Request('http://t/api/admin/login', {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json' }, headers || {}),
+    body: JSON.stringify({ password: pwd })
+  }), env);
+  async function makeEnv() {
+    const env = mockEnv();
+    env.BLOG_ADMIN_SETUP_KEY = SETUP;
+    const r = await core.handleAdminSetup(new Request('http://t/api/admin/setup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Setup-Key': SETUP },
+      body: JSON.stringify({ password: PWD })
+    }), env);
+    assert.strictEqual(r.status, 201, '测试环境初始化 201');
+    return env;
+  }
+
+  // —— ① 单 IP 维度：5 次失败锁定 15 分钟；应急通道仍能进入 ——
+  let env = await makeEnv();
+  for (let i = 0; i < 5; i++) await loginReq(env, 'bad', ipHdr('1.1.1.1'));
+  let r = await loginReq(env, PWD, ipHdr('1.1.1.1'));
+  assert.strictEqual(r.status, 429, '单 IP 锁定后即使密码正确也 429');
+  assert.strictEqual(env._d1.admin_fails.get('1.1.1.1').n, 5, '单 IP 失败计数 = 5');
+  assert.ok(!env._d1.admin_fails.get('subnet:1.1.1.0/24').n || env._d1.admin_fails.get('subnet:1.1.1.0/24').n === 5,
+    '同网段计数同步累计');
+  // 写放大闸门：锁定期间重复请求直接早退，不产生任何 D1 写入
+  for (let i = 0; i < 3; i++) await loginReq(env, 'bad', ipHdr('1.1.1.1'));
+  assert.strictEqual(env._d1.admin_fails.get('1.1.1.1').n, 5, '锁定期间请求不再写库（计数不增长）');
+  // 应急通道：密钥错误无效、密码错误仍 401、两者都对才放行
+  r = await loginReq(env, PWD, { 'CF-Connecting-IP': '1.1.1.1', 'X-Setup-Key': 'wrong-key' });
+  assert.strictEqual(r.status, 429, '错误的安装密钥不能绕过限流');
+  r = await loginReq(env, 'bad', { 'CF-Connecting-IP': '1.1.1.1', 'X-Setup-Key': SETUP });
+  assert.strictEqual(r.status, 401, '应急通道只跳过限流，不跳过密码校验');
+  r = await loginReq(env, PWD, { 'CF-Connecting-IP': '1.1.1.1', 'X-Setup-Key': SETUP });
+  assert.strictEqual(r.status, 200, '应急通道：安装密钥 + 正确密码可绕过锁定');
+  assert.ok(!env._d1.admin_fails.get('1.1.1.1'), '成功登录清除本机计数');
+  assert.ok(!env._d1.admin_fails.get('subnet:1.1.1.0/24'), '成功登录清除子网计数');
+  assert.ok(!env._d1.admin_fails.get('__global__'), '成功登录清除全局计数');
+
+  // —— ② 计数老化：窗口过后 1 小时无新失败 → 清零，老失败不会与新失败叠加 ——
+  env = await makeEnv();
+  for (let i = 0; i < 4; i++) await loginReq(env, 'bad', ipHdr('2.2.2.2'));
+  assert.strictEqual(env._d1.admin_fails.get('2.2.2.2').n, 4, '4 次失败计数 = 4');
+  env._d1.admin_fails.get('2.2.2.2').until = Date.now() - 3600 * 1000 - 1000;   // 模拟 1 小时无失败
+  await loginReq(env, 'bad', ipHdr('2.2.2.2'));
+  assert.strictEqual(env._d1.admin_fails.get('2.2.2.2').n, 1, '老化后计数从 1 重新开始');
+  r = await loginReq(env, PWD, ipHdr('2.2.2.2'));
+  assert.strictEqual(r.status, 200, '老化后正常登录成功');
+
+  // —— ③ 子网维度：同一 /24 内轮换 IP 累计 15 次 → 该网段冷却，其他网段不受影响 ——
+  env = await makeEnv();
+  for (let i = 1; i <= 15; i++) await loginReq(env, 'bad', ipHdr('9.9.9.' + i));
+  r = await loginReq(env, PWD, ipHdr('9.9.9.200'));
+  assert.strictEqual(r.status, 429, '同一 /24 内轮换 IP 会被子网冷却拦住');
+  assert.ok(/秒后再试|分钟后再试/.test((await r.json()).error), '子网冷却给出重试提示');
+  r = await loginReq(env, PWD, ipHdr('9.9.10.200'));
+  assert.strictEqual(r.status, 200, '不同 /24 的用户不受影响');
+
+  // —— ④ 全局维度：跨网段累计 30 次 → 只有 10 秒冷却，冷却结束立即恢复 ——
+  env = await makeEnv();
+  for (let i = 0; i < 30; i++) await loginReq(env, 'bad', ipHdr('10.' + i + '.0.5'));
+  r = await loginReq(env, PWD, ipHdr('172.16.0.9'));
+  assert.strictEqual(r.status, 429, '跨网段轮换 IP 会触发全局冷却');
+  const gmsg = (await r.json()).error;
+  assert.ok(/秒后再试/.test(gmsg), '全局冷却为 10 秒级，不出现分钟级锁定：' + gmsg);
+  env._d1.admin_fails.get('__global__').until = Date.now() - 1000;   // 模拟 10 秒冷却结束
+  r = await loginReq(env, PWD, ipHdr('172.16.0.9'));
+  assert.strictEqual(r.status, 200, '冷却结束后站长可正常登录（全局维度不会长期锁死）');
+
+  // —— ⑤ 边缘限流绑定（可选）：超限 429 且不写 D1；绑定异常不阻塞登录 ——
+  env = await makeEnv();
+  env.LOGIN_LIMITER = { limit: async () => ({ success: false }) };
+  r = await loginReq(env, PWD, ipHdr('3.3.3.3'));
+  assert.strictEqual(r.status, 429, '边缘限流超限 → 429');
+  assert.ok(!env._d1.admin_fails.size, '边缘限流拦截时完全不写 D1（不吃免费写额度）');
+  env.LOGIN_LIMITER = { limit: async () => ({ success: true }) };
+  r = await loginReq(env, PWD, ipHdr('3.3.3.3'));
+  assert.strictEqual(r.status, 200, '边缘限流放行时正常登录');
+  env.LOGIN_LIMITER = { limit: async () => { throw new Error('boom'); } };
+  r = await loginReq(env, PWD, ipHdr('3.3.3.3'));
+  assert.strictEqual(r.status, 200, '边缘限流器异常不应导致登录不可用');
 }]);
 
 tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', async () => {

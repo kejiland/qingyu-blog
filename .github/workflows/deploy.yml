@@ -42,8 +42,18 @@ jobs:
 
       # 一次性全局安装 wrangler（CI 镜像层缓存 → 首次快，之后直接用 wrangler 命令）
       # 避免下方 migrations 循环与 secret 写入里每次 npx --yes 重复解析/网络检查
+      # 若启用了边缘限流绑定（BLOG_RATE_LIMIT_BINDING），则需要 wrangler >= 4.36
       - name: Setup wrangler CLI
-        run: npm install -g wrangler@3.90.0
+        env:
+          RL_BINDING: ${{ secrets.BLOG_RATE_LIMIT_BINDING }}
+        run: |
+          if [ -n "$RL_BINDING" ]; then
+            npm install -g 'wrangler@^4.36.0'
+            echo "✅ 已启用边缘限流绑定 → 使用 wrangler 4.x（该绑定要求 4.36.0+）"
+          else
+            npm install -g wrangler@3.90.0
+            echo "✅ 使用 wrangler 3.90.0（未启用边缘限流绑定）"
+          fi
 
       # 部署前跑本地测试（纯 Node 模拟环境，无网络/无凭据依赖；失败即中止，不部署）
       - name: Run tests (smoke + verify)
@@ -92,6 +102,7 @@ jobs:
           BLOG_D1_ID: ${{ secrets.BLOG_D1_ID }}
           SITE_URL: ${{ secrets.SITE_URL }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
+          BLOG_RATE_LIMIT_BINDING: ${{ secrets.BLOG_RATE_LIMIT_BINDING }}
         run: |
           python3 - <<'PY'
           import os
@@ -111,7 +122,27 @@ jobs:
           # 非敏感变量：缺失则替换为空字符串（安全降级，不会留下字面量占位符）
           dst = dst.replace('{env.SITE_URL}', os.environ.get('SITE_URL', '').strip())
           dst = dst.replace('{env.CF_ZONE_ID}', os.environ.get('CF_ZONE_ID', '').strip())
+          # 边缘限流绑定（可选）：配置了 BLOG_RATE_LIMIT_BINDING 才注入。
+          # 该绑定需要 wrangler >= 4.36，且并非所有账户都支持，因此默认不写入——
+          # 未配置时行为与旧版完全一致（代码会回退到 D1 计数）。
+          rl = os.environ.get('BLOG_RATE_LIMIT_BINDING', '').strip()
+          if rl and not rl.isdigit():
+              print('::error::BLOG_RATE_LIMIT_BINDING 必须是正整数（Workers 限流绑定的 namespace_id，如 1001）')
+              raise SystemExit(1)
+          if rl:
+              dst += (
+                  '\n# 由 BLOG_RATE_LIMIT_BINDING 注入的边缘限流绑定（env.LOGIN_LIMITER）\n'
+                  '[[ratelimits]]\n'
+                  'name = "LOGIN_LIMITER"\n'
+                  'namespace_id = "' + rl + '"\n'
+                  '  [ratelimits.simple]\n'
+                  '  limit = 10\n'
+                  '  period = 60\n'
+              )
+          # 先落盘再打印：避免控制台编码异常（如局部 GBK）导致配置没写出来
           open('wrangler.workers.ci.toml', 'w', encoding='utf-8').write(dst)
+          if rl:
+              print('✅ 已注入边缘限流绑定 namespace_id=' + rl + '（登录限流 10 次/分钟/位置）')
           print('✅ 部署配置已生成（含真实 KV id 与 D1 id，不会打印）')
           PY
 

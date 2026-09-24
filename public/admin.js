@@ -247,6 +247,11 @@
       form =
         '<input class="ab-input" type="password" id="abGatePwd" placeholder="' + t('admin.pwdLabel') + '" autocomplete="current-password">' +
         '<button class="ab-btn primary" id="abGateBtn">' + t('admin.loginBtn') + '</button>' +
+        '<button type="button" class="ab-gate-link" id="abBtnBreakGlass">' + t('admin.breakGlassLink') + '</button>' +
+        '<div id="abGateKeyWrap" style="display:none">' +
+        '<p class="ab-hint">' + t('admin.breakGlassHint') + '</p>' +
+        '<input class="ab-input" type="password" id="abGateKey" placeholder="' + t('admin.breakGlassKeyLabel') + '" autocomplete="off">' +
+        '</div>' +
         '<button type="button" class="ab-gate-link" id="abBtnCloudSetup">' + t('admin.gotoCloudSetup') + '</button>' +
         '<div id="abSetupForm" style="display:none">' +
         '<p class="ab-hint">' + t('admin.cloudSetupHint') + '</p>' +
@@ -276,13 +281,24 @@
 
     var btn = root.querySelector('#abGateBtn');
     var inp = root.querySelector('#abGatePwd');
+    // 应急通道（云端）：被登录限流挡住时，可填入安装密钥立即登录（服务端只跳过限流，不跳过密码校验）
+    var glassToggle = root.querySelector('#abBtnBreakGlass');
+    var glassWrap = root.querySelector('#abGateKeyWrap');
+    var glassKey = root.querySelector('#abGateKey');
+    function showGlass(show) {
+      if (!glassWrap) return;
+      glassWrap.style.display = show ? 'block' : 'none';
+      if (glassToggle) glassToggle.style.display = show ? 'none' : '';
+      if (show && glassKey) { try { glassKey.focus(); } catch (e) {} }
+    }
+    if (glassToggle) glassToggle.addEventListener('click', function () { showGlass(true); });
     async function submit() {
       var pwd = inp.value || '';
       if (!pwd) { toast(t('admin.pwdRequired'), 'err'); return; }
       btn.disabled = true;
       try {
         if (cloudOn()) {
-          var r = await window.cloudLogin(pwd);
+          var r = await window.cloudLogin(pwd, glassKey ? glassKey.value : '');
           if (r && r.ok) {
             if (r.mustChange) {
               // 首次部署自动初始化：弹出清晰的默认密码提示框，供查看/复制后改密（不再一闪而过）
@@ -292,7 +308,12 @@
               toast(t('admin.logging'), 'ok'); go('/admin');
             }
           }
-          else { toast((r && r.message) || t('admin.wrongPwd'), 'err'); btn.disabled = false; }
+          else {
+            // 429 = 触发登录限流：自动展开安装密钥入口，给出可立即进入的路径
+            if (r && r.status === 429) { showGlass(true); toast(t('admin.gateThrottled'), 'err'); }
+            else toast((r && r.message) || t('admin.wrongPwd'), 'err');
+            btn.disabled = false;
+          }
         } else if (window.needAdminSetup && window.needAdminSetup()) {
           if (await window.setupAdmin(pwd)) { toast(t('admin.logging'), 'ok'); go('/admin'); }
           else { toast(t('admin.pwdTooShort'), 'err'); btn.disabled = false; }
@@ -304,6 +325,7 @@
     }
     btn.addEventListener('click', submit);
     inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    if (glassKey) glassKey.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
     inp.focus();
 
     // 云端首次部署：登录 ↔ 安装密钥初始化 切换（后端 BLOG_ADMIN_SETUP_KEY 必填）

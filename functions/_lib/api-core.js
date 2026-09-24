@@ -751,16 +751,21 @@ export async function handleStats(request, env, postId) {
  *       签发随机会话 token（admin_sessions，7 天）。
  * 鉴权：写操作请求头 Authorization: Bearer <session-token>，
  *       isWriteAuthed() 校验会话；旧的 BLOG_WRITE_TOKEN 仍兼容。
- * 限流：同一 IP 连续失败 5 次锁 15 分钟（admin_fails）。
+ * 限流：三层维度，见下方「登录限流的分层计数」注释。
  * 防抢注：首次设置密码需 X-Setup-Key 匹配环境变量 BLOG_ADMIN_SETUP_KEY。
  * ============================================================ */
 
 const ADMIN_AUTH_KEY = 'auth';
-const ADMIN_SESSION_PREFIX = 'admin:session:';   // 复用字符便于阅读（实际存 admin_sessions.token）
-const ADMIN_FAIL_PREFIX = 'admin:fail:';
 const ADMIN_SESSION_TTL = 7 * 24 * 3600;          // 会话 7 天
-const ADMIN_MAX_FAILS = 5;                        // 连续失败次数上限
-const ADMIN_LOCK_MS = 15 * 60 * 1000;             // 锁定 15 分钟
+const ADMIN_FAIL_DECAY_MS = 60 * 60 * 1000;       // 失败计数老化：窗口过后 1 小时无新失败才清零
+const ADMIN_MAX_FAILS = 5;                        // 单 IP 连续失败上限
+const ADMIN_LOCK_MS = 15 * 60 * 1000;             // 单 IP 锁定 15 分钟（只影响攻击者自己的 IP）
+const ADMIN_SUBNET_MAX_FAILS = 15;                // 同一子网（IPv4 /24、IPv6 前 4 段）失败上限
+const ADMIN_SUBNET_LOCK_MS = 60 * 1000;           // 子网冷却 60 秒（短，避免同网段他人误伤）
+const ADMIN_GLOBAL_MAX_FAILS = 30;                // 全局失败阈值
+const ADMIN_GLOBAL_LOCK_MS = 10 * 1000;           // 全局冷却 10 秒（对齐 CF 免费版限流最小窗口）
+const GLOBAL_FAIL_KEY = '__global__';             // admin_fails 中的全局计数行
+const SUBNET_FAIL_PREFIX = 'subnet:';             // admin_fails 中的子网计数行前缀
 const PBKDF2_ITER = 100000;                       // PBKDF2 迭代次数（CF WebCrypto 硬上限 100000）
 
 /* ---------- 加密工具（WebCrypto，Worker/Node 均可用） ---------- */
@@ -807,6 +812,90 @@ function clientIp(request) {
   return String(request.headers.get('CF-Connecting-IP') || '').replace(/[^A-Za-z0-9:._-]/g, '') || 'unknown';
 }
 function nowMs() { return Date.now(); }
+
+/* ============================================================
+ * 登录限流的分层计数（既要防爆破，又不能把站长锁在门外）
+ * ------------------------------------------------------------
+ * 背景：把「失败次数」直接做成全局锁定，等于把可用性交给攻击者——
+ *   任何人从任意 IP 刷够失败次数，唯一的管理员就进不去了（DoS）。
+ *   因此这里采用三层维度 + 短冷却 + 应急通道：
+ *
+ *   ① 单 IP：5 次失败 → 15 分钟。只影响攻击者自己的出口 IP。
+ *   ② 子网：IPv4 /24、IPv6 前 4 段，15 次失败 → 60 秒冷却。
+ *      让「轮换 IP」的成本从「换一个 IP」升到「换一个网段」，
+ *      冷却刻意很短，避免同网段的其他正常用户被误伤。
+ *   ③ 全局：30 次失败 → 仅 10 秒冷却，并打印告警日志。
+ *      10 秒对齐 Cloudflare 免费版限流规则的最小窗口；它同时是一道
+ *      「写放大闸门」——冷却期间直接 429，不查库也不写库，
+ *      于是分布式爆破最多也只能每 10 秒消耗一次 D1 写入。
+ *
+ *   应急通道：带正确 X-Setup-Key 的请求跳过以上全部限流
+ *   （但**不跳过密码校验**）。站长因此永远有一条进得去的路。
+ *
+ *   计数行复用 admin_fails(ip,n,until)：until 既表示锁定截止时间，
+ *   也表示「未达阈值时的计数窗口过期时间」。读路径刻意只读不写，
+ *   否则攻击者每次请求都能触发一次 D1 写入，把免费额度刷爆。
+ * ============================================================ */
+
+/** 子网键：IPv4 取 /24，IPv6 取前 4 段（≈/64）；无法识别时退化为单 IP。 */
+function subnetKey(ip) {
+  const s = String(ip || '');
+  if (s.indexOf(':') >= 0) {
+    return SUBNET_FAIL_PREFIX + s.split(':').slice(0, 4).join(':') + ':/64';
+  }
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.\d{1,3}$/.exec(s);
+  if (m) return SUBNET_FAIL_PREFIX + m[1] + '.' + m[2] + '.' + m[3] + '.0/24';
+  return SUBNET_FAIL_PREFIX + s;
+}
+
+/** 读取一行失败计数：返回 { n, until, locked } 或 null（无记录 / 已老化）。 */
+async function readFailRow(env, key, maxFails) {
+  let row = null;
+  try { row = await dbFirst(env.DB, 'SELECT * FROM admin_fails WHERE ip = ?', key); } catch (e) { return null; }
+  if (!row) return null;
+  const n = Number(row.n) || 0;
+  const until = Number(row.until) || 0;
+  const now = nowMs();
+  if (until > now) return { n, until, locked: n >= maxFails };
+  // 窗口已过：已达阈值（刚冷却完）时保留计数一小段时间，
+  // 避免攻击者「等冷却结束 → 计数归零 → 无限重试」。
+  if (n >= maxFails && now <= until + ADMIN_FAIL_DECAY_MS) return { n, until, locked: false };
+  return null;
+}
+
+/** 记录一次失败：累加计数并顺延窗口；返回 { n, locked, until }。 */
+async function bumpFailRow(env, key, cur, maxFails, lockMs) {
+  const n = (cur && cur.n ? cur.n : 0) + 1;
+  const locked = n >= maxFails;
+  const until = nowMs() + (locked ? lockMs : ADMIN_FAIL_DECAY_MS);
+  try {
+    await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
+      + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', key, n, until);
+  } catch (e) { /* 计数写失败不应阻塞登录判定 */ }
+  return { n, locked, until };
+}
+
+/** 限流提示文案：不足 1 分钟用「秒」，否则用「分钟」。 */
+function lockHint(until) {
+  const ms = Math.max(0, (Number(until) || 0) - nowMs());
+  if (ms <= 60000) return '尝试次数过多，请 ' + Math.max(1, Math.ceil(ms / 1000)) + ' 秒后再试';
+  return '尝试次数过多，请 ' + Math.ceil(ms / 60000) + ' 分钟后再试';
+}
+
+/** 边缘限流（可选 Workers Rate Limiting binding env.LOGIN_LIMITER）。
+ *  绑定缺失或异常时一律放行（返回 true），由 D1 计数兜底；
+ *  未在 wrangler 配置该绑定时行为与旧版完全一致。 */
+async function edgeRateOk(env, key) {
+  const rl = env && env.LOGIN_LIMITER;
+  if (!rl || typeof rl.limit !== 'function') return true;
+  try {
+    const r = await rl.limit({ key: String(key) });
+    return !r || r.success !== false;
+  } catch (e) {
+    console.warn('[admin:login] 边缘限流器异常，已放行并由 D1 计数兜底:', e && e.message);
+    return true;
+  }
+}
 
 /* ---------- 认证状态（D1） ---------- */
 
@@ -933,33 +1022,38 @@ export async function handleAdminLogin(request, env) {
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
 
   const ip = clientIp(request);
-  // 限流：检查是否被锁定。
-  // 除按 IP 计数外，另有一个全局计数行（ip = '__global__'）：仅按 IP 计数时，
-  // 攻击者轮换源 IP 即可无限次试密码（每次都是「第 1 次失败」）。
-  // 全局计数让「任何来源的失败总量」也触发锁定，堵住 IP 轮换绕过；
-  // 阈值放宽（ADMIN_GLOBAL_MAX_FAILS），避免正常用户偶发输错即被长时间锁死。
-  let fail = null, gfail = null;
-  try {
-    fail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
-    if (fail && fail.until && fail.until > nowMs()) {
-      const mins = Math.ceil((fail.until - nowMs()) / 60000);
-      return json({ error: '尝试次数过多，请 ' + mins + ' 分钟后再试' }, 429, request, env);
+  const subKey = subnetKey(ip);
+
+  // 应急通道：带正确安装密钥 → 跳过全部限流（仍必须密码正确）。
+  // 保证「攻击者无法用失败登录把唯一的管理员挡在门外」。
+  const configuredKey = env.BLOG_ADMIN_SETUP_KEY;
+  const givenKey = String(request.headers.get('X-Setup-Key') || '').trim();
+  const breakGlass = !!(configuredKey && givenKey && await safeEqual(givenKey, configuredKey));
+
+  let ipRow = null, subRow = null, gRow = null;
+  if (!breakGlass) {
+    // ① 边缘限流（可选绑定）：超限直接 429，不查 D1、不跑 PBKDF2、不产生 D1 写入
+    if (!await edgeRateOk(env, 'login:' + ip)) {
+      return json({ error: '尝试次数过多，请稍后再试' }, 429, request, env);
     }
-    // 清理已过期的失败记录，避免 admin_fails 表无限增长
-    if (fail && fail.until && fail.until <= nowMs()) {
-      try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', ip); } catch (e) {}
-      fail = null;
+    // ② D1 计数兜底（纯读）：单 IP → 子网 → 全局冷却
+    ipRow = await readFailRow(env, ip, ADMIN_MAX_FAILS);
+    subRow = await readFailRow(env, subKey, ADMIN_SUBNET_MAX_FAILS);
+    gRow = await readFailRow(env, GLOBAL_FAIL_KEY, ADMIN_GLOBAL_MAX_FAILS);
+    if (ipRow && ipRow.locked) {
+      return json({ error: lockHint(ipRow.until) }, 429, request, env);
     }
-    gfail = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", GLOBAL_FAIL_KEY);
-    if (gfail && gfail.until && gfail.until > nowMs()) {
-      const mins = Math.ceil((gfail.until - nowMs()) / 60000);
-      return json({ error: '尝试次数过多，请 ' + mins + ' 分钟后再试' }, 429, request, env);
+    if (subRow && subRow.locked) {
+      return json({ error: lockHint(subRow.until) }, 429, request, env);
     }
-    if (gfail && gfail.until && gfail.until <= nowMs()) {
-      try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', GLOBAL_FAIL_KEY); } catch (e) {}
-      gfail = null;
+    if (gRow && gRow.locked) {
+      // 全局只有 10 秒冷却 + 告警：既给爆破一点阻力，又不会把站长长期挡在门外。
+      // 这里也是最该接告警的地方（Workers Logs / 通知）。
+      console.warn('[admin:login] 全局失败冷却中：',
+        JSON.stringify({ ip, subnet: subKey, n: gRow.n, resetInMs: gRow.until - nowMs() }));
+      return json({ error: lockHint(gRow.until) }, 429, request, env);
     }
-  } catch (e) { /* 忽略读取失败 */ }
+  }
 
   const body = await request.json().catch(() => null);
   const password = String((body && body.password) || '');
@@ -989,33 +1083,26 @@ export async function handleAdminLogin(request, env) {
   // —— 正常登录 ——
   const hash = await deriveKey(password, auth.salt, auth.iter || PBKDF2_ITER);
   if (!await safeEqual(hash, auth.hash)) {
-    // 按 IP 计数（快速锁定单一来源）
-    let n = 1;
-    try {
-      const f = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", ip);
-      n = (f && f.n ? f.n : 0) + 1;
-    } catch (e) { /* ignore */ }
-    const lock = n >= ADMIN_MAX_FAILS ? { n, until: nowMs() + ADMIN_LOCK_MS } : { n };
-    try {
-      await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
-        + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', ip, lock.n, lock.until || 0);
-    } catch (e) { /* ignore */ }
-    // 全局计数（堵 IP 轮换绕过）：阈值更高、锁更久，正常用户影响很小
-    try {
-      const g = await dbFirst(env.DB, "SELECT * FROM admin_fails WHERE ip = ?", GLOBAL_FAIL_KEY);
-      const gn = (g && g.n ? g.n : 0) + 1;
-      const glock = gn >= ADMIN_GLOBAL_MAX_FAILS
-        ? { n: gn, until: nowMs() + ADMIN_GLOBAL_LOCK_MS }
-        : { n: gn, until: 0 };
-      await dbRun(env.DB, 'INSERT INTO admin_fails (ip,n,until) VALUES (?,?,?) '
-        + 'ON CONFLICT(ip) DO UPDATE SET n=excluded.n, until=excluded.until', GLOBAL_FAIL_KEY, glock.n, glock.until);
-    } catch (e) { /* ignore */ }
+    // 失败计数：单 IP（15 分钟）→ 子网（60 秒）→ 全局（10 秒冷却 + 告警）。
+    // 应急通道下的失败不计数，避免站长自己把正常路径刷爆。
+    if (!breakGlass) {
+      await bumpFailRow(env, ip, ipRow, ADMIN_MAX_FAILS, ADMIN_LOCK_MS);
+      await bumpFailRow(env, subKey, subRow, ADMIN_SUBNET_MAX_FAILS, ADMIN_SUBNET_LOCK_MS);
+      const g = await bumpFailRow(env, GLOBAL_FAIL_KEY, gRow, ADMIN_GLOBAL_MAX_FAILS, ADMIN_GLOBAL_LOCK_MS);
+      if (g.locked) {
+        console.warn('[admin:login] 全局失败冷却已触发（疑似爆破）：',
+          JSON.stringify({ ip, subnet: subKey, n: g.n, cooldownMs: ADMIN_GLOBAL_LOCK_MS }));
+      }
+    }
     return json({ error: '密码错误' }, 401, request, env);
   }
 
-  // 成功：清除失败计数（含全局计数），顺带清理全部已过期会话（避免 admin_sessions 无限增长），再签发 token
+  // 成功：清除本机 / 本子网 / 全局三层计数（全局一并清除，避免站长刚登录完还被冷却挡着），
+  // 顺带清理已老化的计数行与过期会话——只在成功路径清理，避免被失败请求刷写。
   try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', ip); } catch (e) { /* ignore */ }
+  try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', subKey); } catch (e) { /* ignore */ }
   try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE ip = ?', GLOBAL_FAIL_KEY); } catch (e) { /* ignore */ }
+  try { await dbRun(env.DB, 'DELETE FROM admin_fails WHERE until <= ?', nowMs() - ADMIN_FAIL_DECAY_MS); } catch (e) { /* ignore */ }
   try { await dbRun(env.DB, 'DELETE FROM admin_sessions WHERE exp <= ?', nowMs()); } catch (e) { /* ignore */ }
   const token = randomToken(32);
   await dbRun(env.DB, 'INSERT INTO admin_sessions (token,exp) VALUES (?,?)', token, nowMs() + ADMIN_SESSION_TTL * 1000);
