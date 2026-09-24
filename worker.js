@@ -168,6 +168,36 @@ export default {
         }
       };
       const origin = 'https://www.2024921.xyz';
+      // 附加：真实走一遍「签发 → PUT」，不依赖浏览器，用来判定签名本身是否被 R2 接受。
+      // 只上传一个 20 字节探针对象到音乐桶，随后立即删除，不触碰任何用户数据。
+      let signedRoundTrip = null;
+      if (request.method === 'POST' && url.searchParams.get('probe') === '1') {
+        try {
+          const { presignPut, r2DeleteObject } = await import('./functions/_lib/music.js');
+          const probeKey = 'music/_diag/probe-' + Date.now() + '.txt';
+          const probeType = 'text/plain';
+          const signedUrl = await presignPut(env, probeKey, 300, null, probeType);
+          const putRes = await fetch(signedUrl, {
+            method: 'PUT',
+            headers: { 'Content-Type': probeType },
+            body: 'diag'
+          });
+          const putBody = await putRes.text().catch(() => '');
+          let cleaned = false;
+          try { await r2DeleteObject(env, probeKey, null); cleaned = true; } catch (e) { cleaned = false; }
+          signedRoundTrip = {
+            key: probeKey,
+            putStatus: putRes.status,
+            putBody: putBody.slice(0, 400),
+            deleted: cleaned,
+            signedHost: (() => { try { return new URL(signedUrl).host; } catch (e) { return ''; } })(),
+            signedPath: (() => { try { return new URL(signedUrl).pathname; } catch (e) { return ''; } })(),
+            signedHeaders: (() => { try { return new URL(signedUrl).searchParams.get('X-Amz-SignedHeaders'); } catch (e) { return ''; } })()
+          };
+        } catch (e) {
+          signedRoundTrip = { error: String((e && e.message) || e) };
+        }
+      }
       return new Response(JSON.stringify({
         ok: true,
         endpointHost: endpointHost,
@@ -179,6 +209,7 @@ export default {
         hasCredentials: !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY),
         // 直接问 R2：对 S3 端点的 PUT 预检，它回不回 CORS 头
         preflightAgainstS3Endpoint: await probe(origin)
+        , signedRoundTrip: signedRoundTrip
       }, null, 2), {
         status: 200,
         headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, getCorsHeaders(request, env))
