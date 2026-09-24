@@ -138,6 +138,52 @@ export default {
     if (url.pathname === '/api/music/upload-url') {
       return handleMusicUploadUrl(request, env);
     }
+    // 一次性诊断：定位「浏览器直传 R2 预检失败」到底是哪一层。
+    // 只回显非敏感配置 + 主动对 R2 S3 端点发一次 OPTIONS，绝不回传任何密钥。
+    if (url.pathname === '/api/music/diag') {
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: getCorsHeaders(request, env) });
+      const rawEndpoint = String(env.R2_ENDPOINT || '');
+      let endpointHost = '';
+      try { endpointHost = new URL(rawEndpoint).host; } catch (e) { endpointHost = '(解析失败)'; }
+      const musicBucket = String(env.R2_BUCKET || '');
+      const probe = async (origin) => {
+        const target = rawEndpoint.replace(/\/+$/, '') + '/' + musicBucket + '/diag-probe.txt';
+        try {
+          const r = await fetch(target, {
+            method: 'OPTIONS',
+            headers: {
+              'Origin': origin,
+              'Access-Control-Request-Method': 'PUT',
+              'Access-Control-Request-Headers': 'content-type'
+            }
+          });
+          return {
+            status: r.status,
+            acao: r.headers.get('Access-Control-Allow-Origin'),
+            acam: r.headers.get('Access-Control-Allow-Methods'),
+            acah: r.headers.get('Access-Control-Allow-Headers')
+          };
+        } catch (e) {
+          return { error: String((e && e.message) || e) };
+        }
+      };
+      const origin = 'https://www.2024921.xyz';
+      return new Response(JSON.stringify({
+        ok: true,
+        endpointHost: endpointHost,
+        endpointHasPath: (() => { try { return new URL(rawEndpoint).pathname; } catch (e) { return '(无效)'; } })(),
+        musicBucket: musicBucket,
+        musicPublicBase: String(env.R2_PUBLIC_BASE || ''),
+        mediaBucket: String(env.R2_MEDIA_BUCKET || ''),
+        mediaPublicBase: String(env.R2_MEDIA_PUBLIC_BASE || ''),
+        hasCredentials: !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY),
+        // 直接问 R2：对 S3 端点的 PUT 预检，它回不回 CORS 头
+        preflightAgainstS3Endpoint: await probe(origin)
+      }, null, 2), {
+        status: 200,
+        headers: Object.assign({ 'Content-Type': 'application/json; charset=utf-8' }, getCorsHeaders(request, env))
+      });
+    }
     if (url.pathname === '/api/music') {
       return handleMusic(request, env);
     }
