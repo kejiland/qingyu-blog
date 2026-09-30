@@ -1020,7 +1020,7 @@
   function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
 
   /* ====================== 文章导入 / 导出 ====================== */
-  function transferDownload(name, blob) {
+  function transferAnchorDownload(name, blob) {
     var a = document.createElement('a');
     var url = URL.createObjectURL(blob);
     a.href = url;
@@ -1032,6 +1032,23 @@
       try { if (a.parentNode) a.parentNode.removeChild(a); } catch (e) {}
       try { URL.revokeObjectURL(url); } catch (e) {}
     }, 1000);
+  }
+  function transferDownload(name, blob) {
+    // 支持 File System Access API 的浏览器优先弹出“另存为”，用户能明确选择文件位置；
+    // 不支持、被取消或权限受限时回退到浏览器默认下载目录。
+    if (typeof window.showSaveFilePicker === 'function') {
+      try {
+        window.showSaveFilePicker({ suggestedName: name }).then(function (handle) {
+          return handle.createWritable().then(function (writable) {
+            return writable.write(blob).then(function () { return writable.close(); });
+          });
+        }).catch(function (err) {
+          if (!err || err.name !== 'AbortError') transferAnchorDownload(name, blob);
+        });
+        return;
+      } catch (e) { transferAnchorDownload(name, blob); return; }
+    }
+    transferAnchorDownload(name, blob);
   }
   function transferDownloadText(name, text, type) {
     transferDownload(name, new Blob([String(text || '')], { type: type || 'text/plain;charset=utf-8' }));
@@ -1257,11 +1274,12 @@
     files.push({ name: 'posts.json', text: transferBackupJson(posts) });
     return transferZip(files);
   }
-  async function transferExportOne(id, button) {
+  async function transferExportOne(id, button, content) {
     var old = button ? button.innerHTML : '';
     if (button) { button.disabled = true; button.innerHTML = icon('spinner', 12) + ' ' + t('admin.transfer.exporting'); }
     try {
-      var posts = await listFullPosts();
+      // 页面加载时已经缓存全文；点击后可同步下载，避免部分浏览器拦截异步触发的下载。
+      var posts = (content && content.__iePosts) || await listFullPosts();
       var post = posts.filter(function (p) { return p.id === id; })[0];
       if (!post) { toast(t('admin.postList.notFound'), 'err'); return; }
       var name = (transferSlug(post.title || post.id) || 'post') + '.md';
@@ -1277,7 +1295,7 @@
     var status = content.querySelector('#abIeStatus');
     if (status) status.textContent = t('admin.transfer.exporting');
     try {
-      var all = await listFullPosts();
+      var all = (content && content.__iePosts) || await listFullPosts();
       var map = {};
       all.forEach(function (p) { map[p.id] = p; });
       var posts = ids && ids.length ? ids.map(function (id) { return map[id]; }).filter(Boolean) : all;
@@ -1294,7 +1312,7 @@
     var status = content.querySelector('#abIeStatus');
     if (status) status.textContent = t('admin.transfer.exporting');
     try {
-      var posts = await listFullPosts();
+      var posts = (content && content.__iePosts) || await listFullPosts();
       transferDownloadText('qingyu-backup-' + transferStamp() + '.json', transferBackupJson(posts), 'application/json;charset=utf-8');
       toast(t('admin.transfer.exported', { count: posts.length }), 'ok');
     } catch (e) {
@@ -1394,8 +1412,8 @@
       '<div class="ab-grid cols-2">' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('download', 16) + ' ' + t('admin.transfer.exportTitle') + '</div>' +
           '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.exportHint') + '</p>' +
-          '<div class="ab-row" style="gap:8px;flex-wrap:wrap"><button class="ab-btn" id="abIeExportAll">' + icon('download', 14) + ' ' + t('admin.transfer.exportAll') + '</button>' +
-          '<button class="ab-btn" id="abIeExportBackup">' + icon('save', 14) + ' ' + t('admin.transfer.exportBackup') + '</button></div></div>' +
+          '<div class="ab-row" style="gap:8px;flex-wrap:wrap"><button class="ab-btn" id="abIeExportAll" disabled>' + icon('download', 14) + ' ' + t('admin.transfer.exportAll') + '</button>' +
+          '<button class="ab-btn" id="abIeExportBackup" disabled>' + icon('save', 14) + ' ' + t('admin.transfer.exportBackup') + '</button></div></div>' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('upload', 16) + ' ' + t('admin.transfer.importTitle') + '</div>' +
           '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.importHint') + '</p>' +
           '<p class="ab-hint" id="abIeStatus" style="min-height:18px;margin:0"></p></div>' +
@@ -1404,7 +1422,7 @@
         '<div class="ab-toolbar" style="margin-bottom:12px;align-items:center">' +
           '<label class="ab-row" style="align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="abIeSelectAll"> <span>' + t('admin.transfer.selectAll') + '</span></label>' +
           '<span class="ab-muted" id="abIeSelected" style="font-size:13px">' + t('admin.transfer.selected', { count: 0 }) + '</span>' +
-          '<button class="ab-btn sm" id="abIeExportSelected" style="margin-left:auto">' + icon('download', 13) + ' ' + t('admin.transfer.exportSelected') + '</button>' +
+          '<button class="ab-btn sm" id="abIeExportSelected" style="margin-left:auto" disabled>' + icon('download', 13) + ' ' + t('admin.transfer.exportSelected') + '</button>' +
         '</div>' +
         '<div class="ab-table-wrap"><table class="ab-table"><thead><tr><th style="width:40px"></th><th>' + t('admin.transfer.colPost') + '</th><th>' + t('admin.transfer.colDate') + '</th><th>' + t('admin.transfer.colStatus') + '</th><th class="col-actions">' + t('admin.transfer.colActions') + '</th></tr></thead><tbody id="abIeTableBody"></tbody></table></div>' +
       '</div>';
@@ -1441,7 +1459,7 @@
     var body = content.querySelector('#abIeTableBody');
     body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.transfer.loading') + '</td></tr>';
     var posts = [];
-    try { posts = await listPosts(); }
+    try { posts = await listFullPosts(); content.__iePosts = posts; }
     catch (e) {
       body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
       return;
@@ -1464,12 +1482,16 @@
     }).join('');
     body.querySelectorAll('.ab-ie-check').forEach(function (cb) { cb.addEventListener('change', function () { updateImportExportSelection(content); }); });
     body.querySelectorAll('[data-ie-export]').forEach(function (btn) {
-      btn.addEventListener('click', function () { transferExportOne(dec(btn.getAttribute('data-ie-export')), btn); });
+      btn.addEventListener('click', function () { transferExportOne(dec(btn.getAttribute('data-ie-export')), btn, content); });
     });
     content.querySelector('#abIeExportSelected').onclick = function () {
       var ids = Array.prototype.slice.call(content.querySelectorAll('.ab-ie-check')).filter(function (cb) { return cb.checked; }).map(function (cb) { return dec(cb.getAttribute('data-id')); });
       transferExportPosts(content, ids);
     };
+    ['#abIeExportAll', '#abIeExportBackup', '#abIeExportSelected'].forEach(function (sel) {
+      var btn = content.querySelector(sel);
+      if (btn) btn.disabled = false;
+    });
     updateImportExportSelection(content);
   }
 
