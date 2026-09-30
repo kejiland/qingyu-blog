@@ -88,9 +88,12 @@ async function handleApi(req, res, url) {
   /* ---------- 文章 ---------- */
   if (p === '/api/posts') {
     if (method === 'GET') {
-      const list = POSTS
+      const sorted = POSTS
         .slice()
-        .sort((a, b) => (!!b.pinned - !!a.pinned) || (a.date < b.date ? 1 : -1))
+        .sort((a, b) => (!!b.pinned - !!a.pinned) || (a.date < b.date ? 1 : -1));
+      if (q.get('full') === '1') return json(res, { ok: true, posts: sorted }), true;
+      const list = sorted
+        .filter((x) => x.status !== 'draft')
         .map((x) => {
           const o = Object.assign({}, x);
           o.search = String(o.content || '').slice(0, 800);

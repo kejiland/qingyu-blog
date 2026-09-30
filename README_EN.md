@@ -169,7 +169,7 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 Push to `main` (or run the workflow manually) and GitHub Actions will:
 
 1. ✅ Install the Wrangler CLI
-2. ✅ Run three test suites (`smoke-test.js` 78 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
+2. ✅ Run three test suites (`smoke-test.js` 79 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
 3. ✅ Validate the required secrets and ID formats
 4. ✅ Apply D1 migrations (three-layer idempotency: `schema_migrations` ledger + column pre-check + tolerant error matching)
 5. ✅ Deploy the Worker
@@ -241,6 +241,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | **Music management** | Audio upload (direct to R2 with a percentage progress bar, drag-and-drop supported); **filename parsing fills in "song - artist"**; inline per-row preview (play / pause / seek / elapsed and total time), rename, delete (synced with the R2 object); inner-scrolling list card with a sticky table header |
 | Blog settings | 5 tabs: **Site basics** (name / description / avatar logo / about-page content / footer copyright / footer notice / moderate new comments), **Profile** (name / bio / avatar / email), **Navigation menu** (visual editor with add / remove / sub-items / reset), **Footer navigation**, **Friend links** |
 | Top bar | Sidebar collapse, breadcrumb, preview site, 🌐 language switch, account menu (profile / change password / logout) |
+| Import / export | Import a single file, multiple files, or a folder; export one Markdown file, selected posts as a ZIP, all posts, or a full JSON backup. Works in both static and cloud modes |
 | One-click export | **Static mode only**: the editor's "export all" writes `posts.js` + `feed.xml` + `sitemap.xml` for you to overwrite `public/` with. Cloud mode generates RSS/Sitemap server-side, so there is no export entry there |
 | Responsive | Fixed sidebar on desktop (collapsible to a 72 px icon rail) / drawer navigation on mobile; breakpoints at 1100 / 991 / 640 / 420 px |
 
@@ -376,7 +377,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 ├── index.html                         # Root redirect (opens public/index.html)
 ├── wrangler.toml                      # Cloudflare Pages config
 ├── wrangler.workers.toml              # Cloudflare Workers config (used for deploys)
-├── smoke-test.js                      # Smoke tests (78 cases)
+├── smoke-test.js                      # Smoke tests (79 cases)
 ├── gb-verify.js                       # Guestbook verification (18 cases)
 ├── search-verify.js                   # Search verification (13 cases)
 ├── README.md                          # 中文说明
@@ -614,7 +615,7 @@ The step-by-step dashboard walkthrough is in section 9 of the **[Cloudflare setu
 ## 🧪 Tests
 
 ```bash
-node smoke-test.js      # Smoke tests: 78 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
+node smoke-test.js      # Smoke tests: 79 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
 node gb-verify.js       # Guestbook verification: 18 cases
 node search-verify.js   # Search verification: 13 cases
 ```

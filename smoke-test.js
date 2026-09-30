@@ -398,6 +398,33 @@ tests.push(['parseMdFile：frontmatter 与无 frontmatter', async () => {
   assert.strictEqual(r2.title, '我的笔记');
 }]);
 
+tests.push(['admin 导入导出：Markdown 往返 / JSON 备份 / ZIP 打包', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const tr = b.win.QingyuAdmin && b.win.QingyuAdmin._transfer;
+  assert.ok(tr && tr.postToMarkdown && tr.parseMarkdown && tr.zip, '导入导出工具已暴露');
+  const source = {
+    id: 'round-trip', title: '往返测试: 标题', date: '2026-09-30', tags: ['技术', '写作'],
+    excerpt: '摘要', cover: 'https://example.com/cover.jpg', category: '随笔',
+    status: 'draft', pinned: true, content: '## 正文\n\n**Markdown** 内容'
+  };
+  const md = tr.postToMarkdown(source);
+  const parsed = tr.parseMarkdown(md, 'round-trip.md');
+  assert.strictEqual(parsed.title, source.title, 'Markdown 标题保留');
+  assert.deepStrictEqual(parsed.tags, source.tags, 'Markdown 标签保留');
+  assert.strictEqual(parsed.status, 'draft', 'Markdown 草稿状态保留');
+  assert.strictEqual(parsed.pinned, true, 'Markdown 置顶状态保留');
+  assert.strictEqual(parsed.content, source.content, 'Markdown 正文保留');
+  const backup = JSON.parse(tr.backup([source]));
+  assert.strictEqual(backup.posts[0].id, source.id, 'JSON 备份保留文章');
+  b.ctx.Blob = Blob;
+  const zip = tr.zip([source]);
+  const bytes = new Uint8Array(await zip.arrayBuffer());
+  assert.deepStrictEqual(Array.from(bytes.slice(0, 4)), [0x50, 0x4B, 0x03, 0x04], 'ZIP 文件头正确');
+  const zipText = new TextDecoder().decode(bytes);
+  assert.ok(zipText.includes('.md') && zipText.includes('posts.json'), 'ZIP 含 Markdown 与 JSON 备份');
+}]);
+
 tests.push(['buildPostsJs：合并草稿并归一化 tags', async () => {
   const { ctx, win } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   ctx.saveDraftToStore('__new', { id: 'n1', title: '新文章', date: '2025-03-01', tags: '技术, 随笔', content: '内容', pinned: true });
@@ -428,7 +455,7 @@ function makeD1() {
     posts: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
@@ -595,10 +622,23 @@ tests.push(['API：POST / GET / 重复 id 409 / 缺字段 400', async () => {
   r = await post({ id: 'a3', content: '没标题' });
   assert.strictEqual(r.status, 400, '缺 title 返回 400');
 
+  r = await post({ id: 'draft1', title: '草稿', date: '2025-01-03', content: '草稿正文', status: 'draft' });
+  assert.strictEqual(r.status, 201);
   const list = await (await core.handlePosts(new Request('http://t/api/posts'), env)).json();
-  assert.strictEqual(list.posts.length, 2);
+  assert.strictEqual(list.posts.length, 2, '公开列表不返回草稿');
   assert.strictEqual(list.posts[0].id, 'a1', '按日期倒序');
   assert.deepStrictEqual(list.posts[0].tags, ['技术', '随笔'], 'tags 归一为数组');
+
+  let adminList = await core.handlePosts(new Request('http://t/api/posts?all=1'), env);
+  assert.strictEqual(adminList.status, 401, '后台 all=1 未登录拒绝');
+  adminList = await core.handlePosts(new Request('http://t/api/posts?all=1', { headers: { Authorization: 'Bearer ' + token } }), env);
+  assert.strictEqual(adminList.status, 200);
+  assert.strictEqual((await adminList.json()).posts.length, 3, '后台 all=1 包含草稿');
+  let fullRes = await core.handlePosts(new Request('http://t/api/posts?full=1'), env);
+  assert.strictEqual(fullRes.status, 401, '后台 full=1 未登录拒绝');
+  fullRes = await core.handlePosts(new Request('http://t/api/posts?full=1', { headers: { Authorization: 'Bearer ' + token } }), env);
+  const full = await fullRes.json();
+  assert.strictEqual(full.posts.find((p) => p.id === 'a1').content, '**内容**', 'full=1 返回正文');
 }]);
 
 tests.push(['API：PUT 更新 / PUT 未知 id 新建 / DELETE / 404 / 无 DB 500', async () => {

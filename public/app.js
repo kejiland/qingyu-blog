@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.7.2';
+var BLOG_VERSION = '2.7.3';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1312,7 +1312,12 @@ function buildPostsJs() {
       date: d.date || new Date().toISOString().slice(0, 10),
       tags: normalizeTags(d),
       excerpt: d.excerpt || '',
+      cover: d.cover || '',
+      category: d.category || '',
+      status: d.status || 'published',
       pinned: !!d.pinned,
+      protected: !!d.protected,
+      enc: d.protected ? (d.enc || null) : null,
       content: d.content || ''
     };
     if (idx >= 0) all[idx] = item; else all.push(item);

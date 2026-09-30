@@ -153,7 +153,7 @@ npx wrangler kv namespace create BLOG
 推送代码或手动运行 Actions，工作流会自动：
 
 1. ✅ 安装 Wrangler CLI
-2. ✅ 运行三套测试（`smoke-test.js` 78 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
+2. ✅ 运行三套测试（`smoke-test.js` 79 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
 3. ✅ 校验必要 Secrets 与 ID 格式
 4. ✅ 执行 D1 迁移（`schema_migrations` 记账表 + 列预检 + 报错兜底，三层幂等）
 5. ✅ 部署 Worker 到 Cloudflare
@@ -225,6 +225,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | **音乐管理** | 音频上传（直传 R2，带百分比进度条，支持拖拽）；**文件名自动识别「歌曲名-歌手」**预填；列表行内试听（播放 / 暂停 / 拖动进度 / 显示当前时间与总时长）、重命名、删除（与 R2 对象同步）；曲目多时列表卡片内滚动 + 表头吸顶 |
 | 博客设置 | 5 个标签页：**站点基础信息**（站点名称 / 简介 / 头像 Logo / 关于页内容 / 页脚版权署名 / 页脚声明 / 新评论默认需审核）、**个人资料**（昵称 / 简介 / 头像 / 邮箱）、**导航菜单**（可视化增删 + 二级子项 + 一键重置）、**底部导航**、**友情链接** |
 | 顶栏 | 侧栏折叠按钮、面包屑、预览站点、🌐 语言切换、账户菜单（个人资料 / 修改密码 / 退出登录） |
+| 导入 / 导出 | 后台支持单篇 Markdown、批量 ZIP、全部导出和 JSON 完整备份；可导入单个文件、多个文件或整个文件夹，静态与云端模式均兼容 |
 | 一键导出 | **静态模式特有**：编辑器里的「一键导出全部」同时导出 `posts.js` + `feed.xml` + `sitemap.xml`，覆盖 `public/` 即发布（云端模式由服务端动态生成 RSS/Sitemap，因此没有导出入口） |
 | 响应式 | PC 固定侧栏（可折叠为 72px 图标栏）/ 移动端抽屉导航；断点 1100 / 991 / 640 / 420px |
 
@@ -360,7 +361,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── index.html                         # 根跳转页（自动跳 public/index.html）
 ├── wrangler.toml                      # Cloudflare Pages 配置
 ├── wrangler.workers.toml              # Cloudflare Workers 配置（部署使用）
-├── smoke-test.js                      # 冒烟测试（78 例）
+├── smoke-test.js                      # 冒烟测试（79 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
 ├── search-verify.js                   # 搜索专项验证（13 例）
 ├── README.md                          # 中文说明（本文件）
@@ -597,7 +598,7 @@ window.BLOG_CONFIG = {
 ## 🧪 测试
 
 ```bash
-node smoke-test.js      # 冒烟测试 78 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
+node smoke-test.js      # 冒烟测试 79 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
 node gb-verify.js       # 留言板专项验证 18 例
 node search-verify.js   # 搜索专项验证 13 例
 ```

@@ -153,7 +153,8 @@
     if (cloudOn()) {
       // 时间戳穿透边缘缓存（api/posts 带 s-maxage=60）：删除/发布后管理端必须立即看到最新列表，
       // 否则命中缓存会误以为「删除没生效，要刷新网页才删掉」。查询参数变化 = 边缘缓存 key 变化。
-      var d = await api('api/posts?_=' + Date.now());
+      // all=1 需管理员会话：附带草稿；公开的 api/posts 仍只返回已发布文章。
+      var d = await api('api/posts?all=1&_=' + Date.now());
       return (d && d.posts) || [];
     }
     // 静态模式：BLOG_POSTS 合并本地草稿
@@ -164,6 +165,14 @@
     base.forEach(function (p) { if (p && p.id) map[p.id] = p; });
     drafts.forEach(function (p) { if (p && p.id) map[p.id] = p; });
     return Object.keys(map).map(function (k) { return map[k]; });
+  }
+  async function listFullPosts() {
+    if (cloudOn()) {
+      // full=1 仅管理员可用：一次返回草稿 + 正文，避免批量导出逐篇请求。
+      var d = await api('api/posts?full=1&_=' + Date.now());
+      return (d && d.posts) || [];
+    }
+    return await listPosts();
   }
   async function getPost(id) {
     if (cloudOn()) {
@@ -180,7 +189,8 @@
     for (var i = 0; i < drafts.length; i++) if (drafts[i] && drafts[i].id === post.id) idx = i;
     var item = { id: post.id, title: post.title, date: post.date, tags: post.tags || [], excerpt: post.excerpt || '',
       cover: post.cover || '', category: post.category || '', status: post.status || 'published',
-      pinned: !!post.pinned, content: post.content || '' };
+      pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null,
+      content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
     localStorage.setItem('qingyu.drafts', JSON.stringify(drafts));
   }
@@ -381,6 +391,7 @@
       { group: t('admin.sidebar.contentSettings'), items: [
         { key: 'media', label: t('admin.sidebar.media'), icon: 'image', href: '/admin/media' },
         { key: 'music', label: t('admin.sidebar.musicManage'), icon: 'music', href: '/admin/music' },
+        { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
       ] }
     ];
@@ -527,6 +538,7 @@
     if (path === '/admin/comments/pending') return { key: 'comments-pending', page: 'comments', filter: 'pending' };
     if (path === '/admin/media') return { key: 'media', page: 'media' };
     if (path === '/admin/music') return { key: 'music', page: 'music' };
+    if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
     return { key: 'dashboard', page: 'dashboard' };
   }
@@ -673,6 +685,7 @@
     if (route.page === 'comments') return pageComments(content, route.filter);
     if (route.page === 'media') return pageMedia(content);
     if (route.page === 'music') return pageMusic(content);
+    if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
   }
 
@@ -1005,6 +1018,460 @@
   }
   function enc(s) { return encodeURIComponent(s); }
   function dec(s) { try { return decodeURIComponent(s); } catch (e) { return s; } }
+
+  /* ====================== 文章导入 / 导出 ====================== */
+  function transferDownload(name, blob) {
+    var a = document.createElement('a');
+    var url = URL.createObjectURL(blob);
+    a.href = url;
+    a.download = name;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () {
+      try { if (a.parentNode) a.parentNode.removeChild(a); } catch (e) {}
+      try { URL.revokeObjectURL(url); } catch (e) {}
+    }, 1000);
+  }
+  function transferDownloadText(name, text, type) {
+    transferDownload(name, new Blob([String(text || '')], { type: type || 'text/plain;charset=utf-8' }));
+  }
+  function transferStamp() {
+    var d = new Date();
+    function p(n) { return String(n).padStart(2, '0'); }
+    return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes());
+  }
+  function transferSlug(value) {
+    return String(value || '').toLowerCase()
+      .replace(/[^\w\u4e00-\u9fa5-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80);
+  }
+  function transferTags(value) {
+    if (Array.isArray(value)) return value.map(function (v) { return String(v).trim(); }).filter(Boolean);
+    var raw = String(value == null ? '' : value).trim();
+    if (!raw) return [];
+    if (raw.charAt(0) === '[') {
+      try {
+        var arr = JSON.parse(raw);
+        if (Array.isArray(arr)) return transferTags(arr);
+      } catch (e) {}
+    }
+    return raw.split(/[,，、]/).map(function (v) { return v.trim(); }).filter(Boolean);
+  }
+  function transferPostMarkdown(post) {
+    var lines = ['---'];
+    var stringKeys = ['id', 'title', 'date', 'excerpt', 'cover', 'category'];
+    stringKeys.forEach(function (key) {
+      var value = String(post[key] == null ? '' : post[key]);
+      if (value !== '') lines.push(key + ': ' + JSON.stringify(value));
+    });
+    lines.push('tags: ' + JSON.stringify(post.tags || []));
+    lines.push('pinned: ' + (post.pinned ? 'true' : 'false'));
+    lines.push('status: ' + JSON.stringify(post.status === 'draft' ? 'draft' : 'published'));
+    if (post.protected) lines.push('protected: true');
+    if (post.enc) lines.push('enc: ' + JSON.stringify(post.enc));
+    lines.push('---', '');
+    return lines.join('\n') + String(post.content || '').replace(/\s*$/, '') + '\n';
+  }
+  function transferScalar(raw) {
+    var value = String(raw == null ? '' : raw).trim();
+    if (!value) return '';
+    var first = value.charAt(0);
+    if (first === '"' || first === '[' || first === '{') {
+      try { return JSON.parse(value); } catch (e) {}
+    }
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    if (value === 'null') return null;
+    if (/^-?\d+(?:\.\d+)?$/.test(value)) return Number(value);
+    return value;
+  }
+  function transferParseMarkdown(text, filename) {
+    var src = String(text || '').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n');
+    var meta = {};
+    var body = src;
+    if (src.slice(0, 3) === '---') {
+      var end = src.indexOf('\n---', 3);
+      if (end >= 0) {
+        var block = src.slice(4, end);
+        body = src.slice(end + 4).replace(/^\n/, '');
+        block.split('\n').forEach(function (line) {
+          var m = /^([A-Za-z_][\w-]*)\s*:\s*(.*)$/.exec(line);
+          if (m) meta[m[1].toLowerCase()] = transferScalar(m[2]);
+        });
+      }
+    }
+    var base = String(filename || '').replace(/^.*[\\/]/, '').replace(/\.(md|markdown)$/i, '');
+    var title = String(meta.title == null ? base : meta.title).trim();
+    var id = transferSlug(meta.id || title || base || ('post-' + Date.now().toString(36)));
+    var enc = meta.enc;
+    if (typeof enc === 'string' && enc) {
+      try { enc = JSON.parse(enc); } catch (e) { enc = null; }
+    }
+    var isProtected = !!(meta.protected && enc);
+    return normalizeImportedPost({
+      id: id,
+      title: title || base || t('admin.postList.noTitle'),
+      date: meta.date || new Date().toISOString().slice(0, 10),
+      tags: transferTags(meta.tags),
+      excerpt: meta.excerpt || '',
+      cover: meta.cover || '',
+      category: meta.category || '',
+      status: meta.status,
+      pinned: meta.pinned,
+      protected: isProtected,
+      enc: isProtected ? enc : null,
+      content: body.replace(/^\n+|\n+$/g, '')
+    }, base);
+  }
+  function transferParseJson(text) {
+    var data = JSON.parse(String(text || ''));
+    var raw = [];
+    if (Array.isArray(data)) raw = data;
+    else if (data && Array.isArray(data.posts)) raw = data.posts;
+    else if (data && data.post && typeof data.post === 'object') raw = [data.post];
+    else if (data && typeof data === 'object') raw = [data];
+    return raw.map(function (p) { return normalizeImportedPost(p, ''); }).filter(Boolean);
+  }
+  function normalizeImportedPost(post, fallbackId) {
+    if (!post || typeof post !== 'object') return null;
+    var title = String(post.title == null ? '' : post.title).trim();
+    var id = transferSlug(post.id || title || fallbackId || ('post-' + Date.now().toString(36)));
+    if (!id) return null;
+    if (!title) title = String(fallbackId || id).trim() || t('admin.postList.noTitle');
+    var enc = post.enc;
+    if (typeof enc === 'string' && enc) {
+      try { enc = JSON.parse(enc); } catch (e) { enc = null; }
+    }
+    var isProtected = !!(post.protected && enc);
+    return {
+      id: id,
+      title: title,
+      date: String(post.date || new Date().toISOString().slice(0, 10)),
+      tags: transferTags(post.tags),
+      excerpt: String(post.excerpt || ''),
+      cover: String(post.cover || ''),
+      category: String(post.category || ''),
+      status: post.status === 'draft' ? 'draft' : 'published',
+      pinned: !!post.pinned,
+      protected: isProtected,
+      enc: isProtected ? enc : null,
+      content: String(post.content || '')
+    };
+  }
+  function transferBackupJson(posts) {
+    return JSON.stringify({
+      format: 'qingyu-blog-posts',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      posts: posts || []
+    }, null, 2);
+  }
+  var _zipCrcTable = null;
+  function transferCrc32(bytes) {
+    if (!_zipCrcTable) {
+      _zipCrcTable = [];
+      for (var n = 0; n < 256; n++) {
+        var c = n;
+        for (var k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        _zipCrcTable[n] = c >>> 0;
+      }
+    }
+    var crc = 0xFFFFFFFF;
+    for (var i = 0; i < bytes.length; i++) crc = _zipCrcTable[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+  function transferU16(n) { return [n & 0xFF, (n >>> 8) & 0xFF]; }
+  function transferU32(n) { return [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF]; }
+  function transferBytes(text) {
+    if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(String(text || ''));
+    var out = [];
+    var s = unescape(encodeURIComponent(String(text || '')));
+    for (var i = 0; i < s.length; i++) out.push(s.charCodeAt(i));
+    return new Uint8Array(out);
+  }
+  function transferConcat(parts) {
+    var len = 0;
+    parts.forEach(function (p) { len += p.length; });
+    var out = new Uint8Array(len), offset = 0;
+    parts.forEach(function (p) { out.set(p, offset); offset += p.length; });
+    return out;
+  }
+  function transferDosTime(date) {
+    var d = date || new Date();
+    var year = Math.max(1980, d.getFullYear());
+    return {
+      time: (d.getHours() << 11) | (d.getMinutes() << 5) | Math.floor(d.getSeconds() / 2),
+      date: ((year - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate()
+    };
+  }
+  function transferZip(files) {
+    var local = [], central = [], offset = 0;
+    var dt = transferDosTime(new Date());
+    (files || []).forEach(function (file) {
+      var name = transferBytes(file.name);
+      var data = transferBytes(file.text || '');
+      var crc = transferCrc32(data);
+      var localHead = transferConcat([
+        new Uint8Array([0x50, 0x4B, 0x03, 0x04]), new Uint8Array(transferU16(20)),
+        new Uint8Array(transferU16(0x0800)), new Uint8Array(transferU16(0)),
+        new Uint8Array(transferU16(dt.time)), new Uint8Array(transferU16(dt.date)),
+        new Uint8Array(transferU32(crc)), new Uint8Array(transferU32(data.length)),
+        new Uint8Array(transferU32(data.length)), new Uint8Array(transferU16(name.length)),
+        new Uint8Array(transferU16(0)), name, data
+      ]);
+      local.push(localHead);
+      var centralHead = transferConcat([
+        new Uint8Array([0x50, 0x4B, 0x01, 0x02]), new Uint8Array(transferU16(20)),
+        new Uint8Array(transferU16(20)), new Uint8Array(transferU16(0x0800)),
+        new Uint8Array(transferU16(0)), new Uint8Array(transferU16(dt.time)),
+        new Uint8Array(transferU16(dt.date)), new Uint8Array(transferU32(crc)),
+        new Uint8Array(transferU32(data.length)), new Uint8Array(transferU32(data.length)),
+        new Uint8Array(transferU16(name.length)), new Uint8Array(transferU16(0)),
+        new Uint8Array(transferU16(0)), new Uint8Array(transferU16(0)),
+        new Uint8Array(transferU16(0)), new Uint8Array(transferU32(0)),
+        new Uint8Array(transferU32(offset)), name
+      ]);
+      central.push(centralHead);
+      offset += localHead.length;
+    });
+    var centralData = transferConcat(central);
+    var end = transferConcat([
+      new Uint8Array([0x50, 0x4B, 0x05, 0x06]), new Uint8Array(transferU16(0)),
+      new Uint8Array(transferU16(0)), new Uint8Array(transferU16(files.length)),
+      new Uint8Array(transferU16(files.length)), new Uint8Array(transferU32(centralData.length)),
+      new Uint8Array(transferU32(offset)), new Uint8Array(transferU16(0))
+    ]);
+    return new Blob(local.concat(central, [end]), { type: 'application/zip' });
+  }
+  function transferZipForPosts(posts) {
+    var used = {}, files = [];
+    (posts || []).forEach(function (post) {
+      var base = transferSlug(post.title || post.id || 'post') || 'post';
+      var name = base + '.md', n = 2;
+      while (used[name]) { name = base + '-' + n + '.md'; n++; }
+      used[name] = true;
+      files.push({ name: name, text: transferPostMarkdown(post) });
+    });
+    files.push({ name: 'posts.json', text: transferBackupJson(posts) });
+    return transferZip(files);
+  }
+  async function transferExportOne(id, button) {
+    var old = button ? button.innerHTML : '';
+    if (button) { button.disabled = true; button.innerHTML = icon('spinner', 12) + ' ' + t('admin.transfer.exporting'); }
+    try {
+      var posts = await listFullPosts();
+      var post = posts.filter(function (p) { return p.id === id; })[0];
+      if (!post) { toast(t('admin.postList.notFound'), 'err'); return; }
+      var name = (transferSlug(post.title || post.id) || 'post') + '.md';
+      transferDownloadText(name, transferPostMarkdown(post), 'text/markdown;charset=utf-8');
+      toast(t('admin.transfer.exported', { count: 1 }), 'ok');
+    } catch (e) {
+      toast(t('admin.transfer.exportFail') + (e.message || e), 'err');
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = old; }
+    }
+  }
+  async function transferExportPosts(content, ids) {
+    var status = content.querySelector('#abIeStatus');
+    if (status) status.textContent = t('admin.transfer.exporting');
+    try {
+      var all = await listFullPosts();
+      var map = {};
+      all.forEach(function (p) { map[p.id] = p; });
+      var posts = ids && ids.length ? ids.map(function (id) { return map[id]; }).filter(Boolean) : all;
+      if (!posts.length) { toast(t('admin.transfer.noSelection'), 'err'); return; }
+      transferDownload('qingyu-posts-' + transferStamp() + '.zip', transferZipForPosts(posts));
+      toast(t('admin.transfer.exported', { count: posts.length }), 'ok');
+    } catch (e) {
+      toast(t('admin.transfer.exportFail') + (e.message || e), 'err');
+    } finally {
+      if (status) status.textContent = '';
+    }
+  }
+  async function transferExportBackup(content) {
+    var status = content.querySelector('#abIeStatus');
+    if (status) status.textContent = t('admin.transfer.exporting');
+    try {
+      var posts = await listFullPosts();
+      transferDownloadText('qingyu-backup-' + transferStamp() + '.json', transferBackupJson(posts), 'application/json;charset=utf-8');
+      toast(t('admin.transfer.exported', { count: posts.length }), 'ok');
+    } catch (e) {
+      toast(t('admin.transfer.exportFail') + (e.message || e), 'err');
+    } finally {
+      if (status) status.textContent = '';
+    }
+  }
+  function transferReadFile(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(String(reader.result || '')); };
+      reader.onerror = function () { reject(reader.error || new Error('read failed')); };
+      reader.readAsText(file);
+    });
+  }
+  function transferSyncStaticImported(post) {
+    if (!Array.isArray(window.BLOG_POSTS)) return;
+    var idx = -1;
+    for (var i = 0; i < window.BLOG_POSTS.length; i++) {
+      if (window.BLOG_POSTS[i] && window.BLOG_POSTS[i].id === post.id) { idx = i; break; }
+    }
+    if (idx >= 0) window.BLOG_POSTS[idx] = Object.assign({}, window.BLOG_POSTS[idx], post);
+    else window.BLOG_POSTS.push(post);
+  }
+  async function transferImportFiles(fileList, content) {
+    var files = Array.prototype.slice.call(fileList || []);
+    if (!files.length) return;
+    var status = content.querySelector('#abIeStatus');
+    if (status) status.textContent = t('admin.transfer.reading');
+    var parsed = [];
+    var failed = 0;
+    for (var i = 0; i < files.length; i++) {
+      var name = String(files[i].name || '');
+      if (!/\.(md|markdown|json)$/i.test(name)) continue;
+      try {
+        var text = await transferReadFile(files[i]);
+        var list = /\.json$/i.test(name) ? transferParseJson(text) : [transferParseMarkdown(text, name)];
+        list.forEach(function (p) { if (p) parsed.push(p); });
+      } catch (e) { failed++; }
+    }
+    if (!parsed.length) {
+      if (status) status.textContent = '';
+      toast(t('admin.transfer.invalidFiles'), 'err');
+      return;
+    }
+    var used = {};
+    parsed.forEach(function (post) {
+      var base = post.id, n = 2;
+      while (used[post.id]) { post.id = base + '-' + n; n++; }
+      used[post.id] = true;
+    });
+    var existing = {};
+    try {
+      var current = await listPosts();
+      current.forEach(function (p) { existing[p.id] = p; });
+    } catch (e) {}
+    var conflicts = parsed.filter(function (p) { return !!existing[p.id]; });
+    function runImport() {
+      var ok = 0;
+      (async function () {
+        for (var i = 0; i < parsed.length; i++) {
+          var post = parsed[i];
+          if (status) status.textContent = t('admin.transfer.importing', { done: i + 1, total: parsed.length });
+          try {
+            await savePost(post, !existing[post.id]);
+            if (!cloudOn()) transferSyncStaticImported(post);
+            ok++;
+          } catch (e) { failed++; }
+        }
+        if (status) status.textContent = '';
+        if (ok) {
+          toast(cloudOn() ? t('admin.transfer.imported', { count: ok }) : t('admin.transfer.importedLocal', { count: ok }), 'ok');
+          pageImportExport(content);
+        } else {
+          toast(t('admin.transfer.importFail'), 'err');
+        }
+      })();
+    }
+    if (conflicts.length) {
+      confirmModal(t('admin.transfer.overwriteTitle'),
+        '<p class="ab-muted">' + esc(t('admin.transfer.overwriteBody', { count: conflicts.length })) + '</p>',
+        runImport, t('admin.transfer.continue'));
+    } else {
+      runImport();
+    }
+  }
+  function pageImportExport(content) {
+    content.innerHTML =
+      '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.transfer.title') + '</h1><p class="ab-page-sub">' + t('admin.transfer.desc') + '</p></div>' +
+        '<div class="ab-row" style="align-items:center;gap:8px;flex-wrap:wrap">' +
+          '<button class="ab-btn" id="abIeImportFiles">' + icon('upload', 15) + ' ' + t('admin.transfer.importFiles') + '</button>' +
+          '<button class="ab-btn primary" id="abIeImportFolder">' + icon('file', 15) + ' ' + t('admin.transfer.importFolder') + '</button>' +
+        '</div></div>' +
+      '<input type="file" id="abIeFileInput" accept=".md,.markdown,.json" multiple hidden>' +
+      '<input type="file" id="abIeFolderInput" accept=".md,.markdown,.json" multiple webkitdirectory directory hidden>' +
+      '<div class="ab-grid cols-2">' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('download', 16) + ' ' + t('admin.transfer.exportTitle') + '</div>' +
+          '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.exportHint') + '</p>' +
+          '<div class="ab-row" style="gap:8px;flex-wrap:wrap"><button class="ab-btn" id="abIeExportAll">' + icon('download', 14) + ' ' + t('admin.transfer.exportAll') + '</button>' +
+          '<button class="ab-btn" id="abIeExportBackup">' + icon('save', 14) + ' ' + t('admin.transfer.exportBackup') + '</button></div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('upload', 16) + ' ' + t('admin.transfer.importTitle') + '</div>' +
+          '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.importHint') + '</p>' +
+          '<p class="ab-hint" id="abIeStatus" style="min-height:18px;margin:0"></p></div>' +
+      '</div>' +
+      '<div class="ab-card" style="margin-top:18px">' +
+        '<div class="ab-toolbar" style="margin-bottom:12px;align-items:center">' +
+          '<label class="ab-row" style="align-items:center;gap:7px;cursor:pointer"><input type="checkbox" id="abIeSelectAll"> <span>' + t('admin.transfer.selectAll') + '</span></label>' +
+          '<span class="ab-muted" id="abIeSelected" style="font-size:13px">' + t('admin.transfer.selected', { count: 0 }) + '</span>' +
+          '<button class="ab-btn sm" id="abIeExportSelected" style="margin-left:auto">' + icon('download', 13) + ' ' + t('admin.transfer.exportSelected') + '</button>' +
+        '</div>' +
+        '<div class="ab-table-wrap"><table class="ab-table"><thead><tr><th style="width:40px"></th><th>' + t('admin.transfer.colPost') + '</th><th>' + t('admin.transfer.colDate') + '</th><th>' + t('admin.transfer.colStatus') + '</th><th class="col-actions">' + t('admin.transfer.colActions') + '</th></tr></thead><tbody id="abIeTableBody"></tbody></table></div>' +
+      '</div>';
+    bindImportExport(content);
+    loadImportExport(content);
+  }
+  function bindImportExport(content) {
+    var fileInput = content.querySelector('#abIeFileInput');
+    var folderInput = content.querySelector('#abIeFolderInput');
+    content.querySelector('#abIeImportFiles').addEventListener('click', function () { fileInput.value = ''; fileInput.click(); });
+    content.querySelector('#abIeImportFolder').addEventListener('click', function () { folderInput.value = ''; folderInput.click(); });
+    fileInput.addEventListener('change', function () { transferImportFiles(fileInput.files, content); });
+    folderInput.addEventListener('change', function () { transferImportFiles(folderInput.files, content); });
+    content.querySelector('#abIeExportAll').addEventListener('click', function () { transferExportPosts(content, null); });
+    content.querySelector('#abIeExportBackup').addEventListener('click', function () { transferExportBackup(content); });
+    var all = content.querySelector('#abIeSelectAll');
+    all.addEventListener('change', function () {
+      content.querySelectorAll('.ab-ie-check').forEach(function (cb) { cb.checked = all.checked; });
+      updateImportExportSelection(content);
+    });
+  }
+  function updateImportExportSelection(content) {
+    var checks = Array.prototype.slice.call(content.querySelectorAll('.ab-ie-check'));
+    var selected = checks.filter(function (cb) { return cb.checked; });
+    var all = content.querySelector('#abIeSelectAll');
+    if (all) {
+      all.checked = checks.length > 0 && selected.length === checks.length;
+      all.indeterminate = selected.length > 0 && selected.length < checks.length;
+    }
+    var label = content.querySelector('#abIeSelected');
+    if (label) label.textContent = t('admin.transfer.selected', { count: selected.length });
+  }
+  async function loadImportExport(content) {
+    var body = content.querySelector('#abIeTableBody');
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.transfer.loading') + '</td></tr>';
+    var posts = [];
+    try { posts = await listPosts(); }
+    catch (e) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
+      return;
+    }
+    posts.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
+    if (!posts.length) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.transfer.empty') + '</td></tr>';
+      return;
+    }
+    body.innerHTML = posts.map(function (p) {
+      var isDraft = (p.status || 'published') === 'draft';
+      var badge = '<span class="ab-status ' + (isDraft ? 'draft' : 'published') + '">' + (isDraft ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
+      return '<tr>' +
+        '<td><input class="ab-ie-check" type="checkbox" data-id="' + esc(enc(p.id)) + '"></td>' +
+        '<td><b>' + esc(p.title || t('admin.postList.noTitle')) + '</b>' + (p.pinned ? ' <span class="ab-chip">' + t('admin.postList.pin') + '</span>' : '') + '</td>' +
+        '<td class="ab-td-date">' + esc(fmtDate(p.date)) + '</td>' +
+        '<td class="ab-td-status">' + badge + '</td>' +
+        '<td class="col-actions"><button class="ab-btn sm" data-ie-export="' + esc(enc(p.id)) + '">' + icon('download', 12) + ' ' + t('admin.transfer.exportMd') + '</button></td>' +
+      '</tr>';
+    }).join('');
+    body.querySelectorAll('.ab-ie-check').forEach(function (cb) { cb.addEventListener('change', function () { updateImportExportSelection(content); }); });
+    body.querySelectorAll('[data-ie-export]').forEach(function (btn) {
+      btn.addEventListener('click', function () { transferExportOne(dec(btn.getAttribute('data-ie-export')), btn); });
+    });
+    content.querySelector('#abIeExportSelected').onclick = function () {
+      var ids = Array.prototype.slice.call(content.querySelectorAll('.ab-ie-check')).filter(function (cb) { return cb.checked; }).map(function (cb) { return dec(cb.getAttribute('data-id')); });
+      transferExportPosts(content, ids);
+    };
+    updateImportExportSelection(content);
+  }
 
   /* ====================== AI（写作助手 & 评论汇总） ======================
    * 复用 window.aiProbe 探测（app.js）；AI 不可用 → slot 留空，后台其余功能不受影响。
@@ -2173,7 +2640,17 @@
   }
 
   /* ----------------------- 导出 ----------------------- */
-  window.QingyuAdmin = { mount: mount, openPwdModal: openPasswordModal };
+  window.QingyuAdmin = {
+    mount: mount,
+    openPwdModal: openPasswordModal,
+    _transfer: {
+      postToMarkdown: transferPostMarkdown,
+      parseMarkdown: transferParseMarkdown,
+      parseJson: transferParseJson,
+      backup: transferBackupJson,
+      zip: transferZipForPosts
+    }
+  };
 
   /* app.js 先于本脚本执行时，初次 route() 因 QingyuAdmin 尚未定义而走了旧后台渲染。
    * 本脚本加载完成后，若当前已在后台路由，重新分发一次路由以挂载新版后台 UI。 */

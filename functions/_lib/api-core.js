@@ -317,25 +317,37 @@ async function readStaticPosts(env) {
 export async function handlePosts(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
-  if (request.method === 'POST' && !(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
   if (request.method === 'GET') {
-    // 列表只返回已发布文章的摘要（不含 content/enc），草稿不对外暴露；
-    // 正文按需通过 /api/posts/:id 加载；非加密文章附带 search 字段供前端搜索使用。
-    const all = sortByDateDesc(await readPosts(env)).filter((p) => p.status !== 'draft');
+    const url = new URL(request.url);
+    const full = url.searchParams.get('full') === '1';
+    const includeDrafts = full || url.searchParams.get('all') === '1';
+
+    // all=1 / full=1 是后台接口：必须登录，可返回草稿（full=1 还返回正文）。
+    // 公开的 GET /api/posts 仍只返回已发布摘要，且响应不区分管理员身份。
+    if (includeDrafts && !(await isWriteAuthed(request, env))) return unauthorized(request, env);
+
+    let all = sortByDateDesc(await readPosts(env));
+    if (!includeDrafts) all = all.filter((p) => p.status !== 'draft');
+
+    // 完整备份：正文/密文原样返回，禁止写进共享缓存。
+    if (full) return json({ ok: true, posts: all }, 200, request, env, { 'Cache-Control': NO_CACHE });
+
     const summary = all.map((p) => {
       if (!p.protected) {
-        const s = String(p.content || '');
-        if (s) p.search = s.slice(0, 800);
+        const content = String(p.content || '');
+        if (content) p.search = content.slice(0, 800);
       }
       delete p.content;
       delete p.enc;
       return p;
     });
-    return json({ ok: true, posts: summary }, 200, request, env, { 'Cache-Control': READ_CACHE, 'Cache-Tag': TAG_POSTS });
+    return json({ ok: true, posts: summary }, 200, request, env,
+      includeDrafts ? { 'Cache-Control': NO_CACHE } : { 'Cache-Control': READ_CACHE, 'Cache-Tag': TAG_POSTS });
   }
 
   if (request.method === 'POST') {
+    if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
     const body = await request.json().catch(() => null);
     const p = normalizePost(body);
     if (!p.id || !p.title) return json({ error: '缺少 id 或 title' }, 400, request, env);
