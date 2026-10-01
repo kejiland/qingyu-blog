@@ -73,8 +73,16 @@
   function makeParticle(anywhere) {
     var kind;
     switch (season) {
-      case 0: kind = Math.random() < 0.85 ? 'petal' : 'dust'; break;   // 春：花瓣为主 + 花粉微尘
-      case 1: kind = Math.random() < 0.5 ? 'mote' : 'cloud'; break;    // 夏：日光微尘 + 流云
+      case 0: {
+        var springRoll = Math.random();
+        kind = springRoll < 0.18 ? 'blossom' : (springRoll < 0.88 ? 'petal' : 'dust');
+        break;  // 春：小簇樱花 + 花瓣 + 花粉微尘
+      }
+      case 1: {
+        var summerRoll = Math.random();
+        kind = summerRoll < 0.52 ? 'cloud' : (summerRoll < 0.9 ? 'mote' : 'ray');
+        break;  // 夏：暖金流云 + 日光微尘 + 细阳光带
+      }
       case 2: kind = Math.random() < 0.85 ? 'leaf' : 'dust'; break;    // 秋：落叶为主
       default: kind = 'snow';                                          // 冬：飘雪
     }
@@ -92,8 +100,10 @@
       alpha: rnd(0.5, 1),
       seed: Math.floor(rnd(0, 1e9)) % 997   // 画"手绘抖动"的伪随机种子
     };
-    if (p.kind === 'cloud') { p.size = rnd(26, 52); p.vy = rnd(4, 10); p.swayAmp = rnd(4, 12); p.alpha = rnd(0.18, 0.32); }
-    if (p.kind === 'petal') { p.vy = rnd(20, 40); p.swayAmp = rnd(26, 48); }
+    if (p.kind === 'cloud') { p.size = rnd(40, 88); p.vy = rnd(4, 9); p.swayAmp = rnd(4, 12); p.alpha = rnd(0.34, 0.54); }
+    if (p.kind === 'ray') { p.size = rnd(28, 72); p.vy = rnd(5, 10); p.swayAmp = rnd(8, 20); p.alpha = rnd(0.12, 0.22); }
+    if (p.kind === 'blossom') { p.size = rnd(6, 10); p.vy = rnd(14, 28); p.swayAmp = rnd(18, 38); p.rotSpeed = rnd(-0.7, 0.7); p.alpha = rnd(0.62, 0.95); }
+    if (p.kind === 'petal') { p.size = rnd(7, 13); p.vy = rnd(20, 40); p.swayAmp = rnd(26, 48); p.alpha = rnd(0.58, 0.9); }
     if (p.kind === 'leaf') { p.vy = rnd(24, 50); p.swayAmp = rnd(40, 70); }
     if (p.kind === 'snow') { p.size = rnd(6, 12); p.vy = rnd(14, 34); p.swayAmp = rnd(18, 42); p.alpha = rnd(0.72, 1); }
     return p;
@@ -133,6 +143,8 @@
     ctx.quadraticCurveTo(-s * 0.12, -s * 0.78, jx, -s * 0.42);
     ctx.quadraticCurveTo(s * 0.12, -s * 0.78, s * 0.34, -s * 0.6);
     ctx.quadraticCurveTo(s + jx, -s * 0.2, jx, s);
+    ctx.fillStyle = 'rgba(201, 143, 160, 0.12)';
+    ctx.fill();
     // 中脉 + 两条侧脉
     ctx.moveTo(jx, s - s * 0.12);
     ctx.lineTo(jx, -s * 0.25);
@@ -141,6 +153,32 @@
     ctx.moveTo(jx, s * 0.3);
     ctx.lineTo(s * 0.35, s * 0.15);
     ctx.stroke();
+    ctx.restore();
+  }
+  function drawBlossom(ctx, p) {
+    var s = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.beginPath();
+    // 五瓣小花：春动画里再加入少量完整花簇，让季节特征更明确
+    for (var i = 0; i < 5; i++) {
+      var a = -Math.PI / 2 + i * Math.PI * 2 / 5;
+      var c = Math.cos(a), sn = Math.sin(a);
+      var px = -sn, py = c;
+      var tx = c * s, ty = sn * s;
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(c * s * 0.42 + px * s * 0.45, sn * s * 0.42 + py * s * 0.45, tx, ty);
+      ctx.quadraticCurveTo(c * s * 0.42 - px * s * 0.45, sn * s * 0.42 - py * s * 0.45, 0, 0);
+    }
+    ctx.fillStyle = 'rgba(201, 143, 160, 0.16)';
+    ctx.fill();
+    ctx.stroke();
+    // 花心
+    ctx.beginPath();
+    ctx.arc(0, 0, s * 0.18, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(217, 179, 87, 0.42)';
+    ctx.fill();
     ctx.restore();
   }
   function drawLeaf(ctx, p) {
@@ -204,12 +242,34 @@
     var s = p.size, jx = sketchJitter(ctx, p);
     ctx.save();
     ctx.translate(p.x, p.y);
+    // 日光微尘：柔亮圆点 + 细十字高光
     ctx.beginPath();
-    // 日光微尘：微小十字光点
+    ctx.arc(0, 0, Math.max(1.2, s * 0.32), 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(217, 179, 87, 0.38)';
+    ctx.fill();
+    ctx.beginPath();
     ctx.moveTo(-s + jx, 0);
     ctx.lineTo(s + jx, 0);
     ctx.moveTo(0, -s + jx * 0.4);
     ctx.lineTo(0, s + jx * 0.4);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawRay(ctx, p) {
+    var s = p.size;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.rotate(p.rot);
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    // 细阳光带：一条弯曲的暖色光痕，和云、微尘组合成夏日空气感
+    ctx.moveTo(-s, 0);
+    ctx.quadraticCurveTo(0, -s * 0.14, s, 0);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.55;
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.72, s * 0.16);
+    ctx.quadraticCurveTo(0, s * 0.04, s * 0.72, s * 0.16);
     ctx.stroke();
     ctx.restore();
   }
@@ -219,7 +279,7 @@
     ctx.globalAlpha = p.alpha;
     ctx.translate(p.x, p.y);
     ctx.beginPath();
-    // 流云：蓬松圆弧轮廓，比单纯两道波浪更接近云朵
+    // 流云：蓬松圆弧轮廓 + 暖色半透明填充，让夏季云层更可辨识
     ctx.moveTo(-s + jx, p.size * 0.28);
     ctx.quadraticCurveTo(-s - p.size * 0.2, -p.size * 0.18, -s * 0.5, -p.size * 0.22);
     ctx.quadraticCurveTo(-s * 0.55, -p.size * 0.72, -s * 0.12, -p.size * 0.62);
@@ -229,16 +289,51 @@
     ctx.quadraticCurveTo(s * 1.15, p.size * 0.2, s * 0.4, p.size * 0.28);
     ctx.quadraticCurveTo(s * 0.25, p.size * 0.42, -s * 0.35, p.size * 0.42);
     ctx.quadraticCurveTo(-s * 0.85, p.size * 0.5, -s + jx, p.size * 0.28);
+    ctx.fillStyle = 'rgba(217, 179, 87, 0.075)';
+    ctx.fill();
+    ctx.stroke();
+    // 内部云脊线，增强层次
+    ctx.beginPath();
+    ctx.moveTo(-s * 0.65, p.size * 0.05);
+    ctx.quadraticCurveTo(-s * 0.28, -p.size * 0.5, s * 0.05, -p.size * 0.2);
+    ctx.quadraticCurveTo(s * 0.32, -p.size * 0.55, s * 0.68, -p.size * 0.05);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawSummerSun() {
+    var x = W - Math.min(150, W * 0.12), y = Math.min(130, H * 0.15);
+    var r = Math.max(54, Math.min(92, W * 0.055));
+    ctx.save();
+    var glow = ctx.createRadialGradient(x, y, 0, x, y, r * 1.65);
+    glow.addColorStop(0, 'rgba(217, 179, 87, 0.14)');
+    glow.addColorStop(0.45, 'rgba(217, 179, 87, 0.065)');
+    glow.addColorStop(1, 'rgba(217, 179, 87, 0)');
+    ctx.fillStyle = glow;
+    ctx.beginPath();
+    ctx.arc(x, y, r * 1.65, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha *= 0.38;
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.stroke();
+    for (var i = 0; i < 8; i++) {
+      var a = i * Math.PI / 4 + 0.22;
+      ctx.moveTo(x + Math.cos(a) * r * 1.18, y + Math.sin(a) * r * 1.18);
+      ctx.lineTo(x + Math.cos(a) * r * 1.42, y + Math.sin(a) * r * 1.42);
+    }
     ctx.stroke();
     ctx.restore();
   }
   function drawParticle(ctx, p) {
     switch (p.kind) {
       case 'petal': drawPetal(ctx, p); break;
+      case 'blossom': drawBlossom(ctx, p); break;
       case 'leaf': drawLeaf(ctx, p); break;
       case 'snow': drawSnow(ctx, p); break;
       case 'mote': drawMote(ctx, p); break;
       case 'cloud': drawCloud(ctx, p); break;
+      case 'ray': drawRay(ctx, p); break;
+      case 'dust': drawMote(ctx, p); break;
     }
   }
 
@@ -259,6 +354,7 @@
     ctx.lineWidth = 1.4;
     ctx.lineCap = 'round';
     ctx.strokeStyle = PALETTE[season];
+    if (season === 1) drawSummerSun();
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
       ctx.globalAlpha = p.alpha * (p.kind === 'snow' ? 0.78 : 0.5);   // 整体低透明，雪花略清晰，不抢正文
