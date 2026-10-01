@@ -9,7 +9,8 @@
  *   · 桌面默认开启；触屏/手机默认关闭（省电、提升 PageSpeed）；localStorage(qingyu.bgAnim) 持久化用户开关
  *   · 尊重 prefers-reduced-motion（系统"减少动态"自动关闭）
  *   · 标签页隐藏自动暂停（省电）；只首页运行；iOS/小屏自动减半粒子数
- *   · 暴露 window.bgAnim：{ on, off, toggle, isOn, sync, seasonName }
+ *   · 暴露 window.bgAnim：{ on, off, toggle, isOn, sync, seasonName, setSeason, clearSeason }
+ *   · 预览指定季节：/?season=spring|summer|autumn|winter&bg=1
  * 与 app.js 协作：app.js 顶栏加开关按钮，点击调 bgAnim.toggle()；
  * 路由变化由全局 'qy:route' 事件驱动 bgAnim.sync()。
  * ============================================================ */
@@ -23,6 +24,8 @@
   var enabled = true;    // 用户开关状态（默认开）
   var season = -1;       // 0春 1夏 2秋 3冬
   var seasonNames = ['spring', 'summer', 'autumn', 'winter'];
+  var seasonMap = { spring: 0, summer: 1, autumn: 2, winter: 3 };
+  var seasonOverride = null; // 预览 / 调试时可强制指定季节
   var isIOS = false;
   var reduced = false;
   var MAX = 48;
@@ -35,6 +38,9 @@
     } catch (e) { return false; }
   }
   function readSetting() {
+    try {
+      if (new URLSearchParams(location.search).get('bg') === '1') return true;
+    } catch (e) {}
     try {
       var v = localStorage.getItem(KEY);
       if (v === '0') return false;
@@ -49,6 +55,11 @@
 
   // ---------- 季节判定（按月分季） ----------
   function currentSeason() {
+    if (seasonOverride !== null) return seasonOverride;
+    try {
+      var key = String(new URLSearchParams(location.search).get('season') || '').toLowerCase();
+      if (Object.prototype.hasOwnProperty.call(seasonMap, key)) return seasonMap[key];
+    } catch (e) {}
     return Math.floor(((new Date()).getMonth() % 12) / 3);  // 0春 1夏 2秋 3冬
   }
 
@@ -84,7 +95,7 @@
     if (p.kind === 'cloud') { p.size = rnd(26, 52); p.vy = rnd(4, 10); p.swayAmp = rnd(4, 12); p.alpha = rnd(0.18, 0.32); }
     if (p.kind === 'petal') { p.vy = rnd(20, 40); p.swayAmp = rnd(26, 48); }
     if (p.kind === 'leaf') { p.vy = rnd(24, 50); p.swayAmp = rnd(40, 70); }
-    if (p.kind === 'snow') { p.vy = rnd(14, 34); p.swayAmp = rnd(18, 42); }
+    if (p.kind === 'snow') { p.size = rnd(6, 12); p.vy = rnd(14, 34); p.swayAmp = rnd(18, 42); p.alpha = rnd(0.72, 1); }
     return p;
   }
   function update(p, dt) {
@@ -154,24 +165,38 @@
     ctx.restore();
   }
   function drawSnow(ctx, p) {
-    var s = p.size, jx = sketchJitter(ctx, p);
+    var s = p.size;
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
+    ctx.lineWidth = Math.max(0.9, Math.min(1.6, s * 0.11));
     ctx.beginPath();
-    // 六角雪花：主枝 + 侧枝，比单纯米字更符合雪花形态
+    // 经典六角雪花：六向主枝 + 每枝两侧多级分叉 + 中心六边形。
+    var branch = [0.38, 0.64, 0.84];
     for (var i = 0; i < 6; i++) {
       var a = i * Math.PI / 3;
       var c = Math.cos(a), sn = Math.sin(a);
-      ctx.moveTo(c * -s, sn * -s);
+      ctx.moveTo(0, 0);
       ctx.lineTo(c * s, sn * s);
-      var bx = c * s * 0.62, by = sn * s * 0.62;
-      var dir = (i % 2) ? -1 : 1;
-      ctx.moveTo(bx, by);
-      ctx.lineTo(bx - sn * s * 0.26 * dir, by + c * s * 0.26 * dir);
-      ctx.moveTo(bx * 0.55, by * 0.55);
-      ctx.lineTo(bx * 0.55 - sn * s * 0.18 * dir, by * 0.55 + c * s * 0.18 * dir);
+      for (var j = 0; j < branch.length; j++) {
+        var t = branch[j], len = s * (0.30 - j * 0.055);
+        var bx = c * s * t, by = sn * s * t;
+        var spread = 0.72;
+        var a1 = a + spread, a2 = a - spread;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + Math.cos(a1) * len, by + Math.sin(a1) * len);
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + Math.cos(a2) * len, by + Math.sin(a2) * len);
+      }
     }
+    // 中心六边形，让雪花不是单纯放射线
+    var r = s * 0.14;
+    for (var k = 0; k < 6; k++) {
+      var ha = k * Math.PI / 3;
+      var hx = Math.cos(ha) * r, hy = Math.sin(ha) * r;
+      if (k === 0) ctx.moveTo(hx, hy); else ctx.lineTo(hx, hy);
+    }
+    ctx.closePath();
     ctx.stroke();
     ctx.restore();
   }
@@ -236,7 +261,7 @@
     ctx.strokeStyle = PALETTE[season];
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
-      ctx.globalAlpha = p.alpha * 0.5;   // 整体低透明，不抢正文
+      ctx.globalAlpha = p.alpha * (p.kind === 'snow' ? 0.78 : 0.5);   // 整体低透明，雪花略清晰，不抢正文
       var np = update(p, dt);
       if (np !== p) particles[i] = np;
       drawParticle(ctx, particles[i]);
@@ -286,6 +311,19 @@
   function toggle() { setOn(!enabled); }
   function isOn() { return enabled; }
   function seasonName() { return seasonNames[season < 0 ? currentSeason() : season]; }
+  function setSeason(value) {
+    var n = typeof value === 'string' ? seasonMap[value.toLowerCase()] : Number(value);
+    if (n == null || !isFinite(n) || n < 0 || n > 3) return false;
+    seasonOverride = n;
+    season = -1;
+    sync();
+    return true;
+  }
+  function clearSeason() {
+    seasonOverride = null;
+    season = -1;
+    sync();
+  }
 
   // ---------- 初始化 ----------
   function boot() {
@@ -326,5 +364,5 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 
-  window.bgAnim = { on: on, off: off, toggle: toggle, isOn: isOn, sync: sync, seasonName: seasonName };
+  window.bgAnim = { on: on, off: off, toggle: toggle, isOn: isOn, sync: sync, seasonName: seasonName, setSeason: setSeason, clearSeason: clearSeason };
 })();
