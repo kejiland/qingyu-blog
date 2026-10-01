@@ -530,5 +530,8 @@
   "admin.transfer.exporting": "कार्य हो रहा है…",
   "admin.transfer.exported": "{count} लेख निर्यात किए गए",
   "admin.transfer.exportFail": "निर्यात विफल: ",
-  "admin.transfer.noSelection": "पहले कम से कम एक लेख चुनें"
+  "admin.transfer.noSelection": "पहले कम से कम एक लेख चुनें",
+  "admin.editor.dateLabel": "प्रकाशन समय",
+  "admin.editor.dateHint": "मिनट तक सटीक; लेख संपादित करने पर प्रकाशन समय अपने आप नहीं बदलेगा",
+  "admin.editor.setNow": "अब"
 }

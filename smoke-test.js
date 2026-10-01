@@ -403,6 +403,11 @@ tests.push(['admin 导入导出：Markdown 往返 / JSON 备份 / ZIP 打包', a
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
   const tr = b.win.QingyuAdmin && b.win.QingyuAdmin._transfer;
   assert.ok(tr && tr.postToMarkdown && tr.parseMarkdown && tr.zip, '导入导出工具已暴露');
+  const ed = b.win.QingyuAdmin && b.win.QingyuAdmin._editor;
+  assert.ok(ed && ed.toDateTimeLocal && ed.normalizeEditorDate, '编辑器日期工具已暴露');
+  assert.strictEqual(ed.toDateTimeLocal('2026-10-01'), '2026-10-01T00:00', '纯日期补 00:00');
+  assert.strictEqual(ed.toDateTimeLocal('2026-10-01 09:05'), '2026-10-01T09:05', '分钟时间转换正确');
+  assert.strictEqual(ed.normalizeEditorDate('2026-10-01T09:05'), '2026-10-01 09:05', '保存时转为分钟精度');
   const source = {
     id: 'round-trip', title: '往返测试: 标题', date: '2026-09-30', tags: ['技术', '写作'],
     excerpt: '摘要', cover: 'https://example.com/cover.jpg', category: '随笔',

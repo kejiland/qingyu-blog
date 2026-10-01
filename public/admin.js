@@ -48,6 +48,28 @@
     if (!s) return '';
     return s.slice(0, 10);
   }
+  function pad2(n) { return String(n).padStart(2, '0'); }
+  function fmtPostDate(s) {
+    var raw = String(s || '').trim();
+    var m = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}):(\d{2}))?/);
+    if (!m) return raw;
+    return m[1] + (m[2] ? ' ' + (m[2].length === 1 ? '0' + m[2] : m[2]) + ':' + m[3] : '');
+  }
+  function localDateTimeValue(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()) + 'T'
+      + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
+  }
+  function toDateTimeLocal(v) {
+    var s = String(v || '').trim();
+    var m = s.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/);
+    if (m) return m[1] + 'T' + (m[2] ? (m[2].length === 1 ? '0' + m[2] : m[2]) + ':' + m[3] : '00:00');
+    return s;
+  }
+  function normalizeEditorDate(v) {
+    var s = String(v || '').trim().replace('T', ' ');
+    return s || localDateTimeValue(new Date()).replace('T', ' ');
+  }
   function fmtSize(n) {
     n = Number(n) || 0;
     if (n < 1024) return n + ' B';
@@ -953,7 +975,7 @@
       return '<tr>' +
         '<td><a class="ab-post-title" data-link="/admin/posts/' + enc(id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a></td>' +
         '<td class="ab-td-tags">' + (p.tags && p.tags.length ? '<div class="ab-tag-row">' + p.tags.map(function (t) { return '<span class="ab-chip">' + esc(t) + '</span>'; }).join('') + '</div>' : '<span class="ab-muted">—</span>') + '</td>' +
-        '<td class="ab-td-date">' + esc(fmtDate(p.date)) + '</td>' +
+        '<td class="ab-td-date">' + esc(fmtPostDate(p.date)) + '</td>' +
         '<td class="ab-td-status">' + statusBadge + '</td>' +
         '<td class="col-actions">' +
           '<button class="ab-btn sm" data-edit="' + enc(id) + '">' + icon('pen', 13) + ' ' + t('admin.postList.edit') + '</button> ' +
@@ -1475,7 +1497,7 @@
       return '<tr>' +
         '<td><input class="ab-ie-check" type="checkbox" data-id="' + esc(enc(p.id)) + '"></td>' +
         '<td><b>' + esc(p.title || t('admin.postList.noTitle')) + '</b>' + (p.pinned ? ' <span class="ab-chip">' + t('admin.postList.pin') + '</span>' : '') + '</td>' +
-        '<td class="ab-td-date">' + esc(fmtDate(p.date)) + '</td>' +
+        '<td class="ab-td-date">' + esc(fmtPostDate(p.date)) + '</td>' +
         '<td class="ab-td-status">' + badge + '</td>' +
         '<td class="col-actions"><button class="ab-btn sm" data-ie-export="' + esc(enc(p.id)) + '">' + icon('download', 12) + ' ' + t('admin.transfer.exportMd') + '</button></td>' +
       '</tr>';
@@ -1690,6 +1712,7 @@
         '<div class="ab-editor-meta">' +
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.tagsPlaceholder') + '</label><input class="ab-input" id="abTags" placeholder="' + t('admin.editor.tagsExample') + '" autocomplete="off"></div>' +
+          '<div class="ab-field" style="margin:0"><label class="ab-label" for="abDate">' + t('admin.editor.dateLabel') + '</label><div class="ab-row"><input class="ab-input" id="abDate" type="datetime-local" step="60"><button class="ab-btn sm" id="abNow">' + t('admin.editor.setNow') + '</button></div><label class="ab-hint">' + t('admin.editor.dateHint') + '</label></div>' +
         '</div>' +
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.coverPlaceholder') + '</label><div class="ab-row"><input class="ab-input" id="abCover" placeholder="https://…"><button class="ab-btn sm" id="abPickCover">' + t('admin.editor.selectMedia') + '</button></div></div>' +
         '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0">' +
@@ -1721,7 +1744,12 @@
       '</div>';
 
     bindEditor(content, route);
-    if (route.id) loadEditor(content, route.id); else updatePreview(content);
+    if (route.id) loadEditor(content, route.id);
+    else {
+      var dateInput = content.querySelector('#abDate');
+      if (dateInput) dateInput.value = localDateTimeValue(new Date());
+      updatePreview(content);
+    }
     initAbAi(content);
   }
 
@@ -1732,6 +1760,9 @@
     content.querySelector('#abToolbar').querySelectorAll('[data-md]').forEach(function (b) {
       b.addEventListener('click', function () { insertMd(area, b.getAttribute('data-md')); updatePreview(content); area.focus(); });
     });
+    var dateInput = content.querySelector('#abDate');
+    var nowBtn = content.querySelector('#abNow');
+    if (nowBtn && dateInput) nowBtn.addEventListener('click', function () { dateInput.value = localDateTimeValue(new Date()); });
     content.querySelector('#abSaveDraft').addEventListener('click', function () { saveEditor(content, route, 'draft'); });
     content.querySelector('#abPublish').addEventListener('click', function () { saveEditor(content, route, 'published'); });
     var exp = content.querySelector('#abExport');
@@ -1772,9 +1803,12 @@
   async function loadEditor(content, id) {
     var p = await getPost(id);
     if (!p) { toast(t('admin.editor.notFound'), 'err'); return; }
+    content.__editingPost = p;
     content.querySelector('#abTitle').value = p.title || '';
     content.querySelector('#abTags').value = (p.tags || []).join(', ');
     content.querySelector('#abCover').value = p.cover || '';
+    var dateInput = content.querySelector('#abDate');
+    if (dateInput) dateInput.value = toDateTimeLocal(p.date || '');
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
     updatePreview(content);
@@ -1787,14 +1821,16 @@
     var tags = content.querySelector('#abTags').value.split(/[,，]/).map(function (t) { return t.trim(); }).filter(Boolean);
 
     var wantPinned = !!content.querySelector('#abPinned').checked;
+    var dateInput = content.querySelector('#abDate');
+    var dateValue = normalizeEditorDate(dateInput ? dateInput.value : '');
 
-    var post = {
-      id: id, title: title, date: new Date().toISOString().slice(0, 10),
+    var post = Object.assign({}, content.__editingPost || {}, {
+      id: id, title: title, date: dateValue,
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: body, cover: content.querySelector('#abCover').value.trim(),
       pinned: wantPinned, tags: tags,
       status: status
-    };
+    });
 
     var btn = status === 'published' ? content.querySelector('#abPublish') : content.querySelector('#abSaveDraft');
     btn.disabled = true;
@@ -2671,6 +2707,11 @@
       parseJson: transferParseJson,
       backup: transferBackupJson,
       zip: transferZipForPosts
+    },
+    _editor: {
+      toDateTimeLocal: toDateTimeLocal,
+      normalizeEditorDate: normalizeEditorDate,
+      fmtPostDate: fmtPostDate
     }
   };
 

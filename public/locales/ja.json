@@ -530,5 +530,8 @@
   "admin.transfer.exporting": "処理中…",
   "admin.transfer.exported": "{count}件の記事をエクスポートしました",
   "admin.transfer.exportFail": "エクスポート失敗：",
-  "admin.transfer.noSelection": "先に記事を選択してください"
+  "admin.transfer.noSelection": "先に記事を選択してください",
+  "admin.editor.dateLabel": "公開日時",
+  "admin.editor.dateHint": "分単位で指定可能。記事を編集しても公開日時は自動変更されません",
+  "admin.editor.setNow": "現在"
 }

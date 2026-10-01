@@ -530,5 +530,8 @@
   "admin.transfer.exporting": "处理中…",
   "admin.transfer.exported": "已导出 {count} 篇文章",
   "admin.transfer.exportFail": "导出失败：",
-  "admin.transfer.noSelection": "请先选择文章"
+  "admin.transfer.noSelection": "请先选择文章",
+  "admin.editor.dateLabel": "发布时间",
+  "admin.editor.dateHint": "可精确到分钟；修改文章不会自动改变发布时间",
+  "admin.editor.setNow": "现在"
 }

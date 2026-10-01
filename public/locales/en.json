@@ -530,5 +530,8 @@
   "admin.transfer.exporting": "Working…",
   "admin.transfer.exported": "Exported {count} posts",
   "admin.transfer.exportFail": "Export failed: ",
-  "admin.transfer.noSelection": "Select at least one post first"
+  "admin.transfer.noSelection": "Select at least one post first",
+  "admin.editor.dateLabel": "Publish date",
+  "admin.editor.dateHint": "Minute precision; editing a post does not change its publish date automatically",
+  "admin.editor.setNow": "Now"
 }
