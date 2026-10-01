@@ -2,7 +2,7 @@
  * Qingyu'Blog · 背景素描动画（春夏秋冬 · 随时间自动切换 · 可一键关闭）
  * ------------------------------------------------------------
  * 零依赖 Canvas 2D：细线条手绘风（素描感）的季节粒子——
- *   春  花瓣     夏  流云 + 日光微尘
+ *   春  樱花瓣   夏  暖阳光晕
  *   秋  落叶     冬  飘雪
  * 特性：
  *   · 季节按月自动切换（3-5春 / 6-8夏 / 9-11秋 / 12-2冬），平滑换季
@@ -67,23 +67,17 @@
   function rnd(a, b) { return a + Math.random() * (b - a); }
   function reseed() {
     particles = [];
-    var count = Math.floor(MAX * (isIOS || W < 768 ? 0.5 : 1));
+    var seasonCount = [30, 0, 44, 48]; // 春花瓣 / 夏太阳 / 秋落叶 / 冬雪花
+    var base = seasonCount[season] || 0;
+    var count = Math.floor(base * (isIOS || W < 768 ? 0.5 : 1));
     for (var i = 0; i < count; i++) particles.push(makeParticle(true));
   }
   function makeParticle(anywhere) {
     var kind;
     switch (season) {
-      case 0: {
-        var springRoll = Math.random();
-        kind = springRoll < 0.18 ? 'blossom' : (springRoll < 0.88 ? 'petal' : 'dust');
-        break;  // 春：小簇樱花 + 花瓣 + 花粉微尘
-      }
-      case 1: {
-        var summerRoll = Math.random();
-        kind = summerRoll < 0.52 ? 'cloud' : (summerRoll < 0.9 ? 'mote' : 'ray');
-        break;  // 夏：暖金流云 + 日光微尘 + 细阳光带
-      }
-      case 2: kind = Math.random() < 0.85 ? 'leaf' : 'dust'; break;    // 秋：落叶为主
+      case 0: kind = 'petal'; break;      // 春：只保留樱花瓣
+      case 1: kind = 'sun'; break;        // 夏：只保留太阳光晕与光芒
+      case 2: kind = 'leaf'; break;       // 秋：只保留落叶
       default: kind = 'snow';                                          // 冬：飘雪
     }
     var p = {
@@ -100,10 +94,7 @@
       alpha: rnd(0.5, 1),
       seed: Math.floor(rnd(0, 1e9)) % 997   // 画"手绘抖动"的伪随机种子
     };
-    if (p.kind === 'cloud') { p.size = rnd(40, 88); p.vy = rnd(4, 9); p.swayAmp = rnd(4, 12); p.alpha = rnd(0.34, 0.54); }
-    if (p.kind === 'ray') { p.size = rnd(28, 72); p.vy = rnd(5, 10); p.swayAmp = rnd(8, 20); p.alpha = rnd(0.12, 0.22); }
-    if (p.kind === 'blossom') { p.size = rnd(6, 10); p.vy = rnd(14, 28); p.swayAmp = rnd(18, 38); p.rotSpeed = rnd(-0.7, 0.7); p.alpha = rnd(0.62, 0.95); }
-    if (p.kind === 'petal') { p.size = rnd(7, 13); p.vy = rnd(20, 40); p.swayAmp = rnd(26, 48); p.alpha = rnd(0.58, 0.9); }
+    if (p.kind === 'petal') { p.size = rnd(9, 16); p.vy = rnd(18, 34); p.swayAmp = rnd(28, 52); p.alpha = rnd(0.62, 0.98); }
     if (p.kind === 'leaf') { p.vy = rnd(24, 50); p.swayAmp = rnd(40, 70); }
     if (p.kind === 'snow') { p.size = rnd(6, 12); p.vy = rnd(14, 34); p.swayAmp = rnd(18, 42); p.alpha = rnd(0.72, 1); }
     return p;
@@ -137,15 +128,26 @@
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
     ctx.beginPath();
-    // 樱花花瓣：下方圆润、顶端有缺刻，比单纯椭圆更接近真实花瓣
+    // 樱花花瓣：宽圆花瓣、顶端浅缺刻，整体保持柔和不对称，更接近真实花瓣
     ctx.moveTo(jx, s);
-    ctx.quadraticCurveTo(-s - jx, -s * 0.2, -s * 0.34, -s * 0.6);
-    ctx.quadraticCurveTo(-s * 0.12, -s * 0.78, jx, -s * 0.42);
-    ctx.quadraticCurveTo(s * 0.12, -s * 0.78, s * 0.34, -s * 0.6);
-    ctx.quadraticCurveTo(s + jx, -s * 0.2, jx, s);
-    ctx.fillStyle = 'rgba(201, 143, 160, 0.12)';
+    ctx.bezierCurveTo(-s * 0.86 - jx, s * 0.48, -s * 0.9, -s * 0.42, -s * 0.2, -s);
+    ctx.quadraticCurveTo(jx, -s * 0.78, s * 0.2, -s);
+    ctx.bezierCurveTo(s * 0.9, -s * 0.42, s * 0.86 + jx, s * 0.48, jx, s);
+    var petalFill = ctx.createRadialGradient(0, -s * 0.1, s * 0.08, 0, s * 0.1, s * 1.15);
+    petalFill.addColorStop(0, 'rgba(255, 225, 232, 0.48)');
+    petalFill.addColorStop(0.55, 'rgba(224, 164, 181, 0.28)');
+    petalFill.addColorStop(1, 'rgba(201, 143, 160, 0.12)');
+    ctx.fillStyle = petalFill;
     ctx.fill();
-    // 中脉 + 两条侧脉
+    // 花瓣折痕与中脉，增加厚度和真实感
+    ctx.beginPath();
+    ctx.moveTo(jx, s * 0.82);
+    ctx.quadraticCurveTo(jx - s * 0.1, s * 0.18, jx, -s * 0.48);
+    ctx.moveTo(jx, s * 0.32);
+    ctx.lineTo(-s * 0.38, s * 0.02);
+    ctx.moveTo(jx, s * 0.32);
+    ctx.lineTo(s * 0.38, s * 0.02);
+    ctx.stroke();
     ctx.moveTo(jx, s - s * 0.12);
     ctx.lineTo(jx, -s * 0.25);
     ctx.moveTo(jx, s * 0.3);
@@ -300,28 +302,40 @@
     ctx.stroke();
     ctx.restore();
   }
-  function drawSummerSun() {
-    var x = W - Math.min(150, W * 0.12), y = Math.min(130, H * 0.15);
-    var r = Math.max(54, Math.min(92, W * 0.055));
+  function drawSummerSun(ts) {
+    var time = (ts || 0) / 1000;
+    var x = W - Math.min(170, W * 0.13), y = Math.min(170, H * 0.18);
+    var r = Math.max(66, Math.min(108, W * 0.062));
+    var pulse = 1 + Math.sin(time * 0.7) * 0.035;
     ctx.save();
-    var glow = ctx.createRadialGradient(x, y, 0, x, y, r * 1.65);
-    glow.addColorStop(0, 'rgba(217, 179, 87, 0.14)');
-    glow.addColorStop(0.45, 'rgba(217, 179, 87, 0.065)');
+    ctx.translate(x, y);
+    var glow = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.9 * pulse);
+    glow.addColorStop(0, 'rgba(255, 218, 119, 0.32)');
+    glow.addColorStop(0.28, 'rgba(217, 179, 87, 0.14)');
+    glow.addColorStop(0.62, 'rgba(217, 179, 87, 0.055)');
     glow.addColorStop(1, 'rgba(217, 179, 87, 0)');
     ctx.fillStyle = glow;
     ctx.beginPath();
-    ctx.arc(x, y, r * 1.65, 0, Math.PI * 2);
+    ctx.arc(0, 0, r * 1.9 * pulse, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha *= 0.38;
+    // 柔和日轮
+    ctx.globalAlpha *= 0.62;
     ctx.beginPath();
-    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.arc(0, 0, r * 0.72, 0, Math.PI * 2);
     ctx.stroke();
-    for (var i = 0; i < 8; i++) {
-      var a = i * Math.PI / 4 + 0.22;
-      ctx.moveTo(x + Math.cos(a) * r * 1.18, y + Math.sin(a) * r * 1.18);
-      ctx.lineTo(x + Math.cos(a) * r * 1.42, y + Math.sin(a) * r * 1.42);
+    // 缓慢旋转的光芒，随距离渐隐
+    ctx.save();
+    ctx.rotate(time * 0.035);
+    for (var i = 0; i < 12; i++) {
+      var a = i * Math.PI / 6;
+      var len = r * (0.42 + (i % 3) * 0.08) * pulse;
+      ctx.globalAlpha = (i % 3 === 0 ? 0.42 : 0.24) * (0.72 + 0.28 * pulse);
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * r * 0.82, Math.sin(a) * r * 0.82);
+      ctx.lineTo(Math.cos(a) * (r * 0.82 + len), Math.sin(a) * (r * 0.82 + len));
+      ctx.stroke();
     }
-    ctx.stroke();
+    ctx.restore();
     ctx.restore();
   }
   function drawParticle(ctx, p) {
@@ -339,7 +353,7 @@
 
   // 每季一组低饱和配色（素描眼感：细线条 + 轻透明）
   var PALETTE = [
-    '#c98fa0', // 春 · 樱粉
+    '#bd7189', // 春 · 樱粉
     '#d9b357', // 夏 · 暖金
     '#c08a4d', // 秋 · 桐褐
     '#9db4c8'  // 冬 · 冰蓝
@@ -354,10 +368,10 @@
     ctx.lineWidth = 1.4;
     ctx.lineCap = 'round';
     ctx.strokeStyle = PALETTE[season];
-    if (season === 1) drawSummerSun();
+    if (season === 1) drawSummerSun(ts);
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
-      ctx.globalAlpha = p.alpha * (p.kind === 'snow' ? 0.78 : 0.5);   // 整体低透明，雪花略清晰，不抢正文
+      ctx.globalAlpha = p.alpha * (p.kind === 'snow' ? 0.78 : (p.kind === 'petal' ? 0.72 : 0.5));   // 季节主元素略清晰，不抢正文
       var np = update(p, dt);
       if (np !== p) particles[i] = np;
       drawParticle(ctx, particles[i]);
