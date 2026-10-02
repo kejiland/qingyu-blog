@@ -405,6 +405,10 @@ tests.push(['admin 导入导出：Markdown 往返 / JSON 备份 / ZIP 打包', a
   assert.ok(tr && tr.postToMarkdown && tr.parseMarkdown && tr.zip, '导入导出工具已暴露');
   const ed = b.win.QingyuAdmin && b.win.QingyuAdmin._editor;
   assert.ok(ed && ed.toDateTimeLocal && ed.normalizeEditorDate, '编辑器日期工具已暴露');
+  const off = b.win.QingyuAdmin && b.win.QingyuAdmin._offline;
+  assert.ok(off && off.queue && off.read && off.flush, '离线写作队列工具已暴露');
+  off.queue({ id: 'offline-local', title: '离线文章', date: '2026-01-01', content: '断网内容', tags: [] }, true);
+  assert.ok(off.read().some((item) => item.post.id === 'offline-local'), '离线文章进入待同步队列');
   assert.strictEqual(ed.toDateTimeLocal('2026-10-01'), '2026-10-01T00:00', '纯日期补 00:00');
   assert.strictEqual(ed.toDateTimeLocal('2026-10-01 09:05'), '2026-10-01T09:05', '分钟时间转换正确');
   assert.strictEqual(ed.normalizeEditorDate('2026-10-01T09:05'), '2026-10-01 09:05', '保存时转为分钟精度');
@@ -1997,6 +2001,25 @@ tests.push(['index.html：静态 base 在资源之前 + 首屏加载动画存在
   assert.ok(basePos > -1 && linkPos > -1 && basePos < linkPos, 'base 位于样式表之前');
   assert.ok(loaderPos > -1 && html.indexOf("Qingyu'Blog · 加载中") > -1, '首屏加载动画标记存在');
   assert.ok(!html.includes('id="dynBase"'), '旧的动态 base 脚本已移除');
+}]);
+
+tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));
+  assert.strictEqual(manifest.display, 'standalone');
+  assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2, '包含安装图标');
+  const pngSize = (name) => {
+    const buf = fs.readFileSync(path.join(PUB, 'icons', name));
+    assert.strictEqual(buf.slice(1, 4).toString('ascii'), 'PNG');
+    return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+  };
+  assert.deepStrictEqual(pngSize('icon-192.png'), { w: 192, h: 192 });
+  assert.deepStrictEqual(pngSize('icon-512.png'), { w: 512, h: 512 });
+  const sw = fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8');
+  assert.ok(sw.includes("'/api/posts'") && sw.includes('Authorization') && sw.includes('ignoreSearch'), '公开文章离线缓存策略存在');
+  const index = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
+  assert.ok(index.includes('rel="manifest"') && index.includes('serviceWorker.register'), '入口接入 PWA 清单与 Service Worker');
+  const worker = fs.readFileSync(path.join(process.cwd(), 'worker.js'), 'utf8');
+  assert.ok(worker.includes('Service-Worker-Allowed') && worker.includes('/manifest.webmanifest'), 'Worker 静态响应包含 PWA 缓存头');
 }]);
 
 tests.push(['导航栏搜索：图标点击展开，实时命中并带摘要', async () => {

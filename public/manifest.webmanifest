@@ -1,0 +1,21 @@
+{
+  "name": "Qingyu'Blog · 轻语博客",
+  "short_name": "轻语博客",
+  "description": "零依赖轻量博客，支持离线阅读与离线写作。",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#faf9f7",
+  "theme_color": "#c25e3a",
+  "lang": "zh-CN",
+  "categories": ["blog", "productivity"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "后台写作", "short_name": "写作", "url": "/admin/posts/new", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" }] }
+  ]
+}

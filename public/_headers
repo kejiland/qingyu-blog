@@ -103,3 +103,15 @@
   Content-Type: application/ai-catalog+json; charset=utf-8
   Cache-Control: public, max-age=3600
   Access-Control-Allow-Origin: *
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json; charset=utf-8
+  Cache-Control: public, max-age=3600
+
+/sw.js
+  Content-Type: application/javascript; charset=utf-8
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+
+/icons/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -202,7 +202,8 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | 卡片式列表 | 封面缩略图（自动取 cover 或正文首图）、置顶徽章、标签贴底、加载骨架屏、分页（`?page=`） |
 | **深色 / 浅色主题** | 一键切换，跟随系统偏好，无首屏闪白；顶栏会随滚动加深阴影 |
 | **主题色切换** | **4 种强调色**：赭橙（terra）/ 黛蓝（indigo）/ 竹青（bamboo）/ 凝夜紫（dusk）。桌面为图标按钮 + 色板弹层，手机端为原生下拉；每种配色会连带调整背景与边框色 |
-| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 667 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
+| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 669 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
+| **PWA 离线阅读与写作** | 可安装到桌面或手机；首页、核心资源与已访问文章离线可打开；云端编辑断网时先保存到本地队列，网络恢复后自动同步 |
 | **背景动画** | canvas 手绘四季粒子（春日樱花瓣 / 夏日嫩绿叶片 / 秋叶 / 六向分叉雪花），仅首页运行、页面隐藏时暂停；桌面默认开、触屏默认关，顶栏可一键开关，尊重 `prefers-reduced-motion`。预览：`/?season=spring\|summer\|autumn\|winter&bg=1` |
 | **Smoji 表情** | 评论、留言板、编辑器三处都内置表情选择器，按需懒加载，支持正文内联渲染 |
 | **AI 文章摘要** | 文章页一键生成内容摘要（单篇缓存 30 天）；AI 不可用时入口自动隐藏 |
@@ -295,6 +296,9 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── config.js / config.min.js      # 全站配置（模式 / 站点地址 / 页脚 / 广告）
 │   ├── style.css / style.min.css      # 前台样式（明暗主题 + 4 种强调色 + 响应式 + 衬线字体栈）
 │   ├── app.js / app.min.js            # 前台逻辑（路由 / Markdown / 搜索 / 评论 / 留言板 / 统计 / i18n / AI 摘要）
+│   ├── manifest.webmanifest           # PWA 安装清单
+│   ├── sw.js                          # 离线缓存 Service Worker
+│   ├── icons/                         # PWA 桌面 / 手机图标
 │   ├── admin.js / admin.min.js        # 后台管理 SPA（按需懒加载）
 │   ├── admin.css / admin.min.css      # 后台样式（玻璃拟态，响应式）
 │   ├── music-player.js / .min.js      # 全站音乐播放器（悬浮按钮 + 面板 + 播放列表 + 进度记忆）
@@ -302,7 +306,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── bg-anim.js / bg-anim.min.js    # 四季 canvas 背景动画
 │   ├── i18n.js / i18n.min.js          # 国际化模块（中/英/日/韩/印地，内置中文兜底）
 │   ├── posts.js / posts.min.js        # 静态模式文章数据（由「导出 posts.js」生成）
-│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 667 键）
+│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 669 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
 │   ├── fonts/dreamserif/              # ⚠️ 历史遗留的本地衬线字体分片（当前版本不再加载，见「已知限制」）
@@ -569,7 +573,7 @@ window.BLOG_CONFIG = {
 
 ### 多语言（i18n）
 
-`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **667 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
+`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **669 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
 
 ---
 

@@ -665,5 +665,7 @@
   "search.fail": "搜索暂时不可用",
   "post.related": "相关文章",
   "post.backlinks": "引用本文",
-  "admin.editor.wiki": "双向链接"
+  "admin.editor.wiki": "双向链接",
+  "admin.editor.savedOffline": "已离线保存，联网后会自动同步",
+  "admin.editor.syncedOffline": "离线内容已同步到云端"
 }

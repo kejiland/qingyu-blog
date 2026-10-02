@@ -665,5 +665,7 @@
   "search.fail": "Search is temporarily unavailable",
   "post.related": "Related posts",
   "post.backlinks": "Linked from",
-  "admin.editor.wiki": "Wiki link"
+  "admin.editor.wiki": "Wiki link",
+  "admin.editor.savedOffline": "Saved offline. It will sync automatically when online.",
+  "admin.editor.syncedOffline": "Offline changes synced to the cloud"
 }

@@ -665,5 +665,7 @@
   "search.fail": "खोज अभी उपलब्ध नहीं है",
   "post.related": "संबंधित लेख",
   "post.backlinks": "इनसे लिंक",
-  "admin.editor.wiki": "दो-तरफ़ा लिंक"
+  "admin.editor.wiki": "दो-तरफ़ा लिंक",
+  "admin.editor.savedOffline": "ऑफ़लाइन सहेजा गया, ऑनलाइन होने पर स्वतः सिंक होगा",
+  "admin.editor.syncedOffline": "ऑफ़लाइन बदलाव क्लाउड पर सिंक हो गए"
 }

@@ -330,6 +330,8 @@
     "admin.editor.link": "链接",
     "admin.editor.image": "图片",
     "admin.editor.wiki": "双向链接",
+    "admin.editor.savedOffline": "已离线保存，联网后会自动同步",
+    "admin.editor.syncedOffline": "离线内容已同步到云端",
     "admin.editor.writeHint": "开始用 Markdown 写作…",
     "admin.editor.saveDraft": "存草稿",
     "admin.editor.publish": "发布",

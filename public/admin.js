@@ -191,8 +191,13 @@
       // 时间戳穿透边缘缓存（api/posts 带 s-maxage=60）：删除/发布后管理端必须立即看到最新列表，
       // 否则命中缓存会误以为「删除没生效，要刷新网页才删掉」。查询参数变化 = 边缘缓存 key 变化。
       // all=1 需管理员会话：附带草稿；公开的 api/posts 仍只返回已发布文章。
-      var d = await api('api/posts?all=1&_=' + Date.now());
-      return (d && d.posts) || [];
+      try {
+        var d = await api('api/posts?all=1&_=' + Date.now());
+        return mergeOfflinePosts((d && d.posts) || []);
+      } catch (e) {
+        if (isNetworkFailure(e)) return readOfflineQueue().map(function (item) { return item.post; });
+        throw e;
+      }
     }
     // 静态模式：BLOG_POSTS 合并本地草稿
     var base = (window.getStaticPosts ? window.getStaticPosts() : []) || [];
@@ -206,14 +211,24 @@
   async function listFullPosts() {
     if (cloudOn()) {
       // full=1 仅管理员可用：一次返回草稿 + 正文，避免批量导出逐篇请求。
-      var d = await api('api/posts?full=1&_=' + Date.now());
-      return (d && d.posts) || [];
+      try {
+        var d = await api('api/posts?full=1&_=' + Date.now());
+        return mergeOfflinePosts((d && d.posts) || []);
+      } catch (e) {
+        if (isNetworkFailure(e)) return readOfflineQueue().map(function (item) { return item.post; });
+        throw e;
+      }
     }
     return await listPosts();
   }
   async function getPost(id) {
     if (cloudOn()) {
-      try { var d = await api('api/posts/' + encodeURIComponent(id) + '?_=' + Date.now()); return d && d.post; } catch (e) { return null; }
+      try {
+        var d = await api('api/posts/' + encodeURIComponent(id) + '?_=' + Date.now());
+        if (d && d.post) return d.post;
+      } catch (e) {}
+      var queued = readOfflineQueue().find(function (item) { return String(item.post.id) === String(id); });
+      return queued ? queued.post : null;
     }
     var all = await listPosts();
     for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
@@ -232,6 +247,73 @@
     localStorage.setItem('qingyu.drafts', JSON.stringify(drafts));
     saveStaticRevision(item, reason || 'save');
   }
+  var OFFLINE_POSTS_KEY = 'qingyu.offlinePosts';
+  function readOfflineQueue() {
+    try {
+      var list = JSON.parse(localStorage.getItem(OFFLINE_POSTS_KEY) || '[]');
+      return Array.isArray(list) ? list.filter(function (item) { return item && item.post && item.post.id; }) : [];
+    } catch (e) { return []; }
+  }
+  function writeOfflineQueue(list) {
+    try {
+      var safe = (Array.isArray(list) ? list : []).slice(-30);
+      if (safe.length) localStorage.setItem(OFFLINE_POSTS_KEY, JSON.stringify(safe));
+      else localStorage.removeItem(OFFLINE_POSTS_KEY);
+    } catch (e) {}
+  }
+  function isNetworkFailure(err) {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+    var status = Number(err && err.status) || 0;
+    if (status === 0 || status >= 500) return true;
+    return /Failed to fetch|NetworkError|Load failed|network|abort|timed out|HTTP 0/i.test(String((err && err.message) || err || ''));
+  }
+  function queueOfflinePost(post, isNew) {
+    var list = readOfflineQueue().filter(function (item) { return String(item.post.id) !== String(post.id); });
+    list.push({ post: post, isNew: !!isNew, queuedAt: Date.now() });
+    writeOfflineQueue(list);
+    saveStaticPost(post, 'offline');
+    try { window.dispatchEvent(new CustomEvent('qy:offline-queue', { detail: { count: list.length } })); } catch (e) {}
+    return list.length;
+  }
+  function mergeOfflinePosts(serverPosts) {
+    var map = {};
+    (Array.isArray(serverPosts) ? serverPosts : []).forEach(function (post) {
+      if (post && post.id) map[String(post.id)] = post;
+    });
+    readOfflineQueue().forEach(function (item) {
+      if (item && item.post && item.post.id) map[String(item.post.id)] = item.post;
+    });
+    return Object.keys(map).map(function (key) { return map[key]; });
+  }
+  async function flushOfflineQueue(silent) {
+    if (!cloudOn() || (typeof navigator !== 'undefined' && navigator.onLine === false)) return { synced: 0, remaining: readOfflineQueue().length };
+    var queue = readOfflineQueue();
+    if (!queue.length) return { synced: 0, remaining: 0 };
+    var remaining = [];
+    var synced = 0;
+    for (var i = 0; i < queue.length; i++) {
+      var item = queue[i];
+      try {
+        var r = await savePost(item.post, item.isNew);
+        if (!r || (!r.ok && !r.post)) throw new Error(t('admin.editor.saveFail'));
+        synced++;
+      } catch (e) {
+        if (item.isNew && Number(e && e.status) === 409) {
+          synced++;
+          continue;
+        }
+        remaining.push(item);
+        if (isNetworkFailure(e)) {
+          remaining = remaining.concat(queue.slice(i + 1));
+          break;
+        }
+      }
+    }
+    writeOfflineQueue(remaining);
+    if (synced && !silent) toast(t('admin.editor.syncedOffline'), 'ok');
+    return { synced: synced, remaining: remaining.length };
+  }
+
   async function savePost(post, isNew) {
     if (cloudOn()) {
       if (isNew) return await api('api/posts', { method: 'POST', body: JSON.stringify(post) });
@@ -2186,7 +2268,8 @@
     var seriesValue = content.querySelector('#abSeries').value.trim();
     var ogImage = content.querySelector('#abOgImage').value || '';
     var ogFingerprint = ogSourceFingerprint(title, dateValue, tags, seriesValue);
-    if (cloudOn() && content.querySelector('#abOgAuto').checked && (!ogImage || content.__ogSource !== ogFingerprint)) {
+    var onlineNow = !(typeof navigator !== 'undefined' && navigator.onLine === false);
+    if (cloudOn() && onlineNow && content.querySelector('#abOgAuto').checked && (!ogImage || content.__ogSource !== ogFingerprint)) {
       try {
         ogImage = await generateShareImage(content, id, title, dateValue.slice(0, 10), tags, seriesValue);
         content.querySelector('#abOgImage').value = ogImage;
@@ -2208,8 +2291,8 @@
 
     var btn = status === 'published' ? content.querySelector('#abPublish') : (status === 'scheduled' ? content.querySelector('#abScheduleBtn') : content.querySelector('#abSaveDraft'));
     btn.disabled = true;
+    var isNew = !route.id;
     try {
-      var isNew = !route.id;
       var r = await savePost(post, isNew);
       if (r && (r.ok || r.post)) {
         toast(status === 'published' ? t('admin.editor.saved') : (status === 'scheduled' ? t('admin.editor.scheduled') : t('admin.editor.savedDraft')), 'ok');
@@ -2221,6 +2304,7 @@
       }
     } catch (e) {
       if (!cloudOn()) { saveStaticPost(post); toast(t('admin.editor.savedDraft'), 'ok'); }
+      else if (isNetworkFailure(e)) { queueOfflinePost(post, isNew); toast(t('admin.editor.savedOffline'), 'ok'); }
       else toast(t('admin.editor.saveFail') + (e.message || e), 'err');
     } finally { btn.disabled = false; }
   }
@@ -3285,6 +3369,12 @@
   }
 
   /* ----------------------- 导出 ----------------------- */
+  if (!window.__qyOfflineSyncBound) {
+    window.__qyOfflineSyncBound = true;
+    window.addEventListener('online', function () { flushOfflineQueue(false); });
+  }
+  if (cloudOn()) flushOfflineQueue(true);
+
   window.QingyuAdmin = {
     mount: mount,
     openPwdModal: openPasswordModal,
@@ -3295,6 +3385,7 @@
       backup: transferBackupJson,
       zip: transferZipForPosts
     },
+    _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
     _editor: {
       toDateTimeLocal: toDateTimeLocal,
       normalizeEditorDate: normalizeEditorDate,

@@ -246,8 +246,14 @@ export default {
         // 版本化资源（style.css?v=…、app.js?v=…）与字体/图标等不可变资源，可放心一年强缓存；
         // 其余扩展名静态文件保持 1 小时 + SWR（部署后仍能快速生效）。
         const versioned = url.search && url.search.indexOf('v=') === 1;
-        const immutablePath = /^\/fonts\/|^\/flags\/|^\/libs\/smoji\//.test(url.pathname);
-        if (hasExt && request.method === 'GET') {
+        const immutablePath = /^\/fonts\/|^\/flags\/|^\/libs\/smoji\/|^\/icons\//.test(url.pathname);
+        if (url.pathname === '/sw.js') {
+          headers.set('Cache-Control', 'no-cache');
+          headers.set('Service-Worker-Allowed', '/');
+        } else if (url.pathname === '/manifest.webmanifest') {
+          headers.set('Content-Type', 'application/manifest+json; charset=utf-8');
+          headers.set('Cache-Control', 'public, max-age=3600');
+        } else if (hasExt && request.method === 'GET') {
           headers.set('Cache-Control', versioned || immutablePath
             ? 'public, max-age=31536000, immutable'
             : 'public, max-age=3600, stale-while-revalidate=86400');
