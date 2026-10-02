@@ -671,5 +671,12 @@
   "lightbox.close": "छवि पूर्वावलोकन बंद करें",
   "lightbox.prev": "पिछली छवि",
   "lightbox.next": "अगली छवि",
-  "lightbox.counter": "{current} / {total}"
+  "lightbox.counter": "{current} / {total}",
+  "nav.popular": "लोकप्रिय",
+  "popular.title": "लोकप्रिय लेख",
+  "popular.desc": "व्यूज़, लाइक और टिप्पणियों के कुल स्कोर से",
+  "popular.all": "सभी",
+  "popular.last7": "पिछले 7 दिन",
+  "popular.last30": "पिछले 30 दिन",
+  "popular.empty": "अभी कोई आँकड़े नहीं हैं"
 }

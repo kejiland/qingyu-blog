@@ -671,5 +671,12 @@
   "lightbox.close": "Close image preview",
   "lightbox.prev": "Previous image",
   "lightbox.next": "Next image",
-  "lightbox.counter": "{current} / {total}"
+  "lightbox.counter": "{current} / {total}",
+  "nav.popular": "Popular",
+  "popular.title": "Popular posts",
+  "popular.desc": "Ranked by views, likes and comments",
+  "popular.all": "All time",
+  "popular.last7": "Last 7 days",
+  "popular.last30": "Last 30 days",
+  "popular.empty": "No statistics yet"
 }

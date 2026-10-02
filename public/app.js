@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.9.7';
+var BLOG_VERSION = '2.9.8';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1360,6 +1360,72 @@ function loadFeaturedPosts(excludeId) {
   });
 }
 
+/* ---------- 热门文章与阅读数据排行 ---------- */
+function popularRangeLabel(range) {
+  if (range === '7') return t('popular.last7');
+  if (range === '30') return t('popular.last30');
+  return t('popular.all');
+}
+function renderPopularList(items) {
+  var box = document.querySelector('#popularList');
+  if (!box) return;
+  if (!items || !items.length) {
+    box.innerHTML = '<div class="empty"><div class="big">' + svgIcon('heart', 34) + '</div><p>' + t('popular.empty') + '</p></div>';
+    return;
+  }
+  box.innerHTML = items.map(function (p, index) {
+    var tags = normalizeTags(p).slice(0, 3).join(' · ');
+    return '<a class="popular-card" href="' + esc(href(postUrl(p.id))) + '">'
+      + '<span class="popular-rank">' + (index + 1) + '</span>'
+      + '<div class="popular-main"><div class="popular-card-title">' + esc(p.title || t('post.untitled')) + '</div>'
+      + '<div class="popular-card-meta">' + esc(tags || p.date || '') + '</div></div>'
+      + '<div class="popular-metrics"><span title="' + esc(t('post.views')) + '">' + svgIcon('eye', 13) + ' ' + (Number(p.views) || 0) + '</span>'
+      + '<span title="' + esc(t('post.likes')) + '">' + svgIcon('heart', 13) + ' ' + (Number(p.likes) || 0) + '</span>'
+      + '<span title="' + esc(t('comment.title')) + '">' + svgIcon('quote', 13) + ' ' + (Number(p.comments) || 0) + '</span></div></a>';
+  }).join('');
+}
+async function loadPopular(range) {
+  var box = document.querySelector('#popularList');
+  if (!box) return;
+  box.innerHTML = '<div class="featured-loading">' + t('site.loading') + '…</div>';
+  if (_cloudOn()) {
+    try {
+      var data = await apiFetch('api/popular?range=' + encodeURIComponent(range || 'all'));
+      renderPopularList((data && data.items) || []);
+      return;
+    } catch (e) { /* 网络失败时回退本地数据 */ }
+  }
+  try {
+    var scores = await getFeaturedPosts(null, 20);
+    var byId = {};
+    getPublishedPosts().forEach(function (p) { byId[String(p.id)] = p; });
+    renderPopularList(scores.map(function (item) { return Object.assign({}, byId[String(item.id)] || {}, item); }));
+  } catch (e) { renderPopularList([]); }
+}
+function bindPopular() {
+  var tabs = document.querySelectorAll('[data-popular-range]');
+  tabs.forEach(function (tab) {
+    tab.addEventListener('click', function () {
+      tabs.forEach(function (other) { other.classList.remove('active'); });
+      tab.classList.add('active');
+      loadPopular(tab.getAttribute('data-popular-range'));
+    });
+  });
+  loadPopular('all');
+}
+function renderPopular() {
+  var html = renderNav('/popular');
+  html += '<main class="container page-fade"><div class="list-head popular-head"><div><h2 class="page-title">' + svgIcon('heart', 20) + ' ' + t('popular.title') + '</h2><p class="admin-head-sub">' + t('popular.desc') + '</p></div></div>';
+  if (_cloudOn()) {
+    html += '<div class="popular-ranges">'
+      + '<button class="popular-range active" data-popular-range="all">' + t('popular.all') + '</button>'
+      + '<button class="popular-range" data-popular-range="30">' + t('popular.last30') + '</button>'
+      + '<button class="popular-range" data-popular-range="7">' + t('popular.last7') + '</button>'
+      + '</div>';
+  }
+  html += '<div class="popular-list" id="popularList"></div></main>' + renderFooter();
+  return html;
+}
 /* ---------- 管理员门禁 ----------
  * 云端模式（API 可用）：密码存 Cloudflare KV，前端只持有会话 token。
  *   登录 POST /api/admin/login → token 存 localStorage('qingyu.token')。
@@ -1673,6 +1739,7 @@ function app() { return document.querySelector('#app'); }
     { i18n: 'nav.home',     url: '/',          path: '/' },
     { i18n: 'nav.tags',     url: '/tags',      path: '/tags' },
     { i18n: 'nav.series',   url: '/series',    path: '/series' },
+    { i18n: 'nav.popular',  url: '/popular',   path: '/popular' },
     { i18n: 'nav.archive',  url: '/archive',   path: '/archive' },
     { i18n: 'nav.guestbook',url: '/guestbook', path: '/guestbook' },
     { i18n: 'nav.about',    url: '/about',     path: '/about' }
@@ -1692,6 +1759,7 @@ function app() { return document.querySelector('#app'); }
     '/': '首页',
     '/tags': '标签',
     '/series': '系列',
+    '/popular': '热门',
     '/archive': '归档',
     '/guestbook': '留言板',
     '/about': '关于'
@@ -3804,6 +3872,7 @@ function buildSitemapClient() {
   lines.push('  <url><loc>' + esc(base + '/') + '</loc></url>');
   lines.push('  <url><loc>' + esc(base + '/about') + '</loc></url>');
   lines.push('  <url><loc>' + esc(base + '/archive') + '</loc></url>');
+  lines.push('  <url><loc>' + esc(base + '/popular') + '</loc></url>');
   lines.push('  <url><loc>' + esc(base + '/guestbook') + '</loc></url>');
   posts.forEach(function (p) {
     lines.push('  <url><loc>' + esc(base + postUrl(p.id)) + '</loc><lastmod>' + esc(p.date || '') + '</lastmod></url>');
@@ -3941,6 +4010,7 @@ async function route() {
   else if (path === '/about') { app().innerHTML = renderAbout(); }
   else if (path === '/tags') { app().innerHTML = renderTags(); }
   else if (path === '/series') { app().innerHTML = renderSeriesList(); fitCardLineClamps(); }
+  else if (path === '/popular') { app().innerHTML = renderPopular(); bindPopular(); }
   else if (path.indexOf('/series/') === 0) { var seriesName = ''; try { seriesName = decodeURIComponent(path.slice('/series/'.length)); } catch (e) { seriesName = path.slice('/series/'.length); } app().innerHTML = renderSeriesDetail(seriesName); fitCardLineClamps(); }
   else if (path === '/guestbook') { app().innerHTML = renderGuestbook(); bindGuestbook(); }
   else {

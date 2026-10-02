@@ -1924,6 +1924,25 @@ kbd {
 }
 
 
+/* ---------- 热门文章排行 ---------- */
+.popular-head { margin-bottom: 14px; }
+.popular-ranges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.popular-range { border: 1px solid var(--border); border-radius: 999px; padding: 7px 14px; background: var(--card); color: var(--muted); font: inherit; font-size: 13px; cursor: pointer; transition: background .16s ease, border-color .16s ease, color .16s ease; }
+.popular-range:hover, .popular-range.active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 42%, var(--border)); color: var(--accent); }
+.popular-list { display: flex; flex-direction: column; gap: 10px; }
+.popular-card { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--card); box-shadow: var(--shadow); text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.popular-card:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); transform: translateY(-1px); text-decoration: none; }
+.popular-rank { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; background: var(--bg-soft); color: var(--muted); font-weight: 700; font-size: 13px; }
+.popular-card:nth-child(1) .popular-rank { background: color-mix(in srgb, #d7a33d 20%, var(--bg-soft)); color: #a87514; }
+.popular-card:nth-child(2) .popular-rank { background: color-mix(in srgb, #8793a3 20%, var(--bg-soft)); color: #66717e; }
+.popular-card:nth-child(3) .popular-rank { background: color-mix(in srgb, #b9784b 20%, var(--bg-soft)); color: #9a5f37; }
+.popular-main { min-width: 0; }
+.popular-card-title { color: var(--fg); font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popular-card-meta { color: var(--muted); font-size: 11.5px; margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.popular-metrics { display: flex; gap: 12px; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.popular-metrics span { display: inline-flex; align-items: center; gap: 4px; }
+.popular-metrics svg { width: 13px; height: 13px; }
+@media (max-width: 640px) { .popular-card { grid-template-columns: 34px minmax(0, 1fr); gap: 10px; padding: 12px; } .popular-metrics { grid-column: 2; justify-content: flex-start; } }
 /* ---------- 双向链接与相关文章 ---------- */
 .relations-slot:empty { display: none; }
 .relations-box { margin: 24px 0; }

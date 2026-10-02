@@ -671,5 +671,12 @@
   "lightbox.close": "이미지 미리보기 닫기",
   "lightbox.prev": "이전 이미지",
   "lightbox.next": "다음 이미지",
-  "lightbox.counter": "{current} / {total}"
+  "lightbox.counter": "{current} / {total}",
+  "nav.popular": "인기",
+  "popular.title": "인기 글",
+  "popular.desc": "조회·좋아요·댓글 종합 점수순",
+  "popular.all": "전체",
+  "popular.last7": "최근 7일",
+  "popular.last30": "최근 30일",
+  "popular.empty": "통계가 아직 없습니다"
 }

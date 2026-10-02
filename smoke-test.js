@@ -625,6 +625,9 @@ function makeD1() {
       if (!mLike && !mView) { const [, likes, views] = params; row.likes = likes; row.views = views; }
       t.stats.set(post_id, row); return { success: true };
     }
+    if (s === 'SELECT * FROM stats') return [...t.stats.values()];
+    if (s === 'SELECT post_id,status,date FROM comments') return [...t.comments.values()].map((r) => ({ post_id: r.post_id, status: r.status, date: r.date }));
+    if (s === 'SELECT * FROM stats_daily') return [];
     /* stats_daily (聚合表，测试仅需不报错) */
     if (/^INSERT INTO stats_daily/.test(s)) { return { success: true }; }
     /* admin_auth */
@@ -816,6 +819,25 @@ tests.push(['API：文章双向链接与相关文章推荐', async () => {
   assert.ok(data.related.some((p) => p.id === 'rel-related'), '共同标签/系列进入相关文章');
   assert.ok(data.backlinks.some((p) => p.id === 'rel-backlink'), 'Wiki 链接生成反向链接');
   assert.ok(data.backlinks.some((p) => p.id === 'rel-markdown'), 'Markdown 站内链接生成反向链接');
+}]);
+
+
+tests.push(['API：热门文章综合排行', async () => {
+  const { env, token, core } = await authEnv();
+  const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const create = (body) => core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers, body: JSON.stringify(body) }), env);
+  await create({ id: 'pop-a', title: '热门第一', date: '2026-05-01', content: 'A' });
+  await create({ id: 'pop-b', title: '热门第二', date: '2026-05-02', content: 'B' });
+  env._d1.stats.set('pop-a', { post_id: 'pop-a', views: 10, likes: 5 });
+  env._d1.stats.set('pop-b', { post_id: 'pop-b', views: 20, likes: 1 });
+  env._d1.comments.set('pop-c1', { id: 'pop-c1', post_id: 'pop-a', status: 'approved', date: '2026-05-03' });
+  env._d1.comments.set('pop-c2', { id: 'pop-c2', post_id: 'pop-a', status: 'approved', date: '2026-05-03' });
+  const popularLib = await import('./functions/_lib/popular.js');
+  const r = await popularLib.handlePopular(new Request('http://t/api/popular?range=all'), env);
+  assert.strictEqual(r.status, 200);
+  const data = await r.json();
+  assert.strictEqual(data.items[0].id, 'pop-a', '综合得分最高排第一');
+  assert.strictEqual(data.items[0].score, 35, '浏览/点赞/评论按权重计分');
 }]);
 
 
@@ -1893,11 +1915,11 @@ tests.push(['保存文件：系统对话框原地覆盖，不支持时回退下�
 
 tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文本/子菜单/外链', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
-  // 默认主导航渲染：5 项（首页/标签/归档/留言/关于）
+  // 默认主导航渲染：7 项（首页/标签/系列/热门/归档/留言/关于）
   const mainNav = (b.html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
   assert.ok(mainNav.includes('>首页<') || mainNav.includes('>Home<'), '默认导航含首页（i18n）');
   assert.ok(mainNav.includes('>归档<') || mainNav.includes('>Archive<'), '默认导航含归档');
-  assert.ok((mainNav.match(/nav-link/g) || []).length >= 5, '默认导航至少 5 个链接');
+  assert.ok((mainNav.match(/nav-link/g) || []).length >= 7, '默认导航至少 7 个链接');
   assert.ok(!mainNav.includes('target="_blank"'), '默认导航全为站内链接（无外链）');
   // resolveNav 支持直接 text（无 i18n key）与子菜单（自定义导航移除后解析器仍保留该能力）
   const items = [
@@ -1915,9 +1937,9 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.strictEqual(resolved[1].children[0].text, '写作', '子项 text 生效');
   assert.strictEqual(resolved[1].children[1].url, 'https://friend.example', '子项外链保留');
   assert.ok(resolved[2].text, 'i18n key 解析出文本（' + resolved[2].text + '）');
-  // 默认 NAV 常量解析后 5 项且不崩溃
+  // 默认 NAV 常量解析后 7 项且不崩溃
   const def = b.ctx.resolveNav(b.ctx.NAV);
-  assert.strictEqual(def.length, 6, '默认 NAV 6 项');
+  assert.strictEqual(def.length, 7, '默认 NAV 7 项');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
@@ -2013,6 +2035,12 @@ tests.push(['沉浸式阅读：进度条 / 目录跟随 / 图片灯箱', async (
   assert.ok(css.includes('.lightbox-overlay') && css.includes('.reading-progress') && css.includes('.toc-list a.active'), '阅读增强样式齐全');
 }]);
 
+tests.push(['热门文章：路由 / 排行数据 / 时间范围入口', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/popular');
+  assert.strictEqual(b.ctx.currentRoute().path, '/popular', '热门页路由解析正确');
+  assert.ok(b.html.includes('id="popularList"') && b.html.includes('热门文章'), '热门页主体已渲染');
+  assert.ok(typeof b.ctx.loadPopular === 'function' && typeof b.ctx.renderPopularList === 'function', '热门排行函数已暴露');
+}]);
 tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));
   assert.strictEqual(manifest.display, 'standalone');

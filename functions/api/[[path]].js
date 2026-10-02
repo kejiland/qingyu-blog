@@ -25,6 +25,7 @@ import { json, corsPreflight, securityHeaders } from '../_lib/api-core.js';
  * 这样即使动态路由优先级高于具体文件，也不会阻断真实接口。 */
 const KNOWN_ROUTES = [
   /^\/api$/,
+  /^\/api\/popular$/,
   /^\/api\/search$/,
   /^\/api\/posts$/,
   /^\/api\/posts\/[^/]+$/,

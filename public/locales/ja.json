@@ -671,5 +671,12 @@
   "lightbox.close": "画像プレビューを閉じる",
   "lightbox.prev": "前の画像",
   "lightbox.next": "次の画像",
-  "lightbox.counter": "{current} / {total} 枚"
+  "lightbox.counter": "{current} / {total} 枚",
+  "nav.popular": "人気",
+  "popular.title": "人気記事",
+  "popular.desc": "閲覧・いいね・コメントの総合スコア順",
+  "popular.all": "全期間",
+  "popular.last7": "過去7日",
+  "popular.last30": "過去30日",
+  "popular.empty": "統計データはまだありません"
 }
