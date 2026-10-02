@@ -651,5 +651,12 @@
   "admin.editor.ogGenerating": "बन रही है…",
   "admin.editor.ogGenerated": "साझा छवि बन गई",
   "admin.editor.ogFail": "साझा छवि विफल: ",
-  "admin.editor.ogCloudOnly": "साझा छवि के लिए क्लाउड मोड और R2 मीडिया बकेट चाहिए"
+  "admin.editor.ogCloudOnly": "साझा छवि के लिए क्लाउड मोड और R2 मीडिया बकेट चाहिए",
+  "admin.media.compressHint": "अपलोड पर छवियाँ WebP में संपीड़ित होती हैं और सूची थंबनेल बनता है। संपादक में स्क्रीनशॉट सीधे पेस्ट करें।",
+  "admin.media.compressing": "संपीड़ित हो रही है…",
+  "admin.media.compressed": "{percent}% कम",
+  "admin.media.pasteUploading": "पेस्ट की गई छवि अपलोड हो रही है…",
+  "admin.media.pastedAlt": "पेस्ट की गई छवि",
+  "admin.media.pasteUploaded": "पेस्ट की गई छवि अपलोड और सम्मिलित हो गई",
+  "admin.media.pasteUploadFail": "पेस्ट छवि अपलोड विफल: "
 }

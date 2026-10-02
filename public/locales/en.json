@@ -651,5 +651,12 @@
   "admin.editor.ogGenerating": "Generating…",
   "admin.editor.ogGenerated": "Share image generated",
   "admin.editor.ogFail": "Share image failed: ",
-  "admin.editor.ogCloudOnly": "Share image generation requires cloud mode and an R2 media bucket"
+  "admin.editor.ogCloudOnly": "Share image generation requires cloud mode and an R2 media bucket",
+  "admin.media.compressHint": "Images are compressed to WebP on upload with a list thumbnail. Paste a screenshot directly in the editor to upload it.",
+  "admin.media.compressing": "Compressing…",
+  "admin.media.compressed": "{percent}% smaller",
+  "admin.media.pasteUploading": "Uploading pasted image…",
+  "admin.media.pastedAlt": "Pasted image",
+  "admin.media.pasteUploaded": "Pasted image uploaded and inserted",
+  "admin.media.pasteUploadFail": "Pasted image upload failed: "
 }

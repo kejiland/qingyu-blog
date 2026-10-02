@@ -14,7 +14,7 @@ const TABLES = {
   posts: ['id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at'],
   post_revisions: ['id','post_id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at','reason','created_at'],
   comments: ['id','post_id','author','content','date','status','parent_id'],
-  media: ['id','name','url','type','size','created_at'],
+  media: ['id','name','url','thumb_url','type','size','created_at'],
   music: ['id','title','artist','url','cover','size','duration','sort','created_at'],
   subscribers: ['id','email','status','token','locale','created_at','confirmed_at','unsubscribed_at','last_notified_at'],
   site_settings: ['k','v'],

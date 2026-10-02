@@ -1402,9 +1402,10 @@ export async function handleMedia(request, env) {
     const name = String((body && body.name) || id).slice(0, 200);
     const type = String((body && body.type) || '').slice(0, 64);
     const size = Number((body && body.size) || 0) || 0;
+    const thumbUrl = String((body && body.thumbUrl) || '').trim();
     const created_at = new Date().toISOString().slice(0, 10);
-    await dbRun(env.DB, 'INSERT INTO media (id,name,url,type,size,created_at) VALUES (?,?,?,?,?,?)', id, name, url, type, size, created_at);
-    return json({ ok: true, media: { id, name, url, type, size, created_at } }, 201, request, env, { 'Cache-Control': NO_CACHE });
+    await dbRun(env.DB, 'INSERT INTO media (id,name,url,thumb_url,type,size,created_at) VALUES (?,?,?,?,?,?,?)', id, name, url, thumbUrl, type, size, created_at);
+    return json({ ok: true, media: { id, name, url, thumbUrl, type, size, created_at } }, 201, request, env, { 'Cache-Control': NO_CACHE });
   }
   return json({ error: 'Method not allowed' }, 405, request, env);
 }

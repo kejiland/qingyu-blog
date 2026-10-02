@@ -651,5 +651,12 @@
   "admin.editor.ogGenerating": "生成中…",
   "admin.editor.ogGenerated": "分享图已生成",
   "admin.editor.ogFail": "分享图生成失败：",
-  "admin.editor.ogCloudOnly": "分享图生成需要云端模式与 R2 媒体桶"
+  "admin.editor.ogCloudOnly": "分享图生成需要云端模式与 R2 媒体桶",
+  "admin.media.compressHint": "上传时自动压缩并转换为 WebP，同时生成列表缩略图；编辑器支持直接粘贴截图上传。",
+  "admin.media.compressing": "正在压缩…",
+  "admin.media.compressed": "已压缩 {percent}%",
+  "admin.media.pasteUploading": "正在上传粘贴的图片…",
+  "admin.media.pastedAlt": "粘贴的图片",
+  "admin.media.pasteUploaded": "粘贴图片已上传并插入正文",
+  "admin.media.pasteUploadFail": "粘贴图片上传失败："
 }

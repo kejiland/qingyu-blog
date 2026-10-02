@@ -65,19 +65,27 @@ export async function handleMediaUploadUrl(request, env) {
   if (!IMAGE_EXTS[ext]) return json({ error: '不支持的图片格式（png / jpg / jpeg / webp / gif / svg / avif / bmp / ico）' }, 400, request, env);
   if (size <= 0 || size > MAX_SIZE) return json({ error: '文件大小需在 1B ~ 10MB 之间' }, 400, request, env);
 
-  const key = 'media/' + randomId() + '.' + ext;
+  const makeThumb = !!(body && body.makeThumb);
+  const base = 'media/' + randomId();
+  const key = base + '.' + ext;
   const contentType = IMAGE_EXTS[ext];
   const uploadUrl = await presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, contentType);
   const publicBase = String(env.R2_MEDIA_PUBLIC_BASE || '').replace(/\/+$/, '');
   const publicUrl = publicBase ? publicBase + '/' + key : '';
+  let thumbKey = '', thumbUploadUrl = '', thumbPublicUrl = '';
+  if (makeThumb) {
+    thumbKey = base + '-thumb.webp';
+    thumbUploadUrl = await presignPut(env, thumbKey, 3600, env.R2_MEDIA_BUCKET, 'image/webp');
+    thumbPublicUrl = publicBase ? publicBase + '/' + thumbKey : '';
+  }
 
-  return json({ ok: true, uploadUrl, publicUrl, key, contentType, expiresIn: 3600 }, 200, request, env, { 'Cache-Control': 'no-store' });
+  return json({ ok: true, uploadUrl, publicUrl, thumbUploadUrl, thumbPublicUrl, key, thumbKey, contentType, expiresIn: 3600 }, 200, request, env, { 'Cache-Control': 'no-store' });
 }
 
-/** 删除媒体：先删 R2 对象（若 url 是本站 media/ 前缀，媒体专用桶），再删 D1 元数据 */
-export async function deleteMediaObject(env, url) {
-  const key = extractMediaR2Key(url, env);
-  if (key) {
+/** 删除媒体：同时清理原图与缩略图 R2 对象（仅本站 media/ 前缀），再删 D1 元数据 */
+export async function deleteMediaObject(env, url, thumbUrl) {
+  const keys = [extractMediaR2Key(url, env), extractMediaR2Key(thumbUrl, env)].filter(Boolean);
+  for (const key of new Set(keys)) {
     try { await r2DeleteObject(env, key, env.R2_MEDIA_BUCKET); } catch (e) { /* R2 删除失败不阻塞元数据删除（避免幽灵记录） */ }
   }
 }

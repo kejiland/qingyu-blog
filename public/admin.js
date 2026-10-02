@@ -1911,6 +1911,52 @@
       canvas.toBlob(function (blob) { blob ? resolve(blob) : reject(new Error('图片生成失败')); }, 'image/png', 0.94);
     });
   }
+  function canvasBlobType(canvas, type, quality) {
+    return new Promise(function (resolve) { canvas.toBlob(function (blob) { resolve(blob); }, type, quality); });
+  }
+  function loadImageFile(file) {
+    return new Promise(function (resolve, reject) {
+      var url = URL.createObjectURL(file);
+      var img = new Image();
+      img.onload = function () { URL.revokeObjectURL(url); resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('图片解码失败')); };
+      img.src = url;
+    });
+  }
+  async function resizeImageFile(file, maxDim, quality, forceType) {
+    var img = await loadImageFile(file);
+    var scale = Math.min(1, maxDim / Math.max(img.naturalWidth || img.width, img.naturalHeight || img.height));
+    var w = Math.max(1, Math.round((img.naturalWidth || img.width) * scale));
+    var h = Math.max(1, Math.round((img.naturalHeight || img.height) * scale));
+    var canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    var ctx = canvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, w, h);
+    var type = forceType || 'image/webp';
+    var blob = await canvasBlobType(canvas, type, quality || 0.82);
+    if (!blob && type !== 'image/jpeg') blob = await canvasBlobType(canvas, 'image/jpeg', quality || 0.82);
+    return blob ? { blob: blob, width: w, height: h } : null;
+  }
+  async function compressImageFile(file) {
+    var type = String(file.type || '').toLowerCase();
+    if (!/^image\//.test(type) || /gif|svg|ico/.test(type)) return { file: file, thumb: null, compressed: false };
+    try {
+      var main = await resizeImageFile(file, 2200, 0.82, 'image/webp');
+      if (!main || !main.blob) return { file: file, thumb: null, compressed: false };
+      // 对本来就很小的图片避免“越压越大”
+      if (main.blob.size >= file.size && /jpeg|jpg|png|webp/.test(type)) return { file: file, thumb: null, compressed: false };
+      var ext = main.blob.type === 'image/jpeg' ? '.jpg' : '.webp';
+      var base = String(file.name || 'image').replace(/\.[^.]+$/, '') || 'image';
+      var mainFile = new File([main.blob], base + ext, { type: main.blob.type, lastModified: Date.now() });
+      var thumb = await resizeImageFile(file, 640, 0.76, 'image/webp');
+      var thumbFile = thumb && thumb.blob ? new File([thumb.blob], base + '-thumb.webp', { type: thumb.blob.type, lastModified: Date.now() }) : null;
+      return { file: mainFile, thumb: thumbFile, compressed: true, originalSize: file.size, width: main.width, height: main.height };
+    } catch (e) {
+      return { file: file, thumb: null, compressed: false };
+    }
+  }
+
   async function generateShareImage(content, postId, title, date, tags, series) {
     if (!cloudOn()) throw new Error(t('admin.editor.ogCloudOnly'));
     var canvas = document.createElement('canvas');
@@ -2010,6 +2056,15 @@
     var area = content.querySelector('#abBody');
     area.addEventListener('input', function () { autosizeArea(area); });
     area.addEventListener('input', debounce(function () { updatePreview(content); }, 200));
+    area.addEventListener('paste', function (e) {
+      var items = e.clipboardData && e.clipboardData.items ? Array.prototype.slice.call(e.clipboardData.items) : [];
+      var imgItem = items.filter(function (it) { return it.type && it.type.indexOf('image/') === 0; })[0];
+      if (!imgItem) return;
+      var file = imgItem.getAsFile();
+      if (!file) return;
+      e.preventDefault();
+      insertPastedImage(content, area, file);
+    });
     content.querySelector('#abToolbar').querySelectorAll('[data-md]').forEach(function (b) {
       b.addEventListener('click', function () { insertMd(area, b.getAttribute('data-md')); updatePreview(content); area.focus(); });
     });
@@ -2044,6 +2099,23 @@
     var smojiBtn = content.querySelector('#abSmoji');
     if (smojiBtn && window.initSmojiPicker) window.initSmojiPicker(smojiBtn, area);
   }
+  async function insertPastedImage(content, area, file) {
+    toast(t('admin.media.pasteUploading'), 'ok');
+    try {
+      var result = await uploadImageAsset(file);
+      var url = result.media && (result.media.url || result.media.publicUrl) || '';
+      var alt = t('admin.media.pastedAlt');
+      var md = '![' + alt + '](' + url + ')';
+      var start = area.selectionStart || 0, end = area.selectionEnd || 0;
+      area.value = area.value.slice(0, start) + md + area.value.slice(end);
+      area.selectionStart = area.selectionEnd = start + md.length;
+      area.dispatchEvent(new Event('input'));
+      toast(t('admin.media.pasteUploaded'), 'ok');
+    } catch (e) {
+      toast(t('admin.media.pasteUploadFail') + (e.message || e), 'err');
+    }
+  }
+
   function updatePreview(content) {
     var area = content.querySelector('#abBody');
     var pane = content.querySelector('#abPreviewPane');
@@ -2161,7 +2233,7 @@
     api('api/media').then(function (d) {
       var list = (d && d.media) || [];
       mask.querySelector('#abPickerGrid').innerHTML = list.length ? ('<div class="ab-media-grid">' + list.map(function (m) {
-        return '<div class="ab-media-card" data-url="' + esc(m.url) + '" style="cursor:pointer"><div class="ab-media-thumb"><img src="' + esc(m.url) + '" alt=""></div><div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div></div></div>';
+        return '<div class="ab-media-card" data-url="' + esc(m.url) + '" style="cursor:pointer"><div class="ab-media-thumb"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt=""></div><div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div></div></div>';
       }).join('') + '</div>') : '<div class="ab-empty"><p>' + t('admin.media.empty') + '</p></div>';
       mask.querySelectorAll('[data-url]').forEach(function (c) { c.addEventListener('click', function () {
         content.querySelector('#abCover').value = c.getAttribute('data-url'); mask.remove(); toast(t('admin.editor.selectMedia'), 'ok');
@@ -2379,7 +2451,7 @@
 
   /* ====================== 媒体库 ====================== */
   function pageMedia(content) {
-    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.media.title') + '</h1><p class="ab-page-sub">' + t('admin.media.desc') + '</p></div>' +
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.media.title') + '</h1><p class="ab-page-sub">' + t('admin.media.desc') + '</p><p class="ab-hint" style="margin:6px 0 0">' + t('admin.media.compressHint') + '</p></div>' +
       (cloudOn() ? '<label class="ab-btn primary">' + icon('upload', 15) + ' ' + t('admin.media.upload') + '<input type="file" id="abUpload" accept="image/*" multiple hidden></label>' : '<span class="ab-chip" style="background:var(--ab-primary-weak);color:var(--ab-primary)">' + t('admin.categories.staticHint') + '</span>') + '</div>' +
       (cloudOn() ? '' : '<div class="ab-card"><div class="ab-empty"><div class="ab-empty-ico">🖼</div><p>' + t('admin.media.cloudOnly') + '</p></div></div>');
     if (!cloudOn()) return;
@@ -2396,7 +2468,7 @@
       var list = (d && d.media) || [];
       grid.innerHTML = list.length ? list.map(function (m) {
         return '<div class="ab-media-card">' +
-          '<div class="ab-media-thumb"><img src="' + esc(m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
+          '<div class="ab-media-thumb"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
           '<div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div><div class="ab-media-size">' + fmtSize(m.size) + '</div></div>' +
           '<div class="ab-media-actions"><button class="ab-btn sm" data-copy="' + enc(m.url) + '">' + t('admin.media.copy') + '</button><button class="ab-btn sm danger" data-delmedia="' + enc(m.id) + '">' + t('admin.media.delete') + '</button></div>' +
         '</div>';
@@ -2413,30 +2485,42 @@
   function copyText(t) {
     try { if (navigator.clipboard) navigator.clipboard.writeText(t); else { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } } catch (e) {}
   }
+  async function uploadImageAsset(file) {
+    var packed = await compressImageFile(file);
+    var mainFile = packed.file;
+    if (mainFile.size > 10 * 1048576) throw new Error(t('admin.media.tooLarge'));
+    var u = await api('api/media/upload-url', { method: 'POST', body: JSON.stringify({ filename: mainFile.name, size: mainFile.size, makeThumb: !!packed.thumb }) });
+    if (!u || !u.uploadUrl) throw new Error((u && u.error) || t('admin.media.uploadFail'));
+    if (!u.publicUrl) throw new Error(t('admin.media.r2Missing'));
+    async function put(url, body, type) {
+      await new Promise(function (resolve, reject) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('PUT', url);
+        xhr.setRequestHeader('Content-Type', type || 'application/octet-stream');
+        xhr.onload = function () {
+          if (xhr.status >= 200 && xhr.status < 300) { resolve(true); return; }
+          reject(new Error('HTTP ' + xhr.status + r2Detail(xhr)));
+        };
+        xhr.onerror = function () { reject(new Error('HTTP 0：预检被拦截 / CORS 或网络中断')); };
+        xhr.send(body);
+      });
+    }
+    await put(u.uploadUrl, mainFile, u.contentType || mainFile.type);
+    if (packed.thumb && u.thumbUploadUrl) await put(u.thumbUploadUrl, packed.thumb, 'image/webp');
+    var registered = await api('api/media', { method: 'POST', body: JSON.stringify({ name: mainFile.name, url: u.publicUrl, thumbUrl: u.thumbPublicUrl || '', type: u.contentType || mainFile.type, size: mainFile.size }) });
+    return { media: registered && registered.media, packed: packed };
+  }
   async function uploadFiles(content, files) {
     if (!files || !files.length) return;
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
       if (!/^image\//.test(file.type)) { toast(file.name + ' ' + t('admin.media.notImage'), 'err'); continue; }
-      if (file.size > 10 * 1048576) { toast(file.name + ' ' + t('admin.media.tooLarge'), 'err'); continue; }
+      if (file.size > 30 * 1048576) { toast(file.name + ' ' + t('admin.media.tooLarge'), 'err'); continue; }
       try {
-        // R2 直传（与音乐上传同款）：先取预签名 PUT URL → XHR 直传 R2 → 注册元数据（url 为公开地址）
-        var u = await api('api/media/upload-url', { method: 'POST', body: JSON.stringify({ filename: file.name, size: file.size }) });
-        if (!u || !u.uploadUrl) throw new Error((u && u.error) || t('admin.media.uploadFail'));
-        if (!u.publicUrl) throw new Error(t('admin.media.r2Missing'));
-        var done = await new Promise(function (resolve, reject) {
-          var xhr = new XMLHttpRequest();
-          xhr.open('PUT', u.uploadUrl);
-          xhr.setRequestHeader('Content-Type', u.contentType || file.type || 'application/octet-stream');
-          xhr.onload = function () {
-            if (xhr.status >= 200 && xhr.status < 300) { resolve(true); return; }
-            reject(new Error('HTTP ' + xhr.status + r2Detail(xhr)));
-          };
-          xhr.onerror = function () { reject(new Error('HTTP 0：预检被拦截 / CORS 或网络中断')); };
-          xhr.send(file);
-        });
-        await api('api/media', { method: 'POST', body: JSON.stringify({ name: file.name, url: u.publicUrl, type: u.contentType || file.type, size: file.size }) });
-        toast(t('admin.media.uploaded') + ' ' + file.name, 'ok');
+        toast(t('admin.media.compressing') + ' ' + file.name, 'ok');
+        var result = await uploadImageAsset(file);
+        var saved = result.packed.compressed ? Math.max(0, Math.round((1 - result.packed.file.size / Math.max(1, result.packed.originalSize)) * 100)) : 0;
+        toast(t('admin.media.uploaded') + ' ' + result.packed.file.name + (saved ? ' · ' + t('admin.media.compressed', { percent: saved }) : ''), 'ok');
       } catch (e) { toast(t('admin.media.uploadFail') + (e.message || e), 'err'); }
     }
     loadMedia(content);

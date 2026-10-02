@@ -651,5 +651,12 @@
   "admin.editor.ogGenerating": "生成中…",
   "admin.editor.ogGenerated": "共有画像を生成しました",
   "admin.editor.ogFail": "共有画像生成失敗：",
-  "admin.editor.ogCloudOnly": "共有画像の生成にはクラウドモードと R2 メディアバケットが必要です"
+  "admin.editor.ogCloudOnly": "共有画像の生成にはクラウドモードと R2 メディアバケットが必要です",
+  "admin.media.compressHint": "アップロード時に WebP へ圧縮し、一覧用サムネイルを生成します。編集画面にはスクリーンショットを直接貼り付けられます。",
+  "admin.media.compressing": "圧縮中…",
+  "admin.media.compressed": "{percent}% 削減",
+  "admin.media.pasteUploading": "貼り付けた画像をアップロード中…",
+  "admin.media.pastedAlt": "貼り付けた画像",
+  "admin.media.pasteUploaded": "貼り付けた画像をアップロードして挿入しました",
+  "admin.media.pasteUploadFail": "貼り付け画像のアップロード失敗："
 }

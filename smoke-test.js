@@ -536,7 +536,7 @@ function makeD1() {
     if (s === 'DELETE FROM subscribers WHERE id = ?') { t.subscribers.delete(params[0]); return { success: true }; }
     if (/^INSERT OR IGNORE INTO mail_outbox/.test(s)) {
       const [post_id,to_email,status,attempts,error,created_at] = params;
-      const key = post_id + ' ' + to_email;
+      const key = post_id + '|' + to_email;
       if (!t.mail_outbox.has(key)) t.mail_outbox.set(key, { id: ++seq, post_id, to_email, status, attempts, error, created_at, sent_at: null });
       return { success: true };
     }
@@ -649,8 +649,8 @@ function makeD1() {
     }
     /* media */
     if (/^INSERT INTO media/.test(s)) {
-      const [id, name, url, type, size, created_at] = params;
-      const row = { id, name, url, type, size, created_at, __rowid: ++seq };
+      const [id, name, url, thumb_url, type, size, created_at] = params;
+      const row = { id, name, url, thumb_url, type, size, created_at, __rowid: ++seq };
       t.media.set(id, row); return { success: true };
     }
 
@@ -1302,11 +1302,11 @@ tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', asy
   };
   Math.random = () => 0.123456789;
 
-  const uploadResult = async (handler, filename, size, targetEnv) => {
+  const uploadResult = async (handler, filename, size, extra, targetEnv) => {
     const response = await handler(new Request('http://t/api/upload-url', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: 'Bearer upload-test-token' },
-      body: JSON.stringify({ filename, size })
+      body: JSON.stringify(Object.assign({ filename, size }, extra || {}))
     }), targetEnv || env);
     assert.strictEqual(response.status, 200);
     const data = await response.json();
@@ -1315,24 +1315,45 @@ tests.push(['R2 直传：预签名绑定 Content-Type（媒体 / 音乐）', asy
   const signature = (url) => url.searchParams.get('X-Amz-Signature');
 
   try {
-    const mediaUpload = await uploadResult(media.handleMediaUploadUrl, 'photo.png', 12345);
+    const mediaUpload = await uploadResult(media.handleMediaUploadUrl, 'photo.png', 12345, { makeThumb: true });
     assert.strictEqual(mediaUpload.url.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
     assert.ok(mediaUpload.url.pathname.startsWith('/test-media/media/'), '图片应写入媒体桶：' + mediaUpload.url.pathname);
     assert.ok(mediaUpload.data.publicUrl.startsWith('https://media.example.com/media/'), '图片公开地址应使用媒体域名：' + mediaUpload.data.publicUrl);
+    assert.ok(mediaUpload.data.thumbUploadUrl && mediaUpload.data.thumbPublicUrl.endsWith('-thumb.webp'), '生成缩略图签名');
 
-    const musicUpload = await uploadResult(music.handleMusicUploadUrl, 'song.mp3', 12345);
+    const musicUpload = await uploadResult(music.handleMusicUploadUrl, 'song.mp3', 12345, null, env);
     assert.strictEqual(musicUpload.url.searchParams.get('X-Amz-SignedHeaders'), 'content-type;host');
     assert.ok(musicUpload.url.pathname.startsWith('/test-music/music/'), '音乐桶可用时音乐应写入音乐桶：' + musicUpload.url.pathname);
     assert.ok(musicUpload.data.publicUrl.startsWith('https://music.example.com/music/'), '音乐公开地址应使用音乐域名：' + musicUpload.data.publicUrl);
 
     const fallbackEnv = Object.assign({}, env, { R2_BUCKET: '', R2_PUBLIC_BASE: '' });
-    const fallbackMusicUpload = await uploadResult(music.handleMusicUploadUrl, 'fallback.mp3', 12345, fallbackEnv);
+    const fallbackMusicUpload = await uploadResult(music.handleMusicUploadUrl, 'fallback.mp3', 12345, null, fallbackEnv);
     assert.ok(fallbackMusicUpload.url.pathname.startsWith('/test-media/music/'), '音乐桶缺失时应回退媒体桶：' + fallbackMusicUpload.url.pathname);
     assert.ok(fallbackMusicUpload.data.publicUrl.startsWith('https://media.example.com/music/'), '回退媒体桶时公开地址应使用媒体域名：' + fallbackMusicUpload.data.publicUrl);
 
     assert.strictEqual(music.extractR2Key('https://media.example.com/music/new.mp3', env), 'music/new.mp3');
     assert.strictEqual(music.extractR2Key('https://music.example.com/music/old.mp3', env), 'music/old.mp3');
     assert.strictEqual(music.extractR2Key('https://evil.example/music/foreign.mp3', env), '');
+
+    const realFetch = global.fetch;
+    const deleted = [];
+    global.fetch = async (url, options) => {
+      deleted.push({ url: String(url), method: options && options.method });
+      return { status: 204, text: async () => '' };
+    };
+    try {
+      await media.deleteMediaObject(
+        env,
+        'https://media.example.com/media/photo.png',
+        'https://media.example.com/media/photo-thumb.webp'
+      );
+    } finally {
+      global.fetch = realFetch;
+    }
+    assert.strictEqual(deleted.length, 2, '删除媒体时同时删除原图与缩略图');
+    assert.ok(deleted.every((item) => item.method === 'DELETE'), '对象清理必须使用 DELETE');
+    assert.ok(deleted[0].url.includes('/test-media/media/photo.png'), '清理原图 R2 对象');
+    assert.ok(deleted[1].url.includes('/test-media/media/photo-thumb.webp'), '清理缩略图 R2 对象');
 
     const key = 'media/fixed-object.png';
     const pngUrl = new URL(await music.presignPut(env, key, 3600, env.R2_MEDIA_BUCKET, 'image/png'));
