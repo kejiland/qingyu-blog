@@ -678,5 +678,21 @@
   "popular.all": "전체",
   "popular.last7": "최근 7일",
   "popular.last30": "최근 30일",
-  "popular.empty": "통계가 아직 없습니다"
+  "popular.empty": "통계가 아직 없습니다",
+  "admin.sidebar.analytics": "글 데이터",
+  "admin.analytics.title": "글 데이터",
+  "admin.analytics.desc": "글별 조회·좋아요·댓글 현황",
+  "admin.analytics.all": "전체",
+  "admin.analytics.last7": "최근 7일",
+  "admin.analytics.last30": "최근 30일",
+  "admin.analytics.totalViews": "총 조회",
+  "admin.analytics.totalLikes": "총 좋아요",
+  "admin.analytics.totalComments": "총 댓글",
+  "admin.analytics.topPost": "인기 글",
+  "admin.analytics.colTitle": "글",
+  "admin.analytics.colViews": "조회",
+  "admin.analytics.colLikes": "좋아요",
+  "admin.analytics.colComments": "댓글",
+  "admin.analytics.colScore": "종합 점수",
+  "admin.analytics.empty": "글 데이터가 없습니다"
 }

@@ -678,5 +678,21 @@
   "popular.all": "सभी",
   "popular.last7": "पिछले 7 दिन",
   "popular.last30": "पिछले 30 दिन",
-  "popular.empty": "अभी कोई आँकड़े नहीं हैं"
+  "popular.empty": "अभी कोई आँकड़े नहीं हैं",
+  "admin.sidebar.analytics": "लेख विश्लेषण",
+  "admin.analytics.title": "लेख विश्लेषण",
+  "admin.analytics.desc": "प्रत्येक लेख के व्यू, लाइक और टिप्पणियाँ",
+  "admin.analytics.all": "सभी",
+  "admin.analytics.last7": "पिछले 7 दिन",
+  "admin.analytics.last30": "पिछले 30 दिन",
+  "admin.analytics.totalViews": "कुल व्यू",
+  "admin.analytics.totalLikes": "कुल लाइक",
+  "admin.analytics.totalComments": "कुल टिप्पणियाँ",
+  "admin.analytics.topPost": "शीर्ष लेख",
+  "admin.analytics.colTitle": "लेख",
+  "admin.analytics.colViews": "व्यू",
+  "admin.analytics.colLikes": "लाइक",
+  "admin.analytics.colComments": "टिप्पणियाँ",
+  "admin.analytics.colScore": "स्कोर",
+  "admin.analytics.empty": "कोई लेख डेटा नहीं"
 }

@@ -678,5 +678,21 @@
   "popular.all": "全部",
   "popular.last7": "近 7 天",
   "popular.last30": "近 30 天",
-  "popular.empty": "暂无统计数据"
+  "popular.empty": "暂无统计数据",
+  "admin.sidebar.analytics": "文章数据",
+  "admin.analytics.title": "文章数据",
+  "admin.analytics.desc": "查看文章浏览、点赞和评论表现",
+  "admin.analytics.all": "全部",
+  "admin.analytics.last7": "近 7 天",
+  "admin.analytics.last30": "近 30 天",
+  "admin.analytics.totalViews": "总浏览",
+  "admin.analytics.totalLikes": "总点赞",
+  "admin.analytics.totalComments": "总评论",
+  "admin.analytics.topPost": "最热文章",
+  "admin.analytics.colTitle": "文章",
+  "admin.analytics.colViews": "浏览",
+  "admin.analytics.colLikes": "点赞",
+  "admin.analytics.colComments": "评论",
+  "admin.analytics.colScore": "综合得分",
+  "admin.analytics.empty": "暂无文章数据"
 }

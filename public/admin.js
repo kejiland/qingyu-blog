@@ -639,6 +639,7 @@
       { group: t('admin.sidebar.overview'), items: [{ key: 'dashboard', label: t('admin.sidebar.dashboard'), icon: 'gauge', href: '/admin' }] },
       { group: t('admin.sidebar.postManage'), items: [
         { key: 'posts', label: t('admin.sidebar.allPosts'), icon: 'list', href: '/admin/posts' },
+        { key: 'analytics', label: t('admin.sidebar.analytics'), icon: 'gauge', href: '/admin/analytics' },
         { key: 'write', label: t('admin.sidebar.writeNew'), icon: 'pen', href: '/admin/posts/new' },
         { key: 'tags', label: t('admin.sidebar.tagManage'), icon: 'tag', href: '/admin/tags' },
         { key: 'series', label: t('admin.sidebar.seriesManage'), icon: 'list', href: '/admin/series' }
@@ -794,6 +795,7 @@
     if (m) return { key: 'write', page: 'editor', id: decodeURIComponent(m[1]), isNew: false };
     if (path === '/admin' || path === '/admin/') return { key: 'dashboard', page: 'dashboard' };
     if (path === '/admin/posts') return { key: 'posts', page: 'posts' };
+    if (path === '/admin/analytics') return { key: 'analytics', page: 'analytics' };
     if (path === '/admin/tags') return { key: 'tags', page: 'tags' };
     if (path === '/admin/series') return { key: 'series', page: 'series' };
     if (path === '/admin/comments') return { key: 'comments', page: 'comments', filter: 'all' };
@@ -944,6 +946,8 @@
     if (_feedTimer) { clearInterval(_feedTimer); _feedTimer = null; } // 离开仪表盘时停止评论自动滚动
     if (route.page === 'dashboard') return pageDashboard(content);
     if (route.page === 'posts') return pagePosts(content);
+    if (route.page === 'analytics') return pageAnalytics(content);
+    if (route.page === 'analytics') return pageAnalytics(content);
     if (route.page === 'editor') return pageEditor(content, route);
     if (route.page === 'tags') return pageTags(content);
     if (route.page === 'series') return pageSeries(content);
@@ -1155,6 +1159,81 @@
     });
   }
 
+  /* ====================== 文章数据分析 ====================== */
+  function localPostAnalytics(posts) {
+    var items = (posts || []).map(function (p) {
+      var views = 0, likes = 0, comments = 0;
+      try {
+        var raw = localStorage.getItem('qingyu.stats.' + p.id);
+        if (raw) { var st = JSON.parse(raw); views = Number(st.views) || 0; likes = Number(st.likes) || 0; }
+      } catch (e) {}
+      try {
+        var cr = localStorage.getItem('qingyu.comments.' + p.id);
+        if (cr) { var arr = JSON.parse(cr); comments = Array.isArray(arr) ? arr.length : 0; }
+      } catch (e) {}
+      return Object.assign({}, p, { views: views, likes: likes, comments: comments, score: views + likes * 3 + comments * 5 });
+    });
+    items.sort(function (a, b) { return b.score - a.score || b.views - a.views; });
+    var summary = items.reduce(function (a, p) { a.views += p.views; a.likes += p.likes; a.comments += p.comments; return a; }, { views: 0, likes: 0, comments: 0, posts: items.length });
+    return { summary: summary, items: items };
+  }
+  function renderAnalyticsSummary(summary, items) {
+    var box = document.querySelector('#abAnalyticsSummary');
+    if (!box) return;
+    var top = items && items[0];
+    var cards = [
+      { label: t('admin.analytics.totalViews'), value: Number(summary && summary.views) || 0, icon: 'eye' },
+      { label: t('admin.analytics.totalLikes'), value: Number(summary && summary.likes) || 0, icon: 'heart' },
+      { label: t('admin.analytics.totalComments'), value: Number(summary && summary.comments) || 0, icon: 'quote' },
+      { label: t('admin.analytics.topPost'), value: top ? (top.title || t('admin.dashboard.noTitle')) : '—', icon: 'gauge', small: true }
+    ];
+    box.innerHTML = cards.map(function (c) {
+      return '<div class="ab-stat"><span class="ab-stat-ico">' + icon(c.icon, 17) + '</span><span class="ab-stat-num' + (c.small ? ' small' : '') + '">' + esc(String(c.value)) + '</span><span class="ab-stat-label">' + esc(c.label) + '</span></div>';
+    }).join('');
+  }
+  function renderAnalyticsTable(items) {
+    var body = document.querySelector('#abAnalyticsBody');
+    if (!body) return;
+    if (!items || !items.length) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.analytics.empty') + '</td></tr>';
+      return;
+    }
+    body.innerHTML = items.map(function (p) {
+      var status = p.status === 'draft' ? t('admin.dashboard.drafts') : (p.status === 'scheduled' ? t('admin.dashboard.scheduled') : '');
+      return '<tr><td><a class="ab-post-title" data-link="/admin/posts/' + enc(p.id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a>' + (status ? ' <span class="ab-chip">' + esc(status) + '</span>' : '') + '</td>'
+        + '<td>' + (Number(p.views) || 0) + '</td><td>' + (Number(p.likes) || 0) + '</td><td>' + (Number(p.comments) || 0) + '</td><td><b class="ab-analytics-score">' + (Number(p.score) || 0) + '</b></td></tr>';
+    }).join('');
+    body.querySelectorAll('[data-link]').forEach(function (a) {
+      a.addEventListener('click', function (e) { e.preventDefault(); go(a.getAttribute('data-link')); });
+    });
+  }
+  async function loadAnalytics(content, range) {
+    var body = content.querySelector('#abAnalyticsBody');
+    if (body) body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    var data = null;
+    if (cloudOn()) {
+      try { data = await api('api/admin/post-analytics?range=' + encodeURIComponent(range || 'all')); } catch (e) {}
+    }
+    if (!data) {
+      try { data = localPostAnalytics(await listPosts()); } catch (e) { data = { summary: {}, items: [] }; }
+    }
+    renderAnalyticsSummary(data.summary || {}, data.items || []);
+    renderAnalyticsTable(data.items || []);
+  }
+  function pageAnalytics(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.analytics.title') + '</h1><p class="ab-page-sub">' + t('admin.analytics.desc') + '</p></div></div>'
+      + (cloudOn() ? '<div class="ab-analytics-tabs"><button class="ab-btn sm active" data-analytics-range="all">' + t('admin.analytics.all') + '</button><button class="ab-btn sm" data-analytics-range="30">' + t('admin.analytics.last30') + '</button><button class="ab-btn sm" data-analytics-range="7">' + t('admin.analytics.last7') + '</button></div>' : '')
+      + '<div class="ab-grid cols-4" id="abAnalyticsSummary"></div>'
+      + '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.analytics.colTitle') + '</th><th>' + t('admin.analytics.colViews') + '</th><th>' + t('admin.analytics.colLikes') + '</th><th>' + t('admin.analytics.colComments') + '</th><th>' + t('admin.analytics.colScore') + '</th></tr></thead><tbody id="abAnalyticsBody"></tbody></table></div></div>';
+    content.querySelectorAll('[data-analytics-range]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        content.querySelectorAll('[data-analytics-range]').forEach(function (b) { b.classList.remove('active'); });
+        btn.classList.add('active');
+        loadAnalytics(content, btn.getAttribute('data-analytics-range'));
+      });
+    });
+    loadAnalytics(content, 'all');
+  }
   /* ====================== 文章列表 ====================== */
   function pagePosts(content) {
     content.innerHTML =

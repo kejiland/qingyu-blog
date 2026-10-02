@@ -678,5 +678,21 @@
   "popular.all": "全期間",
   "popular.last7": "過去7日",
   "popular.last30": "過去30日",
-  "popular.empty": "統計データはまだありません"
+  "popular.empty": "統計データはまだありません",
+  "admin.sidebar.analytics": "記事データ",
+  "admin.analytics.title": "記事データ",
+  "admin.analytics.desc": "記事ごとの閲覧・いいね・コメントを確認",
+  "admin.analytics.all": "全期間",
+  "admin.analytics.last7": "過去7日",
+  "admin.analytics.last30": "過去30日",
+  "admin.analytics.totalViews": "総閲覧数",
+  "admin.analytics.totalLikes": "総いいね",
+  "admin.analytics.totalComments": "総コメント",
+  "admin.analytics.topPost": "トップ記事",
+  "admin.analytics.colTitle": "記事",
+  "admin.analytics.colViews": "閲覧",
+  "admin.analytics.colLikes": "いいね",
+  "admin.analytics.colComments": "コメント",
+  "admin.analytics.colScore": "総合スコア",
+  "admin.analytics.empty": "記事データがありません"
 }

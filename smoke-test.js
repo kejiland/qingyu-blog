@@ -840,6 +840,24 @@ tests.push(['API：热门文章综合排行', async () => {
   assert.strictEqual(data.items[0].score, 35, '浏览/点赞/评论按权重计分');
 }]);
 
+tests.push(['API：后台文章数据分析与权限', async () => {
+  const { env, token, core } = await authEnv();
+  const headers = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const create = (body) => core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers, body: JSON.stringify(body) }), env);
+  await create({ id: 'ana-a', title: '数据第一', date: '2026-06-01', content: 'A', tags: ['数据'] });
+  await create({ id: 'ana-b', title: '数据草稿', date: '2026-06-02', content: 'B', status: 'draft' });
+  env._d1.stats.set('ana-a', { post_id: 'ana-a', views: 9, likes: 2 });
+  env._d1.comments.set('ana-c1', { id: 'ana-c1', post_id: 'ana-a', author: 'x', content: 'c', date: '2026-06-03', status: 'approved' });
+  const analytics = await import('./functions/_lib/analytics.js');
+  const noAuth = await analytics.handlePostAnalytics(new Request('http://t/api/admin/post-analytics'), env);
+  assert.strictEqual(noAuth.status, 401, '未登录不可读文章数据');
+  const res = await analytics.handlePostAnalytics(new Request('http://t/api/admin/post-analytics?range=all', { headers }), env);
+  const data = await res.json();
+  assert.strictEqual(res.status, 200);
+  assert.strictEqual(data.items.length, 2, '后台分析包含草稿');
+  assert.strictEqual(data.items.find((p) => p.id === 'ana-a').score, 20, '综合得分为浏览 + 点赞×3 + 评论×5');
+  assert.strictEqual(data.summary.posts, 2, '汇总文章数正确');
+}]);
 
 tests.push(['备份：创建 R2 备份并登记列表', async () => {
   const { env, token, core } = await authEnv();
@@ -2040,6 +2058,12 @@ tests.push(['热门文章：路由 / 排行数据 / 时间范围入口', async (
   assert.strictEqual(b.ctx.currentRoute().path, '/popular', '热门页路由解析正确');
   assert.ok(b.html.includes('id="popularList"') && b.html.includes('热门文章'), '热门页主体已渲染');
   assert.ok(typeof b.ctx.loadPopular === 'function' && typeof b.ctx.renderPopularList === 'function', '热门排行函数已暴露');
+}]);
+tests.push(['后台：文章数据分析页已完整接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('function pageAnalytics') && src.includes('abAnalyticsSummary') && src.includes('abAnalyticsBody'), '分析页主体已接入');
+  assert.ok(src.includes("key: 'analytics'") && src.includes("href: '/admin/analytics'"), '侧边栏分析入口已接入');
+  assert.ok(src.includes('api/admin/post-analytics'), '分析接口已接线');
 }]);
 tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));

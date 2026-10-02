@@ -678,5 +678,21 @@
   "popular.all": "All time",
   "popular.last7": "Last 7 days",
   "popular.last30": "Last 30 days",
-  "popular.empty": "No statistics yet"
+  "popular.empty": "No statistics yet",
+  "admin.sidebar.analytics": "Post analytics",
+  "admin.analytics.title": "Post analytics",
+  "admin.analytics.desc": "Views, likes and comments for every post",
+  "admin.analytics.all": "All time",
+  "admin.analytics.last7": "Last 7 days",
+  "admin.analytics.last30": "Last 30 days",
+  "admin.analytics.totalViews": "Total views",
+  "admin.analytics.totalLikes": "Total likes",
+  "admin.analytics.totalComments": "Total comments",
+  "admin.analytics.topPost": "Top post",
+  "admin.analytics.colTitle": "Post",
+  "admin.analytics.colViews": "Views",
+  "admin.analytics.colLikes": "Likes",
+  "admin.analytics.colComments": "Comments",
+  "admin.analytics.colScore": "Score",
+  "admin.analytics.empty": "No post analytics yet"
 }

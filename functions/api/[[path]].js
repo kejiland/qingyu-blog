@@ -44,6 +44,7 @@ const KNOWN_ROUTES = [
   /^\/api\/stats\/trend$/,
   /^\/api\/feed\.xml$/,
   /^\/api\/sitemap\.xml$/,
+  /^\/api\/admin\/post-analytics$/,
   /^\/api\/admin\/(setup|login|logout|password)$/,
   /^\/api\/ai\/(ping|summary|assist|comments)$/
 ];

@@ -9,6 +9,7 @@
 import { handleSearch } from './functions/_lib/search.js';
 import { handlePostRelations } from './functions/_lib/relations.js';
 import { handlePopular } from './functions/_lib/popular.js';
+import { handlePostAnalytics } from './functions/_lib/analytics.js';
 import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
@@ -112,6 +113,9 @@ export default {
     }
     if (url.pathname === '/api/admin/logout') {
       return handleAdminLogout(request, env);
+    }
+    if (url.pathname === '/api/admin/post-analytics') {
+      return handlePostAnalytics(request, env);
     }
     if (url.pathname === '/api/admin/password') {
       return handleAdminPassword(request, env);

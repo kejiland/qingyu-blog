@@ -442,6 +442,11 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
 
 /* ---------- 表格 ---------- */
+/* ====================== 文章数据分析 ====================== */
+.ab-analytics-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ab-analytics-tabs .ab-btn.active { background: var(--ab-primary); border-color: var(--ab-primary); color: #fff; }
+.ab-analytics-score { color: var(--ab-primary); font-variant-numeric: tabular-nums; }
+.ab-stat-num.small { font-size: 15px; line-height: 1.3; word-break: break-word; }
 .ab-table-wrap {
   background: var(--ab-card);
   border: 1px solid var(--ab-border); border-radius: var(--ab-radius);
@@ -690,7 +695,12 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
   .ab-header-btn span.ab-hide-sm { display: none; }
   .ab-breadcrumb .ab-hide-sm { display: none; }
   .ab-content { padding: 14px; }
-  .ab-table-wrap { overflow-x: auto; }
+  /* ====================== 文章数据分析 ====================== */
+.ab-analytics-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ab-analytics-tabs .ab-btn.active { background: var(--ab-primary); border-color: var(--ab-primary); color: #fff; }
+.ab-analytics-score { color: var(--ab-primary); font-variant-numeric: tabular-nums; }
+.ab-stat-num.small { font-size: 15px; line-height: 1.3; word-break: break-word; }
+.ab-table-wrap { overflow-x: auto; }
   .ab-table { min-width: 560px; }
   .ab-page-head { gap: 8px; }
   .ab-hide-xs { display: none !important; }
