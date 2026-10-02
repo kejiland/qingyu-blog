@@ -97,6 +97,26 @@ export async function presignPut(env, key, expiresSec, bucket, contentType) {
   return p.endpoint + path + '?' + canonicalQuery + '&X-Amz-Signature=' + s.signature;
 }
 
+/** 生成 R2 S3 兼容的预签名 GET URL（用于读取私有备份对象）。 */
+export async function presignGet(env, key, expiresSec, bucket) {
+  expiresSec = expiresSec || 900;
+  const b = bucket || env.R2_BUCKET;
+  const p = await r2SignParams(env);
+  const path = s3Path('/' + b + '/' + key);
+  const qp = {
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': env.R2_ACCESS_KEY_ID + '/' + p.scope,
+    'X-Amz-Date': p.amzDate,
+    'X-Amz-Expires': String(expiresSec),
+    'X-Amz-SignedHeaders': 'host'
+  };
+  const canonicalQuery = Object.keys(qp).sort()
+    .map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(qp[k]); })
+    .join('&');
+  const s = await signS3(env, 'GET', path, canonicalQuery, 'host:' + p.host + '\n', 'host');
+  return p.endpoint + path + '?' + canonicalQuery + '&X-Amz-Signature=' + s.signature;
+}
+
 /* ---------- 常量与工具 ---------- */
 const AUDIO_EXTS = { mp3: 'audio/mpeg', m4a: 'audio/mp4', ogg: 'audio/ogg', oga: 'audio/ogg', wav: 'audio/wav', aac: 'audio/aac', opus: 'audio/ogg', flac: 'audio/flac' };
 const MAX_SIZE = 30 * 1024 * 1024; // 单曲 ≤ 30MB

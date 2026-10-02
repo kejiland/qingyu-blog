@@ -567,6 +567,7 @@
       { group: t('admin.sidebar.contentSettings'), items: [
         { key: 'media', label: t('admin.sidebar.media'), icon: 'image', href: '/admin/media' },
         { key: 'music', label: t('admin.sidebar.musicManage'), icon: 'music', href: '/admin/music' },
+        { key: 'backup', label: t('admin.sidebar.backups'), icon: 'save', href: '/admin/backups' },
         { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
       ] }
@@ -714,6 +715,7 @@
     if (path === '/admin/comments/pending') return { key: 'comments-pending', page: 'comments', filter: 'pending' };
     if (path === '/admin/media') return { key: 'media', page: 'media' };
     if (path === '/admin/music') return { key: 'music', page: 'music' };
+    if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
     return { key: 'dashboard', page: 'dashboard' };
@@ -861,6 +863,7 @@
     if (route.page === 'comments') return pageComments(content, route.filter);
     if (route.page === 'media') return pageMedia(content);
     if (route.page === 'music') return pageMusic(content);
+    if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
   }
@@ -2262,6 +2265,94 @@
       } catch (e) { toast(t('admin.media.uploadFail') + (e.message || e), 'err'); }
     }
     loadMedia(content);
+  }
+
+  /* ====================== 备份与恢复 ====================== */
+  function backupReasonLabel(reason) {
+    if (reason === 'auto') return t('admin.backup.reasonAuto');
+    if (reason === 'pre-restore') return t('admin.backup.reasonSafety');
+    return t('admin.backup.reasonManual');
+  }
+  function pageBackups(content) {
+    content.innerHTML =
+      '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.backup.title') + '</h1><p class="ab-page-sub">' + t('admin.backup.desc') + '</p></div>' +
+        '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abBackupRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button>' +
+        '<button class="ab-btn primary" id="abBackupCreate">' + icon('save', 14) + ' ' + t('admin.backup.create') + '</button></div></div>' +
+      '<div class="ab-card" id="abBackupNotice" style="margin-bottom:16px"></div>' +
+      '<div class="ab-card"><div class="ab-section-title">' + icon('save', 16) + ' ' + t('admin.backup.history') + '</div>' +
+        '<div class="ab-table-wrap" style="margin-top:12px"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.backup.colReason') + '</th><th>' + t('admin.backup.colSize') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abBackupBody"></tbody></table></div></div>';
+    content.querySelector('#abBackupRefresh').addEventListener('click', function () { loadBackups(content); });
+    content.querySelector('#abBackupCreate').addEventListener('click', function () { createBackupManual(content); });
+    loadBackups(content);
+  }
+  async function loadBackups(content) {
+    var body = content.querySelector('#abBackupBody');
+    var notice = content.querySelector('#abBackupNotice');
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    try {
+      var d = await api('api/admin/backups');
+      var configured = !!(d && d.configured);
+      var list = (d && d.backups) || [];
+      notice.innerHTML = configured
+        ? '<div class="ab-row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="ab-chip">' + icon('cloud', 13) + ' R2</span><b>' + t('admin.backup.enabled') + '</b><span class="ab-muted">' + t('admin.backup.schedule') + '</span></div>'
+        : '<div class="ab-row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="ab-chip">' + t('admin.backup.disabledChip') + '</span><b>' + t('admin.backup.disabled') + '</b><span class="ab-muted">' + t('admin.backup.configureHint') + '</span></div>';
+      if (!list.length) {
+        body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.backup.empty') + '</td></tr>';
+        return;
+      }
+      body.innerHTML = list.map(function (b) {
+        return '<tr><td>' + esc(fmtTimestamp(b.createdAt)) + '</td><td><span class="ab-chip">' + esc(backupReasonLabel(b.reason)) + '</span></td><td>' + esc(fmtSize(b.size)) + '</td>' +
+          '<td class="col-actions"><button class="ab-btn sm" data-backup-download="' + esc(b.id) + '">' + icon('download', 12) + ' ' + t('admin.backup.download') + '</button> ' +
+          '<button class="ab-btn sm" data-backup-restore="' + esc(b.id) + '">' + icon('refresh', 12) + ' ' + t('admin.backup.restore') + '</button> ' +
+          '<button class="ab-btn sm danger" data-backup-delete="' + esc(b.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
+      }).join('');
+      body.querySelectorAll('[data-backup-download]').forEach(function (btn) {
+        btn.addEventListener('click', function () { downloadBackup(btn.getAttribute('data-backup-download')); });
+      });
+      body.querySelectorAll('[data-backup-restore]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-backup-restore');
+          confirmModal(t('admin.backup.restore'), '<p class="ab-muted">' + t('admin.backup.restoreConfirm') + '</p>', async function () {
+            try {
+              btn.disabled = true;
+              await api('api/admin/backups/' + enc(id) + '/restore', { method: 'POST', body: '{}' });
+              toast(t('admin.backup.restored'), 'ok');
+              setTimeout(function () { location.reload(); }, 900);
+            } catch (e) { btn.disabled = false; toast(t('admin.backup.restoreFail') + (e.message || e), 'err'); }
+          }, t('admin.backup.restore'));
+        });
+      });
+      body.querySelectorAll('[data-backup-delete]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-backup-delete');
+          confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.backup.deleteConfirm') + '</p>', async function () {
+            try { await api('api/admin/backups/' + enc(id), { method: 'DELETE' }); toast(t('admin.backup.deleted'), 'ok'); loadBackups(content); }
+            catch (e) { toast(t('admin.backup.deleteFail') + (e.message || e), 'err'); }
+          }, t('admin.comments.delete'));
+        });
+      });
+    } catch (e) {
+      notice.innerHTML = '<span class="ab-muted">' + esc(t('admin.backup.loadFail') + (e.message || e)) + '</span>';
+      body.innerHTML = '';
+    }
+  }
+  async function createBackupManual(content) {
+    var btn = content.querySelector('#abBackupCreate');
+    var old = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = icon('spinner', 13) + ' ' + t('admin.backup.creating');
+    try {
+      await api('api/admin/backups', { method: 'POST', body: '{}' });
+      toast(t('admin.backup.created'), 'ok');
+      await loadBackups(content);
+    } catch (e) { toast(t('admin.backup.createFail') + (e.message || e), 'err'); }
+    finally { btn.disabled = false; btn.innerHTML = old; }
+  }
+  async function downloadBackup(id) {
+    try {
+      var data = await api('api/admin/backups/' + enc(id));
+      transferDownloadText('qingyu-backup-' + id + '.json', JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
+    } catch (e) { toast(t('admin.backup.downloadFail') + (e.message || e), 'err'); }
   }
 
   /* ====================== 博客设置 ====================== */

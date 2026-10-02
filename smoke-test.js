@@ -457,7 +457,7 @@ tests.push(['stripMd 生成纯文本摘要', async () => {
 function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
-    posts: new Map(), post_revisions: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
+    posts: new Map(), post_revisions: new Map(), backups: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status', 'publish_at'];
@@ -466,6 +466,11 @@ function makeD1() {
     const s = sql.replace(/\s+/g, ' ').trim();
     /* posts */
     if (s === 'SELECT * FROM posts') return [...t.posts.values()];
+    const postColumns = /^SELECT ([a-z_]+(?:,[a-z_]+)*) FROM posts$/.exec(s);
+    if (postColumns) {
+      const cols = postColumns[1].split(',');
+      return [...t.posts.values()].map((row) => { const o = {}; cols.forEach((c) => { o[c] = row[c] === undefined ? null : row[c]; }); return o; });
+    }
     if (s === "SELECT id FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?") {
       return [...t.posts.values()].filter((r) => r.status === 'scheduled' && Number(r.publish_at) <= Number(params[0])).map((r) => ({ id: r.id }));
     }
@@ -500,6 +505,19 @@ function makeD1() {
       return { success: true };
     }
     if (s === 'DELETE FROM posts WHERE id = ?') { t.posts.delete(params[0]); return { success: true }; }
+    /* backups */
+    if (s === 'SELECT id,object_key FROM backups ORDER BY created_at DESC, id DESC') {
+      return [...t.backups.values()].sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? 1 : -1));
+    }
+    if (s === 'SELECT * FROM backups ORDER BY created_at DESC, id DESC') {
+      return [...t.backups.values()].sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? 1 : -1));
+    }
+    if (s === 'SELECT * FROM backups WHERE id = ?') return t.backups.get(params[0]) || null;
+    if (/^INSERT INTO backups/.test(s)) {
+      const [id, object_key, size, reason, created_at, counts] = params;
+      t.backups.set(id, { id, object_key, size, reason, created_at, counts }); return { success: true };
+    }
+    if (s === 'DELETE FROM backups WHERE id = ?') { t.backups.delete(params[0]); return { success: true }; }
     /* comments */
     if (s === 'SELECT * FROM comments WHERE post_id = ? ORDER BY rowid ASC'
       || s === "SELECT * FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY rowid ASC") {
@@ -726,6 +744,42 @@ tests.push(['API：文章版本历史与恢复', async () => {
   const current = await (await core.handlePostId(new Request('http://t/api/posts/rev1', { headers: authHeaders }), env, 'rev1')).json();
   assert.strictEqual(current.post.title, '第一版');
   assert.strictEqual(current.post.content, '旧内容');
+}]);
+
+tests.push(['备份：创建 R2 备份并登记列表', async () => {
+  const { env, token, core } = await authEnv();
+  env.R2_ACCESS_KEY_ID = 'test-key';
+  env.R2_SECRET_ACCESS_KEY = 'test-secret';
+  env.R2_ENDPOINT = 'https://r2.example';
+  env.R2_BACKUP_BUCKET = 'blog-backups';
+  const authJson = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: authJson,
+    body: JSON.stringify({ id: 'backup-post', title: '备份文章', content: '内容' })
+  }), env);
+  const backup = await import('./functions/_lib/backup.js');
+  const originalFetch = global.fetch;
+  let uploadedBody = '';
+  global.fetch = async function (url, opts) {
+    if (opts && String(opts.method || '').toUpperCase() === 'PUT') {
+      uploadedBody = String(opts.body || '');
+      return new Response('', { status: 200 });
+    }
+    return new Response(uploadedBody, { status: 200 });
+  };
+  try {
+    const created = await backup.createBackup(env, 'manual');
+    assert.ok(created.id && created.size > 0, '创建备份元数据');
+    assert.ok(uploadedBody.includes('backup-post') && uploadedBody.includes('备份文章'), '备份包含文章数据');
+    const r = await backup.handleBackups(new Request('http://t/api/admin/backups', { headers: authJson }), env);
+    const data = await r.json();
+    assert.strictEqual(data.configured, true);
+    assert.strictEqual(data.backups.length, 1);
+    assert.strictEqual(data.backups[0].reason, 'manual');
+    assert.strictEqual(data.backups[0].counts.posts, 1);
+  } finally {
+    global.fetch = originalFetch;
+  }
 }]);
 
 tests.push(['API：PUT 更新 / PUT 未知 id 新建 / DELETE / 404 / 无 DB 500', async () => {

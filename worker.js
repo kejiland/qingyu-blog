@@ -12,6 +12,7 @@ import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
 import { onRequest as aiComments } from './functions/api/ai/comments.js';
 import { handleMusic, handleMusicId, handleMusicUploadUrl } from './functions/_lib/music.js';
+import { handleBackups, handleBackupId, handleBackupRestore, createBackup } from './functions/_lib/backup.js';
 import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.js';
 
 export default {
@@ -44,6 +45,10 @@ export default {
       if (result && result.published) {
         console.log('[cron] scheduled posts published:', result.published, result.ids.join(','));
       }
+      if (event && event.cron === '0 19 * * *') {
+        const backup = await createBackup(env, 'auto');
+        console.log('[cron] daily backup created:', backup.id, backup.size);
+      }
     } catch (e) {
       console.error('[cron] scheduled publishing failed:', e && e.message, e && e.stack);
     }
@@ -55,6 +60,17 @@ export default {
     // API 路由
     if (url.pathname === '/api/posts') {
       return handlePosts(request, env);
+    }
+    if (url.pathname === '/api/admin/backups') {
+      return handleBackups(request, env);
+    }
+    let backupMatch = url.pathname.match(/^\/api\/admin\/backups\/([^/]+)\/restore$/);
+    if (backupMatch) {
+      return handleBackupRestore(request, env, decodeURIComponent(backupMatch[1]));
+    }
+    backupMatch = url.pathname.match(/^\/api\/admin\/backups\/([^/]+)$/);
+    if (backupMatch) {
+      return handleBackupId(request, env, decodeURIComponent(backupMatch[1]));
     }
     if (url.pathname === '/api/admin/setup') {
       return handleAdminSetup(request, env);
