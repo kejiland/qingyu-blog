@@ -499,6 +499,7 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
 .ab-status.published { color: var(--ab-ok); background: color-mix(in srgb, var(--ab-ok) 12%, transparent); }
 .ab-status.draft { color: var(--ab-warn); background: color-mix(in srgb, var(--ab-warn) 14%, transparent); }
+.ab-status.scheduled { color: var(--ab-primary); background: color-mix(in srgb, var(--ab-primary) 12%, transparent); }
 .ab-status.approved { color: var(--ab-ok); background: color-mix(in srgb, var(--ab-ok) 12%, transparent); }
 .ab-status.pending { color: var(--ab-warn); background: color-mix(in srgb, var(--ab-warn) 14%, transparent); }
 

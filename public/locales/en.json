@@ -533,5 +533,11 @@
   "admin.transfer.noSelection": "Select at least one post first",
   "admin.editor.dateLabel": "Publish date",
   "admin.editor.dateHint": "Minute precision; editing a post does not change its publish date automatically",
-  "admin.editor.setNow": "Now"
+  "admin.editor.setNow": "Now",
+  "admin.dashboard.scheduled": "Scheduled",
+  "admin.editor.scheduleLabel": "Scheduled publish time",
+  "admin.editor.scheduleHint": "Checked every 5 minutes in cloud mode and published automatically when due",
+  "admin.editor.scheduleButton": "Schedule",
+  "admin.editor.scheduleRequired": "Choose a scheduled time later than now",
+  "admin.editor.scheduled": "Scheduled for publishing"
 }

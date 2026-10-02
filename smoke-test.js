@@ -460,17 +460,25 @@ function makeD1() {
     posts: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status', 'publish_at'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
     /* posts */
     if (s === 'SELECT * FROM posts') return [...t.posts.values()];
+    if (s === "SELECT id FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?") {
+      return [...t.posts.values()].filter((r) => r.status === 'scheduled' && Number(r.publish_at) <= Number(params[0])).map((r) => ({ id: r.id }));
+    }
     if (s === 'SELECT 1 FROM posts WHERE id = ?') return t.posts.has(params[0]) ? { '1': 1 } : null;
     if (s === 'SELECT * FROM posts WHERE id = ?') return t.posts.get(params[0]) || null;
     if (/^INSERT( OR REPLACE)? INTO posts/.test(s)) {
       const row = {}; POST_COLS.forEach((c, i) => { row[c] = params[i]; });
       t.posts.set(row.id, row); return { success: true };
+    }
+    if (s === "UPDATE posts SET status = 'published', publish_at = NULL WHERE id = ? AND status = 'scheduled'") {
+      const row = t.posts.get(params[0]);
+      if (row && row.status === 'scheduled') { row.status = 'published'; row.publish_at = null; }
+      return { success: true };
     }
     if (s === 'DELETE FROM posts WHERE id = ?') { t.posts.delete(params[0]); return { success: true }; }
     /* comments */
@@ -644,6 +652,34 @@ tests.push(['API：POST / GET / 重复 id 409 / 缺字段 400', async () => {
   fullRes = await core.handlePosts(new Request('http://t/api/posts?full=1', { headers: { Authorization: 'Bearer ' + token } }), env);
   const full = await fullRes.json();
   assert.strictEqual(full.posts.find((p) => p.id === 'a1').content, '**内容**', 'full=1 返回正文');
+}]);
+
+tests.push(['API：定时发布到期后自动发布', async () => {
+  const { env, token, core } = await authEnv();
+  const now = Date.now();
+  const authJson = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const create = (post) => core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: authJson, body: JSON.stringify(post)
+  }), env);
+  let r = await create({ id: 'sched-due', title: '已到期', date: '2026-10-01', content: 'A', status: 'scheduled', publishAt: now - 1000 });
+  assert.strictEqual(r.status, 201);
+  r = await create({ id: 'sched-future', title: '未到期', date: '2026-10-02', content: 'B', status: 'scheduled', publishAt: now + 3600000 });
+  assert.strictEqual(r.status, 201);
+
+  let publicList = await (await core.handlePosts(new Request('http://t/api/posts'), env)).json();
+  assert.strictEqual(publicList.posts.length, 0, '公开列表不返回定时文章');
+  let hidden = await core.handlePostId(new Request('http://t/api/posts/sched-due'), env, 'sched-due');
+  assert.strictEqual(hidden.status, 404, '未登录不可读取定时文章');
+
+  const published = await core.publishScheduledPosts(env, now);
+  assert.strictEqual(published.published, 1, '只发布已到期文章');
+  assert.deepStrictEqual(published.ids, ['sched-due']);
+  publicList = await (await core.handlePosts(new Request('http://t/api/posts'), env)).json();
+  assert.deepStrictEqual(publicList.posts.map((p) => p.id), ['sched-due'], '到期文章进入公开列表');
+  const adminList = await (await core.handlePosts(new Request('http://t/api/posts?all=1', { headers: authJson }), env)).json();
+  const future = adminList.posts.find((p) => p.id === 'sched-future');
+  assert.strictEqual(future.status, 'scheduled', '未到期文章保持定时状态');
+  assert.ok(future.publishAt > now, '未到期时间保留');
 }]);
 
 tests.push(['API：PUT 更新 / PUT 未知 id 新建 / DELETE / 404 / 无 DB 500', async () => {

@@ -6,7 +6,7 @@
  *   · 其余请求 → 静态资源（由 wrangler.workers.toml [assets] 绑定提供）
  * 部署：npx wrangler deploy
  * ============================================================ */
-import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, dbFirst } from './functions/_lib/api-core.js';
+import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
@@ -34,6 +34,18 @@ export default {
           securityHeaders()
         )
       });
+    }
+  },
+
+  async scheduled(event, env) {
+    try {
+      const now = event && event.scheduledTime ? event.scheduledTime : Date.now();
+      const result = await publishScheduledPosts(env, now);
+      if (result && result.published) {
+        console.log('[cron] scheduled posts published:', result.published, result.ids.join(','));
+      }
+    } catch (e) {
+      console.error('[cron] scheduled publishing failed:', e && e.message, e && e.stack);
     }
   },
 

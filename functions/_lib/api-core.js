@@ -140,9 +140,18 @@ export function unauthorized(request, env) {
   return json({ error: '未授权：请先登录获取会话 token，并在请求头携带 Authorization: Bearer <token>' }, 401, request, env);
 }
 
+function normalizePostStatus(v) {
+  return v === 'draft' || v === 'scheduled' ? v : 'published';
+}
+function normalizePublishAt(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+}
 export function normalizePost(p) {
   const out = p || {};
   const protectedPost = !!out.protected && out.enc && typeof out.enc === 'object';
+  const status = normalizePostStatus(out.status);
+  const publishAt = status === 'scheduled' ? normalizePublishAt(out.publishAt !== undefined ? out.publishAt : out.publish_at) : null;
   return {
     id: String(out.id || ''),
     title: String(out.title || '').trim(),
@@ -155,7 +164,8 @@ export function normalizePost(p) {
     protected: !!out.protected,
     enc: protectedPost ? out.enc : null,
     category: String(out.category || '').trim(),
-    status: (out.status === 'draft') ? 'draft' : 'published',
+    status: status,
+    publishAt: publishAt,
     tags: Array.isArray(out.tags)
       ? out.tags.map((t) => String(t).trim()).filter(Boolean)
       : String(out.tags || '').split(/[,，]/).map((t) => t.trim()).filter(Boolean)
@@ -184,7 +194,8 @@ function postFromRow(r) {
     protected: isProtected,
     enc: enc,
     category: String(r.category || ''),
-    status: (r.status === 'draft') ? 'draft' : 'published',
+    status: normalizePostStatus(r.status),
+    publishAt: normalizePublishAt(r.publish_at),
     tags: tags
   };
 }
@@ -198,8 +209,13 @@ function postToParams(p) {
     p.enc ? JSON.stringify(p.enc) : null,
     JSON.stringify(p.tags || []),
     p.category || '',
-    p.status === 'draft' ? 'draft' : 'published'
+    normalizePostStatus(p.status),
+    p.status === 'scheduled' ? normalizePublishAt(p.publishAt) : null
   ];
+}
+
+function isPublicPost(p) {
+  return (p && (p.status || 'published')) === 'published';
 }
 
 function sortByDateDesc(posts) {
@@ -237,7 +253,7 @@ export function buildFeedXml(posts, siteUrl, opts) {
   const base = String(siteUrl || '').replace(/\/+$/, '');
   const title = o.title || '轻语博客';
   const desc = o.description || '一个零依赖的轻量博客';
-  const list = sortByDateDesc(posts).filter((p) => !p.protected && p.status !== 'draft').slice(0, o.maxItems || 20);
+  const list = sortByDateDesc(posts).filter((p) => !p.protected && isPublicPost(p)).slice(0, o.maxItems || 20);
   const items = list.map((p) => {
     const link = base + '/posts/' + encodeURIComponent(p.id) + '/';
     const content = p.content || '';
@@ -328,7 +344,7 @@ export async function handlePosts(request, env) {
     if (includeDrafts && !(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
     let all = sortByDateDesc(await readPosts(env));
-    if (!includeDrafts) all = all.filter((p) => p.status !== 'draft');
+    if (!includeDrafts) all = all.filter(isPublicPost);
 
     // 完整备份：正文/密文原样返回，禁止写进共享缓存。
     if (full) return json({ ok: true, posts: all }, 200, request, env, { 'Cache-Control': NO_CACHE });
@@ -351,10 +367,11 @@ export async function handlePosts(request, env) {
     const body = await request.json().catch(() => null);
     const p = normalizePost(body);
     if (!p.id || !p.title) return json({ error: '缺少 id 或 title' }, 400, request, env);
+    if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     const exist = await dbFirst(env.DB, 'SELECT 1 FROM posts WHERE id = ?', p.id);
     if (exist) return json({ error: '已存在相同 id（' + p.id + '），请用 PUT 更新' }, 409, request, env);
     await dbRun(env.DB,
-      'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + p.id]);
     return json({ ok: true, post: p }, 201, request, env);
@@ -375,7 +392,7 @@ export async function handlePostId(request, env, id) {
     const p = exist ? postFromRow(exist) : null;
     if (!p) return json({ error: '未找到该内容' }, 404, request, env);
     // 草稿只对作者可见：未登录（无写权限）时对外不可读，避免草稿全文泄漏
-    if (p.status === 'draft' && !(await isWriteAuthed(request, env))) {
+    if ((p.status === 'draft' || p.status === 'scheduled') && !(await isWriteAuthed(request, env))) {
       return json({ error: '未找到该内容' }, 404, request, env);
     }
     // 单篇详情可稍长缓存（含正文/密文），写操作会使缓存自然过期
@@ -387,8 +404,9 @@ export async function handlePostId(request, env, id) {
     const p = normalizePost(body);
     p.id = id;
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
+    if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,
-      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + id]);
     return json({ ok: true, post: p }, 200, request, env);
@@ -548,6 +566,24 @@ export async function handleCommentId(request, env, postId, cid) {
 }
 
 /* ============================================================
+ * 定时发布（由 Worker Cron Trigger 周期调用）
+ * ============================================================ */
+export async function publishScheduledPosts(env, nowMs) {
+  if (!env || !env.DB) return { published: 0, ids: [] };
+  const now = Number(nowMs) || Date.now();
+  const due = await dbAll(env.DB,
+    "SELECT id FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?",
+    now).catch(() => []);
+  if (!due.length) return { published: 0, ids: [] };
+  await dbBatch(env.DB, due.map((row) => ({
+    sql: "UPDATE posts SET status = 'published', publish_at = NULL WHERE id = ? AND status = 'scheduled'",
+    params: [row.id]
+  })));
+  await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP].concat(due.map((row) => 'post:' + row.id)));
+  return { published: due.length, ids: due.map((row) => String(row.id)) };
+}
+
+/* ============================================================
  * Sitemap（/api/sitemap.xml）
  * ============================================================ */
 
@@ -567,7 +603,7 @@ export function buildSitemapXml(posts, siteUrl) {
     row(base + '/archive'),
     row(base + '/guestbook')
   ];
-  sortByDateDesc(posts).filter((p) => p.status !== 'draft').forEach((p) => {
+  sortByDateDesc(posts).filter(isPublicPost).forEach((p) => {
     lines.push(row(base + '/posts/' + encodeURIComponent(p.id) + '/', p.date || ''));
   });
   lines.push('</urlset>');

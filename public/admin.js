@@ -62,9 +62,24 @@
   }
   function toDateTimeLocal(v) {
     var s = String(v || '').trim();
+    if (/^\d{12,}$/.test(s)) {
+      var d = new Date(Number(s));
+      if (!isNaN(d.getTime())) return localDateTimeValue(d);
+    }
     var m = s.match(/^(\d{4}-\d{2}-\d{2})(?:[ T](\d{1,2}):(\d{2}))?$/);
     if (m) return m[1] + 'T' + (m[2] ? (m[2].length === 1 ? '0' + m[2] : m[2]) + ':' + m[3] : '00:00');
     return s;
+  }
+  function dateTimeLocalToMs(v) {
+    var s = String(v || '').trim();
+    if (!s) return null;
+    var ms = Date.parse(s);
+    return isNaN(ms) ? null : ms;
+  }
+  function fmtTimestamp(ms) {
+    var n = Number(ms) || 0;
+    if (!n) return '';
+    return localDateTimeValue(new Date(n)).replace('T', ' ');
   }
   function normalizeEditorDate(v) {
     var s = String(v || '').trim().replace('T', ' ');
@@ -212,7 +227,7 @@
     var item = { id: post.id, title: post.title, date: post.date, tags: post.tags || [], excerpt: post.excerpt || '',
       cover: post.cover || '', category: post.category || '', status: post.status || 'published',
       pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null,
-      content: post.content || '' };
+      publishAt: post.publishAt || null, content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
     localStorage.setItem('qingyu.drafts', JSON.stringify(drafts));
   }
@@ -731,8 +746,9 @@
     var posts = [];
     try { posts = await listPosts(); } catch (e) {}
     var total = posts.length;
-    var published = posts.filter(function (p) { return (p.status || 'published') !== 'draft'; }).length;
+    var published = posts.filter(function (p) { return (p.status || 'published') === 'published'; }).length;
     var drafts = posts.filter(function (p) { return (p.status || 'published') === 'draft'; }).length;
+    var scheduled = posts.filter(function (p) { return (p.status || 'published') === 'scheduled'; }).length;
 
     var commentsAll = [], pending = 0;
     if (cloudOn()) {
@@ -744,6 +760,7 @@
     var stats = [
       { label: t('admin.dashboard.totalPosts'), value: total, icon: 'doc' },
       { label: t('admin.dashboard.published'), value: published, icon: 'check' },
+      { label: t('admin.dashboard.scheduled'), value: scheduled, icon: 'clock' },
       { label: t('admin.dashboard.drafts'), value: drafts, icon: 'pen' },
       { label: t('admin.dashboard.pinned'), value: pinnedCount, icon: 'pin' },
       { label: t('admin.dashboard.totalComments'), value: cloudOn() ? commentsAll.length : '—', icon: 'quote' },
@@ -915,7 +932,7 @@
         '<button class="ab-btn primary" data-link="/admin/posts/new">' + icon('pen', 15) + ' ' + t('admin.sidebar.writeNew') + '</button></div>' +
       '<div class="ab-toolbar">' +
         '<div class="ab-search"><input class="ab-input" id="abPostKw" placeholder="' + t('admin.postList.search') + '"></div>' +
-        '<select class="ab-select" id="abPostStatus" style="max-width:140px"><option value="all">' + t('admin.postList.allStatus') + '</option><option value="published">' + t('admin.dashboard.published') + '</option><option value="draft">' + t('admin.dashboard.drafts') + '</option></select>' +
+        '<select class="ab-select" id="abPostStatus" style="max-width:160px"><option value="all">' + t('admin.postList.allStatus') + '</option><option value="published">' + t('admin.dashboard.published') + '</option><option value="scheduled">' + t('admin.dashboard.scheduled') + '</option><option value="draft">' + t('admin.dashboard.drafts') + '</option></select>' +
       '</div>' +
       '<div class="ab-table-wrap"><table class="ab-table"><thead><tr>' +
         '<th>' + t('admin.postList.colTitle') + '</th><th>' + t('admin.postList.colTags') + '</th><th>' + t('admin.postList.colDate') + '</th><th>' + t('admin.postList.colStatus') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th>' +
@@ -970,8 +987,10 @@
     body.innerHTML = slice.map(function (p) {
       var id = p.id;
       var statusBadge = '';
-      if (p.pinned) statusBadge = '<span class="ab-status published">' + icon('pin', 11) + ' ' + t('admin.postList.pin') + '</span>';
-      else statusBadge = '<span class="ab-status ' + ((p.status || 'published') === 'draft' ? 'draft' : 'published') + '">' + ((p.status || 'published') === 'draft' ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
+      var postStatus = p.status || 'published';
+      if (postStatus === 'scheduled') statusBadge = '<span class="ab-status scheduled">' + icon('clock', 11) + ' ' + t('admin.dashboard.scheduled') + (p.publishAt ? ' · ' + esc(fmtTimestamp(p.publishAt)) : '') + '</span>';
+      else if (p.pinned) statusBadge = '<span class="ab-status published">' + icon('pin', 11) + ' ' + t('admin.postList.pin') + '</span>';
+      else statusBadge = '<span class="ab-status ' + (postStatus === 'draft' ? 'draft' : 'published') + '">' + (postStatus === 'draft' ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
       return '<tr>' +
         '<td><a class="ab-post-title" data-link="/admin/posts/' + enc(id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a></td>' +
         '<td class="ab-td-tags">' + (p.tags && p.tags.length ? '<div class="ab-tag-row">' + p.tags.map(function (t) { return '<span class="ab-chip">' + esc(t) + '</span>'; }).join('') + '</div>' : '<span class="ab-muted">—</span>') + '</td>' +
@@ -1107,7 +1126,8 @@
     });
     lines.push('tags: ' + JSON.stringify(post.tags || []));
     lines.push('pinned: ' + (post.pinned ? 'true' : 'false'));
-    lines.push('status: ' + JSON.stringify(post.status === 'draft' ? 'draft' : 'published'));
+    lines.push('status: ' + JSON.stringify(post.status === 'draft' ? 'draft' : (post.status === 'scheduled' ? 'scheduled' : 'published')));
+    if (post.publishAt) lines.push('publish_at: ' + JSON.stringify(new Date(Number(post.publishAt)).toISOString()));
     if (post.protected) lines.push('protected: true');
     if (post.enc) lines.push('enc: ' + JSON.stringify(post.enc));
     lines.push('---', '');
@@ -1158,6 +1178,7 @@
       cover: meta.cover || '',
       category: meta.category || '',
       status: meta.status,
+      publishAt: meta.publish_at ? Date.parse(String(meta.publish_at)) : null,
       pinned: meta.pinned,
       protected: isProtected,
       enc: isProtected ? enc : null,
@@ -1184,6 +1205,10 @@
       try { enc = JSON.parse(enc); } catch (e) { enc = null; }
     }
     var isProtected = !!(post.protected && enc);
+    var postStatus = post.status === 'draft' ? 'draft' : (post.status === 'scheduled' ? 'scheduled' : 'published');
+    var publishAtRaw = post.publishAt != null ? post.publishAt : post.publish_at;
+    var publishAt = Number(publishAtRaw) || (publishAtRaw ? Date.parse(String(publishAtRaw)) : null);
+    if (!Number.isFinite(publishAt) || publishAt <= 0) publishAt = null;
     return {
       id: id,
       title: title,
@@ -1192,7 +1217,8 @@
       excerpt: String(post.excerpt || ''),
       cover: String(post.cover || ''),
       category: String(post.category || ''),
-      status: post.status === 'draft' ? 'draft' : 'published',
+      status: postStatus,
+      publishAt: postStatus === 'scheduled' ? publishAt : null,
       pinned: !!post.pinned,
       protected: isProtected,
       enc: isProtected ? enc : null,
@@ -1492,8 +1518,10 @@
       return;
     }
     body.innerHTML = posts.map(function (p) {
-      var isDraft = (p.status || 'published') === 'draft';
-      var badge = '<span class="ab-status ' + (isDraft ? 'draft' : 'published') + '">' + (isDraft ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
+      var postStatus = p.status || 'published';
+      var badge = postStatus === 'scheduled'
+        ? '<span class="ab-status scheduled">' + icon('clock', 11) + ' ' + t('admin.dashboard.scheduled') + (p.publishAt ? ' · ' + esc(fmtTimestamp(p.publishAt)) : '') + '</span>'
+        : '<span class="ab-status ' + (postStatus === 'draft' ? 'draft' : 'published') + '">' + (postStatus === 'draft' ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
       return '<tr>' +
         '<td><input class="ab-ie-check" type="checkbox" data-id="' + esc(enc(p.id)) + '"></td>' +
         '<td><b>' + esc(p.title || t('admin.postList.noTitle')) + '</b>' + (p.pinned ? ' <span class="ab-chip">' + t('admin.postList.pin') + '</span>' : '') + '</td>' +
@@ -1713,6 +1741,7 @@
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.tagsPlaceholder') + '</label><input class="ab-input" id="abTags" placeholder="' + t('admin.editor.tagsExample') + '" autocomplete="off"></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label" for="abDate">' + t('admin.editor.dateLabel') + '</label><div class="ab-row"><input class="ab-input" id="abDate" type="datetime-local" step="60"><button class="ab-btn sm" id="abNow">' + t('admin.editor.setNow') + '</button></div><label class="ab-hint">' + t('admin.editor.dateHint') + '</label></div>' +
+          (cloudOn() ? '<div class="ab-field" style="margin:0"><label class="ab-label" for="abSchedule">' + t('admin.editor.scheduleLabel') + '</label><input class="ab-input" id="abSchedule" type="datetime-local" step="60"><label class="ab-hint">' + t('admin.editor.scheduleHint') + '</label></div>' : '') +
         '</div>' +
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.coverPlaceholder') + '</label><div class="ab-row"><input class="ab-input" id="abCover" placeholder="https://…"><button class="ab-btn sm" id="abPickCover">' + t('admin.editor.selectMedia') + '</button></div></div>' +
         '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0">' +
@@ -1739,6 +1768,7 @@
       '</div>' +
       '<div class="ab-row ab-editor-actions">' +
         (cloudOn() ? '' : '<button class="ab-btn" id="abExport">' + t('editor.exportAll') + '</button>') +
+        (cloudOn() ? '<button class="ab-btn" id="abScheduleBtn">' + icon('clock', 15) + ' ' + t('admin.editor.scheduleButton') + '</button>' : '') +
         '<button class="ab-btn" id="abSaveDraft">' + t('admin.editor.saveDraft') + '</button>' +
         '<button class="ab-btn primary" id="abPublish">' + icon('check', 15) + ' ' + t('admin.editor.publish') + '</button>' +
       '</div>';
@@ -1765,6 +1795,8 @@
     if (nowBtn && dateInput) nowBtn.addEventListener('click', function () { dateInput.value = localDateTimeValue(new Date()); });
     content.querySelector('#abSaveDraft').addEventListener('click', function () { saveEditor(content, route, 'draft'); });
     content.querySelector('#abPublish').addEventListener('click', function () { saveEditor(content, route, 'published'); });
+    var scheduleBtn = content.querySelector('#abScheduleBtn');
+    if (scheduleBtn) scheduleBtn.addEventListener('click', function () { saveEditor(content, route, 'scheduled'); });
     var exp = content.querySelector('#abExport');
     if (exp) exp.addEventListener('click', downloadAllStatic);
     var pick = content.querySelector('#abPickCover');
@@ -1809,6 +1841,8 @@
     content.querySelector('#abCover').value = p.cover || '';
     var dateInput = content.querySelector('#abDate');
     if (dateInput) dateInput.value = toDateTimeLocal(p.date || '');
+    var scheduleInput = content.querySelector('#abSchedule');
+    if (scheduleInput && p.publishAt) scheduleInput.value = toDateTimeLocal(p.publishAt);
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
     updatePreview(content);
@@ -1823,22 +1857,28 @@
     var wantPinned = !!content.querySelector('#abPinned').checked;
     var dateInput = content.querySelector('#abDate');
     var dateValue = normalizeEditorDate(dateInput ? dateInput.value : '');
+    var publishAt = null;
+    if (status === 'scheduled') {
+      var scheduleInput = content.querySelector('#abSchedule');
+      publishAt = dateTimeLocalToMs(scheduleInput ? scheduleInput.value : '');
+      if (!publishAt || publishAt <= Date.now()) { toast(t('admin.editor.scheduleRequired'), 'err'); return; }
+    }
 
     var post = Object.assign({}, content.__editingPost || {}, {
-      id: id, title: title, date: dateValue,
+      id: id, title: title, date: dateValue, publishAt: publishAt,
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: body, cover: content.querySelector('#abCover').value.trim(),
       pinned: wantPinned, tags: tags,
       status: status
     });
 
-    var btn = status === 'published' ? content.querySelector('#abPublish') : content.querySelector('#abSaveDraft');
+    var btn = status === 'published' ? content.querySelector('#abPublish') : (status === 'scheduled' ? content.querySelector('#abScheduleBtn') : content.querySelector('#abSaveDraft'));
     btn.disabled = true;
     try {
       var isNew = !route.id;
       var r = await savePost(post, isNew);
       if (r && (r.ok || r.post)) {
-        toast(status === 'published' ? t('admin.editor.saved') : t('admin.editor.savedDraft'), 'ok');
+        toast(status === 'published' ? t('admin.editor.saved') : (status === 'scheduled' ? t('admin.editor.scheduled') : t('admin.editor.savedDraft')), 'ok');
         if (cloudOn()) go('/admin/posts'); else {
           toast(t('admin.editor.savedLocal'), 'ok');
         }

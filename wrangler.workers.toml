@@ -63,3 +63,6 @@ binding = "AI"
 [vars]
 SITE_URL = "{env.SITE_URL}"
 CF_ZONE_ID = "{env.CF_ZONE_ID}"
+# 定时发布：每 5 分钟检查一次到期的 scheduled 文章
+[triggers]
+crons = ["*/5 * * * *"]

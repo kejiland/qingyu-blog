@@ -153,7 +153,7 @@ npx wrangler kv namespace create BLOG
 推送代码或手动运行 Actions，工作流会自动：
 
 1. ✅ 安装 Wrangler CLI
-2. ✅ 运行三套测试（`smoke-test.js` 79 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
+2. ✅ 运行三套测试（`smoke-test.js` 80 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
 3. ✅ 校验必要 Secrets 与 ID 格式
 4. ✅ 执行 D1 迁移（`schema_migrations` 记账表 + 列预检 + 报错兜底，三层幂等）
 5. ✅ 部署 Worker 到 Cloudflare
@@ -214,8 +214,9 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | --- | --- |
 | 路由 | `/admin`（仪表盘）、`/admin/posts`、`/admin/posts/new`、`/admin/posts/:id/edit`、`/admin/tags`、`/admin/comments`、`/admin/comments/pending`、`/admin/media`、`/admin/music`、`/admin/settings`；未知 `/admin/*` 回退到仪表盘 |
 | 登录门禁 | 云端：密码登录，或「首次部署？使用安装密钥初始化」（安装密钥走 `X-Setup-Key`）；触发登录限流时页面会自动展开「被限流？用安装密钥登录」应急入口（只跳过限流，不跳过密码校验）。静态：本地门禁。任何接口返回 401 会提示「登录已过期」并自动跳回登录页 |
-| 仪表盘 | **6 张统计卡**（文章总数 / 已发布 / 草稿 / 置顶 / 评论总数 / 待审核）+ **近 30 天访问与评论两张折线图**（内联 SVG，支持悬停预览与点击固定数值）+ 最新发布 / 最新评论（自动滚动、悬停暂停） |
-| 文章管理 | 关键字搜索（标题 + 标签，250ms 防抖）、状态筛选（全部 / 已发布 / 草稿）、每页 10 篇分页、置顶切换（乐观更新）、**删除无感刷新**（行级淡出 + 服务端级联清理评论/统计） |
+| 仪表盘 | **7 张统计卡**（文章总数 / 已发布 / 定时发布 / 草稿 / 置顶 / 评论总数 / 待审核）+ **近 30 天访问与评论两张折线图**（内联 SVG，支持悬停预览与点击固定数值）+ 最新发布 / 最新评论（自动滚动、悬停暂停） |
+| 文章管理 | 关键字搜索（标题 + 标签，250ms 防抖）、状态筛选（全部 / 已发布 / 定时发布 / 草稿）、每页 10 篇分页、置顶切换（乐观更新）、**删除无感刷新**（行级淡出 + 服务端级联清理评论/统计） |
+| 定时发布 | 云端模式可指定未来发布时间，Worker Cron 每 5 分钟检查一次，到点自动发布；定时文章不会提前出现在首页、RSS 或 Sitemap |
 | 编辑器 | 标题 / 发布时间（精确到分钟，编辑时保留原时间）/ 标签 / 封面（可从媒体库选）/ 置顶 / Markdown 正文；**右侧实时预览**、输入框自动增高、工具栏（加粗、斜体、标题、引用、代码、列表、链接、图片、表情）；存草稿或直接发布 |
 | **AI 写作助手** | 编辑器内一键：标题建议 / 润色 / 翻译（5 种目标语言），结果可应用到标题、替换原文、插入正文末尾或复制；AI 不可用时整条栏位不渲染 |
 | 评论管理 | 全局评论列表（评论人 / 内容 / 所属文章 / 时间 / 状态 / 操作）、关键字搜索、状态筛选、**通过审核**（就地更新徽章，不整表重载）、删除（行级淡出）；侧栏「待审核评论」带实时数量徽章 |
@@ -361,7 +362,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── index.html                         # 根跳转页（自动跳 public/index.html）
 ├── wrangler.toml                      # Cloudflare Pages 配置
 ├── wrangler.workers.toml              # Cloudflare Workers 配置（部署使用）
-├── smoke-test.js                      # 冒烟测试（79 例）
+├── smoke-test.js                      # 冒烟测试（80 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
 ├── search-verify.js                   # 搜索专项验证（13 例）
 ├── README.md                          # 中文说明（本文件）
@@ -598,7 +599,7 @@ window.BLOG_CONFIG = {
 ## 🧪 测试
 
 ```bash
-node smoke-test.js      # 冒烟测试 79 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
+node smoke-test.js      # 冒烟测试 80 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
 node gb-verify.js       # 留言板专项验证 18 例
 node search-verify.js   # 搜索专项验证 13 例
 ```

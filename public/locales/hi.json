@@ -533,5 +533,11 @@
   "admin.transfer.noSelection": "पहले कम से कम एक लेख चुनें",
   "admin.editor.dateLabel": "प्रकाशन समय",
   "admin.editor.dateHint": "मिनट तक सटीक; लेख संपादित करने पर प्रकाशन समय अपने आप नहीं बदलेगा",
-  "admin.editor.setNow": "अब"
+  "admin.editor.setNow": "अब",
+  "admin.dashboard.scheduled": "निर्धारित प्रकाशन",
+  "admin.editor.scheduleLabel": "निर्धारित प्रकाशन समय",
+  "admin.editor.scheduleHint": "क्लाउड मोड में हर 5 मिनट जाँच होती है और समय आने पर स्वतः प्रकाशित होता है",
+  "admin.editor.scheduleButton": "निर्धारित करें",
+  "admin.editor.scheduleRequired": "अभी के बाद का प्रकाशन समय चुनें",
+  "admin.editor.scheduled": "निर्धारित प्रकाशन सेट हो गया"
 }

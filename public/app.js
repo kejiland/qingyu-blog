@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.7.9';
+var BLOG_VERSION = '2.8.0';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -708,7 +708,7 @@ function getStaticPosts() {
 
 /** 仅返回已发布文章（过滤草稿），用于前台公开页面（首页/归档/标签/关于/搜索等） */
 function getPublishedPosts() {
-  return getStaticPosts().filter(function (p) { return (p.status || 'published') !== 'draft'; });
+  return getStaticPosts().filter(function (p) { return (p.status || 'published') === 'published'; });
 }
 
 function slug(s) { return String(s || '').toLowerCase().replace(/[^\w\u4e00-\u9fa5-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64); }
@@ -1315,6 +1315,7 @@ function buildPostsJs() {
       cover: d.cover || '',
       category: d.category || '',
       status: d.status || 'published',
+      publishAt: d.publishAt || null,
       pinned: !!d.pinned,
       protected: !!d.protected,
       enc: d.protected ? (d.enc || null) : null,
@@ -1349,7 +1350,7 @@ function buildFeedXmlClient(posts, maxItems) {
   var base = cfg.siteUrl || (typeof location !== 'undefined' ? location.origin : '');
   base = String(base || '').replace(/\/+$/, '');
   // 与云端 buildFeedXml 对齐：排除加密文章与草稿（公开产物不外泄）
-  var list = (posts || []).filter(function (p) { return !(p && p.protected) && (p.status || 'published') !== 'draft'; })
+  var list = (posts || []).filter(function (p) { return !(p && p.protected) && (p.status || 'published') === 'published'; })
     .slice().sort(sortPosts).slice(0, maxItems || 20);
   var items = list.map(function (p) {
     var link = base + postUrl(p.id);

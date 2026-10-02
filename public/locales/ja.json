@@ -533,5 +533,11 @@
   "admin.transfer.noSelection": "先に記事を選択してください",
   "admin.editor.dateLabel": "公開日時",
   "admin.editor.dateHint": "分単位で指定可能。記事を編集しても公開日時は自動変更されません",
-  "admin.editor.setNow": "現在"
+  "admin.editor.setNow": "現在",
+  "admin.dashboard.scheduled": "予約投稿",
+  "admin.editor.scheduleLabel": "予約公開日時",
+  "admin.editor.scheduleHint": "クラウドモードでは5分ごとに確認し、時刻になると自動公開します",
+  "admin.editor.scheduleButton": "予約投稿",
+  "admin.editor.scheduleRequired": "現在より後の予約日時を選択してください",
+  "admin.editor.scheduled": "予約投稿を設定しました"
 }
