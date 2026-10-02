@@ -2014,6 +2014,7 @@ tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async (
   };
   assert.deepStrictEqual(pngSize('icon-192.png'), { w: 192, h: 192 });
   assert.deepStrictEqual(pngSize('icon-512.png'), { w: 512, h: 512 });
+  assert.deepStrictEqual(pngSize('icon-512-maskable.png'), { w: 512, h: 512 });
   const sw = fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8');
   assert.ok(sw.includes("'/api/posts'") && sw.includes('Authorization') && sw.includes('ignoreSearch'), '公开文章离线缓存策略存在');
   const index = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
