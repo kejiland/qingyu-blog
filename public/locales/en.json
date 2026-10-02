@@ -539,5 +539,21 @@
   "admin.editor.scheduleHint": "Checked every 5 minutes in cloud mode and published automatically when due",
   "admin.editor.scheduleButton": "Schedule",
   "admin.editor.scheduleRequired": "Choose a scheduled time later than now",
-  "admin.editor.scheduled": "Scheduled for publishing"
+  "admin.editor.scheduled": "Scheduled for publishing",
+  "admin.revisions.button": "Version history",
+  "admin.revisions.title": "Post version history",
+  "admin.revisions.pick": "Select a version to compare",
+  "admin.revisions.empty": "No revisions yet. Save the post to create the first version.",
+  "admin.revisions.loading": "Loading versions…",
+  "admin.revisions.notFound": "Version not found",
+  "admin.revisions.loadFail": "Failed to load versions: ",
+  "admin.revisions.diff": "Compared with the current editor content",
+  "admin.revisions.restore": "Restore this version",
+  "admin.revisions.restoreConfirm": "Restore this version? The current content will be saved as a revision first.",
+  "admin.revisions.restored": "Version restored",
+  "admin.revisions.restoreFail": "Restore failed: ",
+  "admin.revisions.reasonCreate": "Created",
+  "admin.revisions.reasonUpdate": "Saved",
+  "admin.revisions.reasonRestore": "Restored",
+  "admin.revisions.newHint": "Save the post first to view version history"
 }

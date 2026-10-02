@@ -169,7 +169,7 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 Push to `main` (or run the workflow manually) and GitHub Actions will:
 
 1. ✅ Install the Wrangler CLI
-2. ✅ Run three test suites (`smoke-test.js` 80 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
+2. ✅ Run three test suites (`smoke-test.js` 81 cases / `gb-verify.js` 18 / `search-verify.js` 13 — a failure aborts the deploy)
 3. ✅ Validate the required secrets and ID formats
 4. ✅ Apply D1 migrations (three-layer idempotency: `schema_migrations` ledger + column pre-check + tolerant error matching)
 5. ✅ Deploy the Worker
@@ -233,6 +233,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | Dashboard | **7 stat cards** (total posts / published / scheduled / drafts / pinned / total comments / pending) + **two 30-day line charts** (inline SVG, hover preview and click-to-pin values) + latest posts / latest comments (auto-scrolling, pauses on hover) |
 | Post management | Keyword search (title + tags, 250 ms debounce), status filter (all / published / scheduled / draft), 10 per page, optimistic pin toggle, **seamless delete** (row fades out; comments and stats are cascaded server-side) |
 | Scheduled publishing | In cloud mode, choose a future publish time; a Worker Cron checks every 5 minutes and publishes automatically. Scheduled posts are hidden from the public site, RSS and Sitemap |
+| **Version history** | Every save keeps up to 50 snapshots; browse versions, inspect body diffs and restore any version with one click |
 | Editor | Title / publish date (minute precision, preserved while editing) / tags / cover (pick from the media library) / pinned / Markdown body; **live preview**, auto-growing input, toolbar (bold, italic, heading, quote, code, list, link, image, emoji); save as draft or publish |
 | **AI writing assistant** | One click for title suggestions / polish / translation (5 target languages); apply the result to the title, replace the body, append it, or copy it. The whole bar is not rendered when AI is unavailable |
 | Comment management | Global list (author / content / post / time / status / actions), keyword search, status filter, **approve** (badge updates in place, no table reload), delete (row fades out); the sidebar shows a live pending-count badge |
@@ -378,7 +379,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 ├── index.html                         # Root redirect (opens public/index.html)
 ├── wrangler.toml                      # Cloudflare Pages config
 ├── wrangler.workers.toml              # Cloudflare Workers config (used for deploys)
-├── smoke-test.js                      # Smoke tests (80 cases)
+├── smoke-test.js                      # Smoke tests (81 cases)
 ├── gb-verify.js                       # Guestbook verification (18 cases)
 ├── search-verify.js                   # Search verification (13 cases)
 ├── README.md                          # 中文说明
@@ -616,7 +617,7 @@ The step-by-step dashboard walkthrough is in section 9 of the **[Cloudflare setu
 ## 🧪 Tests
 
 ```bash
-node smoke-test.js      # Smoke tests: 80 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
+node smoke-test.js      # Smoke tests: 81 cases (Markdown / TOC / highlighting / import-export / admin gate / comment security / stats / search / RSS / Sitemap / cloud API / caching …)
 node gb-verify.js       # Guestbook verification: 18 cases
 node search-verify.js   # Search verification: 13 cases
 ```

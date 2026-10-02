@@ -219,7 +219,7 @@
     for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
     return null;
   }
-  function saveStaticPost(post) {
+  function saveStaticPost(post, reason) {
     var drafts = [];
     try { drafts = JSON.parse(localStorage.getItem('qingyu.drafts') || '[]'); } catch (e) {}
     var idx = -1;
@@ -230,6 +230,7 @@
       publishAt: post.publishAt || null, content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
     localStorage.setItem('qingyu.drafts', JSON.stringify(drafts));
+    saveStaticRevision(item, reason || 'save');
   }
   async function savePost(post, isNew) {
     if (cloudOn()) {
@@ -254,6 +255,144 @@
     }
     return { ok: true, needExport: inBundle };
   }
+  function staticRevisionKey(id) { return 'qingyu.revisions.' + String(id || ''); }
+  function readStaticRevisions(id) {
+    try {
+      var arr = JSON.parse(localStorage.getItem(staticRevisionKey(id)) || '[]');
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
+  }
+  function saveStaticRevision(post, reason) {
+    if (!post || !post.id) return;
+    var list = readStaticRevisions(post.id);
+    var snapshot = Object.assign({}, post, {
+      revisionId: Date.now().toString(36) + Math.random().toString(36).slice(2, 7),
+      reason: reason || 'save',
+      createdAt: Date.now()
+    });
+    var fingerprint = JSON.stringify([post.title, post.date, post.excerpt, post.content, post.cover, post.pinned, post.tags, post.status, post.publishAt]);
+    var last = list[0];
+    var lastFingerprint = last ? JSON.stringify([last.title, last.date, last.excerpt, last.content, last.cover, last.pinned, last.tags, last.status, last.publishAt]) : '';
+    if (lastFingerprint !== fingerprint) list.unshift(snapshot);
+    localStorage.setItem(staticRevisionKey(post.id), JSON.stringify(list.slice(0, 50)));
+  }
+  function revisionPostId(rev) { return rev && (rev.postId || rev.post_id || rev.id || ''); }
+  async function listPostRevisions(id) {
+    if (cloudOn()) {
+      var d = await api('api/posts/' + enc(id) + '/revisions');
+      return (d && d.revisions) || [];
+    }
+    return readStaticRevisions(id);
+  }
+  async function getPostRevision(id, revisionId) {
+    if (cloudOn()) {
+      var d = await api('api/posts/' + enc(id) + '/revisions/' + enc(revisionId));
+      return d && d.revision;
+    }
+    var list = readStaticRevisions(id);
+    return list.filter(function (r) { return String(r.revisionId) === String(revisionId); })[0] || null;
+  }
+  async function restorePostRevision(id, revisionId) {
+    if (cloudOn()) {
+      return await api('api/posts/' + enc(id) + '/revisions/' + enc(revisionId) + '/restore', { method: 'POST', body: '{}' });
+    }
+    var rev = await getPostRevision(id, revisionId);
+    if (!rev) return null;
+    var post = Object.assign({}, rev, { id: id });
+    delete post.revisionId;
+    delete post.createdAt;
+    delete post.reason;
+    saveStaticPost(post, 'restore');
+    if (Array.isArray(window.BLOG_POSTS)) {
+      var idx = -1;
+      for (var i = 0; i < window.BLOG_POSTS.length; i++) if (window.BLOG_POSTS[i] && window.BLOG_POSTS[i].id === id) { idx = i; break; }
+      if (idx >= 0) window.BLOG_POSTS[idx] = Object.assign({}, window.BLOG_POSTS[idx], post);
+      else window.BLOG_POSTS.push(post);
+    }
+    return { ok: true, post: post };
+  }
+  function revisionReasonLabel(reason) {
+    if (reason === 'create') return t('admin.revisions.reasonCreate');
+    if (reason === 'restore') return t('admin.revisions.reasonRestore');
+    return t('admin.revisions.reasonUpdate');
+  }
+  function lineDiff(oldText, newText) {
+    var oldLines = String(oldText || '').split(/\r?\n/);
+    var newLines = String(newText || '').split(/\r?\n/);
+    var n = oldLines.length, m = newLines.length;
+    if (n * m > 300000) {
+      return newLines.map(function (line) { return '+ ' + line; }).join('\n');
+    }
+    var dp = Array(n + 1);
+    for (var i = 0; i <= n; i++) { dp[i] = new Uint16Array(m + 1); }
+    for (i = n - 1; i >= 0; i--) {
+      for (var j = m - 1; j >= 0; j--) {
+        dp[i][j] = oldLines[i] === newLines[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+    var out = [], x = 0, y = 0;
+    while (x < n && y < m) {
+      if (oldLines[x] === newLines[y]) { out.push('  ' + newLines[y]); x++; y++; }
+      else if (dp[x + 1][y] >= dp[x][y + 1]) { out.push('- ' + oldLines[x]); x++; }
+      else { out.push('+ ' + newLines[y]); y++; }
+    }
+    while (x < n) out.push('- ' + oldLines[x++]);
+    while (y < m) out.push('+ ' + newLines[y++]);
+    return out.join('\n');
+  }
+  async function openRevisionHistory(content, route) {
+    if (!route.id) { toast(t('admin.revisions.newHint'), 'err'); return; }
+    var mask = document.createElement('div');
+    mask.className = 'ab-modal-mask';
+    mask.innerHTML = '<div class="ab-modal" style="max-width:980px;width:min(96vw,980px)"><h3>' + t('admin.revisions.title') + '</h3>' +
+      '<div style="display:grid;grid-template-columns:240px minmax(0,1fr);gap:12px;min-height:420px;max-height:70vh">' +
+      '<div id="abRevList" style="overflow:auto;border-right:1px solid var(--ab-border);padding-right:10px"><span class="ab-spin"></span></div>' +
+      '<div id="abRevDetail" style="overflow:auto"><p class="ab-muted">' + t('admin.revisions.pick') + '</p></div></div>' +
+      '<div class="ab-modal-actions"><button class="ab-btn ghost" data-act="cancel">' + t('confirm.cancel') + '</button></div></div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function (e) { if (e.target === mask || e.target.getAttribute('data-act') === 'cancel') mask.remove(); });
+    var listEl = mask.querySelector('#abRevList');
+    var detailEl = mask.querySelector('#abRevDetail');
+    try {
+      var revisions = await listPostRevisions(route.id);
+      if (!revisions.length) {
+        listEl.innerHTML = '<p class="ab-muted">' + t('admin.revisions.empty') + '</p>';
+        return;
+      }
+      listEl.innerHTML = revisions.map(function (r) {
+        return '<button type="button" class="ab-nav-item" data-rev="' + esc(String(r.id || r.revisionId)) + '" style="width:100%;text-align:left;margin-bottom:6px"><b>' + esc(fmtTimestamp(r.createdAt)) + '</b><br><span class="ab-muted">' + esc(revisionReasonLabel(r.reason)) + '</span></button>';
+      }).join('');
+      async function showRevision(revId) {
+        detailEl.innerHTML = '<span class="ab-spin"></span> ' + t('admin.revisions.loading');
+        try {
+          var rev = await getPostRevision(route.id, revId);
+          if (!rev) { detailEl.innerHTML = '<p class="ab-muted">' + t('admin.revisions.notFound') + '</p>'; return; }
+          var current = { title: content.querySelector('#abTitle').value, content: content.querySelector('#abBody').value };
+          var diff = lineDiff(rev.content || '', current.content || '');
+          detailEl.innerHTML = '<div class="ab-card" style="padding:12px;margin:0 0 12px"><b>' + esc(rev.title || t('admin.postList.noTitle')) + '</b><div class="ab-muted" style="font-size:12px;margin-top:6px">' + esc(fmtTimestamp(rev.createdAt)) + ' · ' + esc(revisionReasonLabel(rev.reason)) + '</div><div style="margin-top:12px"><button class="ab-btn primary sm" id="abRevRestore">' + icon('refresh', 13) + ' ' + t('admin.revisions.restore') + '</button></div></div>' +
+            '<div style="font-size:12px;margin-bottom:6px" class="ab-muted">' + t('admin.revisions.diff') + '</div><pre style="white-space:pre-wrap;word-break:break-word;background:var(--ab-hover);padding:12px;border-radius:8px;max-height:46vh;overflow:auto">' + esc(diff) + '</pre>';
+          detailEl.querySelector('#abRevRestore').addEventListener('click', function () {
+            confirmModal(t('admin.revisions.restore'), '<p class="ab-muted">' + t('admin.revisions.restoreConfirm') + '</p>', async function () {
+              try {
+                var result = await restorePostRevision(route.id, revId);
+                if (!result || !result.ok) throw new Error(t('admin.revisions.restoreFail'));
+                toast(t('admin.revisions.restored'), 'ok');
+                mask.remove();
+                await loadEditor(content, route.id);
+              } catch (e) { toast(t('admin.revisions.restoreFail') + (e.message || e), 'err'); }
+            }, t('admin.revisions.restore'));
+          });
+        } catch (e) { detailEl.innerHTML = '<p class="ab-muted">' + t('admin.revisions.loadFail') + esc(e.message || e) + '</p>'; }
+      }
+      listEl.querySelectorAll('[data-rev]').forEach(function (btn) {
+        btn.addEventListener('click', function () { showRevision(btn.getAttribute('data-rev')); });
+      });
+      showRevision(String(revisions[0].id || revisions[0].revisionId));
+    } catch (e) {
+      listEl.innerHTML = '<p class="ab-muted">' + t('admin.revisions.loadFail') + esc(e.message || e) + '</p>';
+    }
+  }
+
   function downloadPostsJs() {
     if (!window.buildPostsJs) { toast(t('admin.toast.exportNotSupported'), 'err'); return; }
     // posts.js
@@ -1768,6 +1907,7 @@
       '</div>' +
       '<div class="ab-row ab-editor-actions">' +
         (cloudOn() ? '' : '<button class="ab-btn" id="abExport">' + t('editor.exportAll') + '</button>') +
+        (route.id ? '<button class="ab-btn" id="abHistory">' + icon('refresh', 15) + ' ' + t('admin.revisions.button') + '</button>' : '') +
         (cloudOn() ? '<button class="ab-btn" id="abScheduleBtn">' + icon('clock', 15) + ' ' + t('admin.editor.scheduleButton') + '</button>' : '') +
         '<button class="ab-btn" id="abSaveDraft">' + t('admin.editor.saveDraft') + '</button>' +
         '<button class="ab-btn primary" id="abPublish">' + icon('check', 15) + ' ' + t('admin.editor.publish') + '</button>' +
@@ -1797,6 +1937,8 @@
     content.querySelector('#abPublish').addEventListener('click', function () { saveEditor(content, route, 'published'); });
     var scheduleBtn = content.querySelector('#abScheduleBtn');
     if (scheduleBtn) scheduleBtn.addEventListener('click', function () { saveEditor(content, route, 'scheduled'); });
+    var historyBtn = content.querySelector('#abHistory');
+    if (historyBtn) historyBtn.addEventListener('click', function () { openRevisionHistory(content, route); });
     var exp = content.querySelector('#abExport');
     if (exp) exp.addEventListener('click', downloadAllStatic);
     var pick = content.querySelector('#abPickCover');

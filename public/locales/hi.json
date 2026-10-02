@@ -539,5 +539,21 @@
   "admin.editor.scheduleHint": "क्लाउड मोड में हर 5 मिनट जाँच होती है और समय आने पर स्वतः प्रकाशित होता है",
   "admin.editor.scheduleButton": "निर्धारित करें",
   "admin.editor.scheduleRequired": "अभी के बाद का प्रकाशन समय चुनें",
-  "admin.editor.scheduled": "निर्धारित प्रकाशन सेट हो गया"
+  "admin.editor.scheduled": "निर्धारित प्रकाशन सेट हो गया",
+  "admin.revisions.button": "संस्करण इतिहास",
+  "admin.revisions.title": "लेख संस्करण इतिहास",
+  "admin.revisions.pick": "तुलना के लिए संस्करण चुनें",
+  "admin.revisions.empty": "अभी कोई संस्करण नहीं है। लेख सहेजने पर पहला संस्करण बनेगा।",
+  "admin.revisions.loading": "संस्करण लोड हो रहे हैं…",
+  "admin.revisions.notFound": "संस्करण नहीं मिला",
+  "admin.revisions.loadFail": "संस्करण लोड विफल: ",
+  "admin.revisions.diff": "वर्तमान संपादक सामग्री से तुलना",
+  "admin.revisions.restore": "यह संस्करण बहाल करें",
+  "admin.revisions.restoreConfirm": "क्या इस संस्करण को बहाल करें? वर्तमान सामग्री पहले इतिहास में सहेजी जाएगी।",
+  "admin.revisions.restored": "संस्करण बहाल हो गया",
+  "admin.revisions.restoreFail": "बहाली विफल: ",
+  "admin.revisions.reasonCreate": "बनाया गया",
+  "admin.revisions.reasonUpdate": "सहेजा गया",
+  "admin.revisions.reasonRestore": "बहाल किया गया",
+  "admin.revisions.newHint": "संस्करण इतिहास देखने से पहले लेख सहेजें"
 }

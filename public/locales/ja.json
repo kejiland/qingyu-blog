@@ -539,5 +539,21 @@
   "admin.editor.scheduleHint": "クラウドモードでは5分ごとに確認し、時刻になると自動公開します",
   "admin.editor.scheduleButton": "予約投稿",
   "admin.editor.scheduleRequired": "現在より後の予約日時を選択してください",
-  "admin.editor.scheduled": "予約投稿を設定しました"
+  "admin.editor.scheduled": "予約投稿を設定しました",
+  "admin.revisions.button": "変更履歴",
+  "admin.revisions.title": "記事の変更履歴",
+  "admin.revisions.pick": "比較するバージョンを選択",
+  "admin.revisions.empty": "履歴はまだありません。保存すると最初のバージョンが作成されます。",
+  "admin.revisions.loading": "バージョンを読み込み中…",
+  "admin.revisions.notFound": "バージョンが見つかりません",
+  "admin.revisions.loadFail": "バージョン読込失敗：",
+  "admin.revisions.diff": "現在の編集内容との比較",
+  "admin.revisions.restore": "このバージョンを復元",
+  "admin.revisions.restoreConfirm": "このバージョンに復元しますか？現在の内容は先に履歴へ保存されます。",
+  "admin.revisions.restored": "バージョンを復元しました",
+  "admin.revisions.restoreFail": "復元失敗：",
+  "admin.revisions.reasonCreate": "作成",
+  "admin.revisions.reasonUpdate": "保存",
+  "admin.revisions.reasonRestore": "復元",
+  "admin.revisions.newHint": "先に記事を保存してから変更履歴を確認してください"
 }

@@ -539,5 +539,21 @@
   "admin.editor.scheduleHint": "클라우드 모드에서 5분마다 확인하며 시간이 되면 자동 발행됩니다",
   "admin.editor.scheduleButton": "예약 발행",
   "admin.editor.scheduleRequired": "현재 이후의 예약 시간을 선택하세요",
-  "admin.editor.scheduled": "예약 발행이 설정되었습니다"
+  "admin.editor.scheduled": "예약 발행이 설정되었습니다",
+  "admin.revisions.button": "버전 기록",
+  "admin.revisions.title": "글 버전 기록",
+  "admin.revisions.pick": "비교할 버전을 선택하세요",
+  "admin.revisions.empty": "아직 버전 기록이 없습니다. 글을 저장하면 첫 버전이 생성됩니다.",
+  "admin.revisions.loading": "버전 불러오는 중…",
+  "admin.revisions.notFound": "버전을 찾을 수 없습니다",
+  "admin.revisions.loadFail": "버전 불러오기 실패: ",
+  "admin.revisions.diff": "현재 편집 내용과 비교",
+  "admin.revisions.restore": "이 버전 복원",
+  "admin.revisions.restoreConfirm": "이 버전으로 복원할까요? 현재 내용은 먼저 버전 기록으로 저장됩니다.",
+  "admin.revisions.restored": "버전을 복원했습니다",
+  "admin.revisions.restoreFail": "복원 실패: ",
+  "admin.revisions.reasonCreate": "생성",
+  "admin.revisions.reasonUpdate": "저장",
+  "admin.revisions.reasonRestore": "복원",
+  "admin.revisions.newHint": "먼저 글을 저장한 후 버전 기록을 확인하세요"
 }

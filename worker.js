@@ -6,7 +6,7 @@
  *   · 其余请求 → 静态资源（由 wrangler.workers.toml [assets] 绑定提供）
  * 部署：npx wrangler deploy
  * ============================================================ */
-import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, dbFirst } from './functions/_lib/api-core.js';
+import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
@@ -110,7 +110,19 @@ export default {
     if (url.pathname === '/feed.xml') {
       return handleFeed(request, env);
     }
-    let match = url.pathname.match(/^\/api\/posts\/([^/]+)\/comments\/([^/]+)$/);
+    let match = url.pathname.match(/^\/api\/posts\/([^/]+)\/revisions\/([^/]+)\/restore$/);
+    if (match) {
+      return handlePostRevisionRestore(request, env, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
+    }
+    match = url.pathname.match(/^\/api\/posts\/([^/]+)\/revisions\/([^/]+)$/);
+    if (match) {
+      return handlePostRevision(request, env, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
+    }
+    match = url.pathname.match(/^\/api\/posts\/([^/]+)\/revisions$/);
+    if (match) {
+      return handlePostRevisions(request, env, decodeURIComponent(match[1]));
+    }
+    match = url.pathname.match(/^\/api\/posts\/([^/]+)\/comments\/([^/]+)$/);
     if (match) {
       return handleCommentId(request, env, decodeURIComponent(match[1]), decodeURIComponent(match[2]));
     }

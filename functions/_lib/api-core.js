@@ -373,6 +373,7 @@ export async function handlePosts(request, env) {
     await dbRun(env.DB,
       'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
+    await recordPostRevision(env, p, 'create').catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + p.id]);
     return json({ ok: true, post: p }, 201, request, env);
   }
@@ -408,6 +409,7 @@ export async function handlePostId(request, env, id) {
     await dbRun(env.DB,
       'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
+    await recordPostRevision(env, p, 'update').catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + id]);
     return json({ ok: true, post: p }, 200, request, env);
   }
@@ -563,6 +565,117 @@ export async function handleCommentId(request, env, postId, cid) {
   if (!exist) return json({ error: '评论不存在' }, 404, request, env);
   await dbRun(env.DB, 'DELETE FROM comments WHERE post_id = ? AND id = ?', postId, cid);
   return json({ ok: true }, 200, request, env);
+}
+
+/* ============================================================
+ * 文章版本历史
+ * ============================================================ */
+function revisionFromRow(r) {
+  if (!r) return null;
+  let tags = [];
+  try { tags = r.tags ? JSON.parse(r.tags) : []; } catch (e) { tags = []; }
+  let enc = null;
+  if (r.enc) { try { enc = JSON.parse(r.enc); } catch (e) { enc = null; } }
+  return {
+    id: Number(r.id) || 0,
+    postId: String(r.post_id || ''),
+    title: String(r.title || ''),
+    date: String(r.date || ''),
+    excerpt: String(r.excerpt || ''),
+    content: String(r.content || ''),
+    cover: String(r.cover || ''),
+    pinned: !!r.pinned,
+    protected: !!r.protected,
+    enc: enc,
+    tags: tags,
+    category: String(r.category || ''),
+    status: normalizePostStatus(r.status),
+    publishAt: normalizePublishAt(r.publish_at),
+    reason: String(r.reason || 'save'),
+    createdAt: Number(r.created_at) || 0
+  };
+}
+function revisionMetaFromRow(r) {
+  const rev = revisionFromRow(r);
+  if (!rev) return null;
+  delete rev.content;
+  delete rev.enc;
+  return rev;
+}
+function revisionFingerprint(post) {
+  return JSON.stringify([
+    post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
+    post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc || null,
+    post.tags || [], post.category || '', normalizePostStatus(post.status), post.publishAt || null
+  ]);
+}
+async function recordPostRevision(env, post, reason) {
+  if (!env || !env.DB || !post || !post.id) return;
+  const last = await dbFirst(env.DB,
+    'SELECT * FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC LIMIT 1',
+    post.id);
+  if (last && revisionFingerprint(revisionFromRow(last)) === revisionFingerprint(post)) return;
+  const createdAt = Date.now();
+  await dbRun(env.DB,
+    'INSERT INTO post_revisions (post_id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    post.id, post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
+    post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc ? JSON.stringify(post.enc) : null,
+    JSON.stringify(post.tags || []), post.category || '', normalizePostStatus(post.status),
+    post.status === 'scheduled' ? normalizePublishAt(post.publishAt) : null, reason || 'save', createdAt);
+  // Each post keeps at most 50 revisions, newest first.
+  const rows = await dbAll(env.DB, 'SELECT id FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC', post.id).catch(() => []);
+  for (const row of rows.slice(50)) {
+    await dbRun(env.DB, 'DELETE FROM post_revisions WHERE id = ?', row.id).catch(() => {});
+  }
+}
+
+export async function handlePostRevisions(request, env, postId) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const rows = await dbAll(env.DB,
+    'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC',
+    postId).catch(() => []);
+  return json({ ok: true, revisions: rows.map(revisionMetaFromRow).filter(Boolean) }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+
+export async function handlePostRevision(request, env, postId, revisionId) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const row = await dbFirst(env.DB,
+    'SELECT * FROM post_revisions WHERE post_id = ? AND id = ?', postId, Number(revisionId));
+  const revision = revisionFromRow(row);
+  if (!revision) return json({ error: '版本不存在' }, 404, request, env);
+  return json({ ok: true, revision: revision }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+
+export async function handlePostRevisionRestore(request, env, postId, revisionId) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  const row = await dbFirst(env.DB,
+    'SELECT * FROM post_revisions WHERE post_id = ? AND id = ?', postId, Number(revisionId));
+  const revision = revisionFromRow(row);
+  if (!revision) return json({ error: '版本不存在' }, 404, request, env);
+  const currentRow = await dbFirst(env.DB, 'SELECT * FROM posts WHERE id = ?', postId);
+  const current = postFromRow(currentRow);
+  if (current) await recordPostRevision(env, current, 'update');
+  const post = {
+    id: postId, title: revision.title, date: revision.date, excerpt: revision.excerpt,
+    content: revision.content, cover: revision.cover, pinned: revision.pinned,
+    protected: revision.protected, enc: revision.enc, tags: revision.tags,
+    category: revision.category, status: revision.status, publishAt: revision.publishAt
+  };
+  await dbRun(env.DB,
+    'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    ...postToParams(post));
+  await recordPostRevision(env, post, 'restore');
+  await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + postId]);
+  return json({ ok: true, post: post }, 200, request, env);
 }
 
 /* ============================================================

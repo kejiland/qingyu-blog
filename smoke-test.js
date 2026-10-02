@@ -457,7 +457,7 @@ tests.push(['stripMd 生成纯文本摘要', async () => {
 function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
-    posts: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
+    posts: new Map(), post_revisions: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status', 'publish_at'];
@@ -471,6 +471,25 @@ function makeD1() {
     }
     if (s === 'SELECT 1 FROM posts WHERE id = ?') return t.posts.has(params[0]) ? { '1': 1 } : null;
     if (s === 'SELECT * FROM posts WHERE id = ?') return t.posts.get(params[0]) || null;
+    if (s === 'SELECT * FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC LIMIT 1') {
+      return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id)[0] || null;
+    }
+    if (s === 'SELECT id FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
+      return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id).map((r) => ({ id: r.id }));
+    }
+    if (s === 'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
+      return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id);
+    }
+    if (s === 'SELECT * FROM post_revisions WHERE post_id = ? AND id = ?') {
+      return [...t.post_revisions.values()].find((r) => r.post_id === params[0] && r.id === Number(params[1])) || null;
+    }
+    if (/^INSERT INTO post_revisions/.test(s)) {
+      const id = ++seq;
+      const [post_id,title,date,excerpt,content,cover,pinned,protectedFlag,enc,tags,category,status,publish_at,reason,created_at] = params;
+      t.post_revisions.set(id, { id, post_id, title, date, excerpt, content, cover, pinned, protected: protectedFlag, enc, tags, category, status, publish_at, reason, created_at });
+      return { success: true };
+    }
+    if (s === 'DELETE FROM post_revisions WHERE id = ?') { t.post_revisions.delete(Number(params[0])); return { success: true }; }
     if (/^INSERT( OR REPLACE)? INTO posts/.test(s)) {
       const row = {}; POST_COLS.forEach((c, i) => { row[c] = params[i]; });
       t.posts.set(row.id, row); return { success: true };
@@ -680,6 +699,33 @@ tests.push(['API：定时发布到期后自动发布', async () => {
   const future = adminList.posts.find((p) => p.id === 'sched-future');
   assert.strictEqual(future.status, 'scheduled', '未到期文章保持定时状态');
   assert.ok(future.publishAt > now, '未到期时间保留');
+}]);
+
+tests.push(['API：文章版本历史与恢复', async () => {
+  const { env, token, core } = await authEnv();
+  const authHeaders = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  let r = await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: authHeaders,
+    body: JSON.stringify({ id: 'rev1', title: '第一版', date: '2026-10-01', content: '旧内容' })
+  }), env);
+  assert.strictEqual(r.status, 201);
+  r = await core.handlePostId(new Request('http://t/api/posts/rev1', {
+    method: 'PUT', headers: authHeaders,
+    body: JSON.stringify({ title: '第二版', date: '2026-10-01', content: '新内容' })
+  }), env, 'rev1');
+  assert.strictEqual(r.status, 200);
+  const listRes = await core.handlePostRevisions(new Request('http://t/api/posts/rev1/revisions', { headers: authHeaders }), env, 'rev1');
+  const list = await listRes.json();
+  assert.ok(list.revisions.length >= 2, '保存后生成历史版本');
+  const old = list.revisions[list.revisions.length - 1];
+  const oneRes = await core.handlePostRevision(new Request('http://t/api/posts/rev1/revisions/' + old.id, { headers: authHeaders }), env, 'rev1', old.id);
+  const one = await oneRes.json();
+  assert.strictEqual(one.revision.content, '旧内容', '可读取完整历史正文');
+  const restoreRes = await core.handlePostRevisionRestore(new Request('http://t/api/posts/rev1/revisions/' + old.id + '/restore', { method: 'POST', headers: authHeaders }), env, 'rev1', old.id);
+  assert.strictEqual(restoreRes.status, 200, '可恢复历史版本');
+  const current = await (await core.handlePostId(new Request('http://t/api/posts/rev1', { headers: authHeaders }), env, 'rev1')).json();
+  assert.strictEqual(current.post.title, '第一版');
+  assert.strictEqual(current.post.content, '旧内容');
 }]);
 
 tests.push(['API：PUT 更新 / PUT 未知 id 新建 / DELETE / 404 / 无 DB 500', async () => {
