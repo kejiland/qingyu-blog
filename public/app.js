@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.9.6';
+var BLOG_VERSION = '2.9.7';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -653,6 +653,142 @@ function stampHeadingNumbers(headings) {
   });
 }
 
+/* ---------- 阅读进度 / 目录跟随 / 图片灯箱 ---------- */
+var _articleResizeBound = false;
+var _lightboxKeyBound = false;
+var _lightbox = { images: [], index: 0, el: null, lastFocus: null, prevOverflow: '' };
+
+function updateReadingProgress() {
+  var bar = document.querySelector('#readingProgress span');
+  var article = document.querySelector('.article');
+  if (!bar || !article) return;
+  var scrollY = (typeof window !== 'undefined' && typeof window.scrollY === 'number')
+    ? window.scrollY
+    : ((typeof window !== 'undefined' && typeof window.pageYOffset === 'number') ? window.pageYOffset : 0);
+  var rect = article.getBoundingClientRect ? article.getBoundingClientRect() : { top: 0, height: 0 };
+  var top = Number(rect.top || 0) + scrollY;
+  var height = Number(article.offsetHeight || rect.height || 0);
+  var viewport = Number((typeof window !== 'undefined' && window.innerHeight) || (document.documentElement && document.documentElement.clientHeight) || 0);
+  var end = Math.max(top + 1, top + height - viewport);
+  var progress = height <= viewport ? (scrollY >= top ? 1 : 0) : (scrollY - top) / (end - top);
+  progress = Math.max(0, Math.min(1, progress));
+  bar.style.transform = 'scaleX(' + progress + ')';
+}
+
+function updateTocActive() {
+  var links = document.querySelectorAll('a[data-toc]');
+  if (!links || !links.length) return;
+  var active = null;
+  links.forEach(function (link) {
+    var href = link.getAttribute('href') || '';
+    var heading = href.charAt(0) === '#' ? document.getElementById(href.slice(1)) : null;
+    if (!heading || !heading.getBoundingClientRect) return;
+    if (heading.getBoundingClientRect().top <= 150) active = link;
+  });
+  links.forEach(function (link) {
+    if (!link.classList) return;
+    if (link === active) link.classList.add('active');
+    else link.classList.remove('active');
+  });
+}
+
+function ensureLightbox() {
+  if (_lightbox.el) return _lightbox.el;
+  var overlay = document.createElement('div');
+  overlay.className = 'lightbox-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-hidden', 'true');
+  overlay.innerHTML = '<button type="button" class="lightbox-close" aria-label="' + esc(t('lightbox.close')) + '">✕</button>'
+    + '<button type="button" class="lightbox-nav lightbox-prev" aria-label="' + esc(t('lightbox.prev')) + '">‹</button>'
+    + '<img class="lightbox-image" alt="">'
+    + '<div class="lightbox-counter"></div>'
+    + '<button type="button" class="lightbox-nav lightbox-next" aria-label="' + esc(t('lightbox.next')) + '">›</button>';
+  overlay.addEventListener('click', function (e) {
+    var target = e.target;
+    if (target === overlay || (target && target.classList && target.classList.contains('lightbox-close'))) { closeLightbox(); return; }
+    if (target && target.classList && target.classList.contains('lightbox-prev')) { showLightbox(_lightbox.index - 1); return; }
+    if (target && target.classList && target.classList.contains('lightbox-next')) { showLightbox(_lightbox.index + 1); }
+  });
+  document.body.appendChild(overlay);
+  _lightbox.el = overlay;
+  return overlay;
+}
+
+function showLightbox(index) {
+  if (!_lightbox.images.length || !_lightbox.el) return;
+  var total = _lightbox.images.length;
+  _lightbox.index = (index + total) % total;
+  var source = _lightbox.images[_lightbox.index];
+  var image = _lightbox.el.querySelector('.lightbox-image');
+  var counter = _lightbox.el.querySelector('.lightbox-counter');
+  var prev = _lightbox.el.querySelector('.lightbox-prev');
+  var next = _lightbox.el.querySelector('.lightbox-next');
+  if (image) {
+    image.src = source.currentSrc || source.src || '';
+    image.alt = source.alt || '';
+  }
+  if (counter) counter.textContent = t('lightbox.counter', { current: _lightbox.index + 1, total: total });
+  if (prev) prev.style.visibility = total > 1 ? 'visible' : 'hidden';
+  if (next) next.style.visibility = total > 1 ? 'visible' : 'hidden';
+}
+
+function openLightbox(index, imageEl) {
+  var article = document.querySelector('.article');
+  if (!article || !article.querySelectorAll) return;
+  var images = Array.prototype.slice.call(article.querySelectorAll('img')).filter(function (img) { return img && !img.classList.contains('smoji-inline') && (img.currentSrc || img.src); });
+  var start = images.indexOf(imageEl);
+  if (start < 0 && typeof index === 'number') start = index;
+  if (start < 0 || !images.length) return;
+  _lightbox.images = images;
+  _lightbox.lastFocus = document.activeElement || null;
+  _lightbox.prevOverflow = document.body && document.body.style ? document.body.style.overflow : '';
+  if (document.body && document.body.style) document.body.style.overflow = 'hidden';
+  var overlay = ensureLightbox();
+  overlay.classList.add('open');
+  overlay.setAttribute('aria-hidden', 'false');
+  showLightbox(start);
+  var close = overlay.querySelector('.lightbox-close');
+  if (close && close.focus) close.focus();
+}
+
+function closeLightbox() {
+  if (!_lightbox.el) return;
+  _lightbox.el.classList.remove('open');
+  _lightbox.el.setAttribute('aria-hidden', 'true');
+  if (document.body && document.body.style) document.body.style.overflow = _lightbox.prevOverflow || '';
+  _lightbox.images = [];
+  if (_lightbox.lastFocus && _lightbox.lastFocus.focus) _lightbox.lastFocus.focus();
+  _lightbox.lastFocus = null;
+}
+
+function bindArticleEnhancements() {
+  var article = document.querySelector('.article');
+  if (article && article.querySelectorAll) {
+    Array.prototype.slice.call(article.querySelectorAll('img')).filter(function (img) { return !img.classList.contains('smoji-inline'); }).forEach(function (img, index) {
+      img.classList.add('lightbox-source');
+      img.addEventListener('click', function (e) {
+        e.preventDefault();
+        openLightbox(index, img);
+      });
+    });
+  }
+  updateReadingProgress();
+  updateTocActive();
+  if (!_articleResizeBound && typeof window !== 'undefined' && window.addEventListener) {
+    _articleResizeBound = true;
+    window.addEventListener('resize', function () { updateReadingProgress(); updateTocActive(); }, { passive: true });
+  }
+  if (!_lightboxKeyBound && typeof document !== 'undefined' && document.addEventListener) {
+    _lightboxKeyBound = true;
+    document.addEventListener('keydown', function (e) {
+      if (!_lightbox.el || !_lightbox.el.classList.contains('open')) return;
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') showLightbox(_lightbox.index - 1);
+      else if (e.key === 'ArrowRight') showLightbox(_lightbox.index + 1);
+    });
+  }
+}
 /* ---------- 配置与数据 ---------- */
 // 云端模式下从 D1 加载的运行时站点设置（由 bootstrap 拉取并合并进 getConfig）
 var _siteSettings = null;
@@ -2230,6 +2366,8 @@ async function renderPost(id) {
   var posts = getPublishedPosts();
   var post = posts.find(function (p) { return p.id === id; });
   html += '<main class="container page-fade"><div class="post-body">';
+  html += '<div class="reading-progress" id="readingProgress" aria-hidden="true"><span></span></div>';
+
   if (!post) {
     // 云端列表尚未拉取完成（boot 探测中）时不能急于下结论：刷新文章页会出现
     // 「内容不存在」一闪而过（内容刚加载出来前先闪红字再变正常）。
@@ -3751,6 +3889,7 @@ function serializeQuery(query) {
 var _i18nReady = false;
 async function route() {
   _searchOpen = false;   // 进入新页面时收起顶部搜索
+  if (typeof closeLightbox === 'function') closeLightbox();
   _featuredCache = null; // 清除精选缓存，确保每页重新计算
   destroySmojiPicker(); // 清理 Smoji 表情选择器
   // 重置 body overflow，防止侧边栏打开时切换语言导致页面无法滚动
@@ -4250,6 +4389,7 @@ function bindGlobal() {
   if (tb) tb.addEventListener('click', function () { toggleTheme(); });
   bindAccentPicker();
   bindTocScroll();
+  bindArticleEnhancements();
   bindSearch();
   bindBackTop();
   populateLangSwitch();
@@ -4449,6 +4589,8 @@ function updateBackTop() {
       if (y > 8) b.classList.add('scrolled'); else b.classList.remove('scrolled');
     }
   } catch (e) { /* ignore */ }
+  updateReadingProgress();
+  updateTocActive();
   if (!bt || !bt.classList || !bt.classList.add) return;
   if (y > 300) bt.classList.add('show'); else bt.classList.remove('show');
 }
@@ -4515,6 +4657,7 @@ function bindTocScroll() {
       // 若找不到目标，则恢复 router innerHTML 的行为：不阻止默认（可能跳到 404），故此处无默认跳转
     });
   });
+  updateTocActive();
 }
 
 /* 顶部导航搜索：点击搜索图标 → 隐藏导航、显示搜索框；输入实时出结果下拉面板 */

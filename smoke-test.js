@@ -2003,6 +2003,16 @@ tests.push(['index.html：静态 base 在资源之前 + 首屏加载动画存在
   assert.ok(!html.includes('id="dynBase"'), '旧的动态 base 脚本已移除');
 }]);
 
+tests.push(['沉浸式阅读：进度条 / 目录跟随 / 图片灯箱', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
+  assert.ok(b.html.includes('id="readingProgress"'), '文章页渲染阅读进度条');
+  assert.ok(typeof b.ctx.updateReadingProgress === 'function', '阅读进度更新函数已暴露');
+  assert.ok(typeof b.ctx.updateTocActive === 'function', '目录跟随函数已暴露');
+  assert.ok(typeof b.ctx.openLightbox === 'function' && typeof b.ctx.closeLightbox === 'function', '图片灯箱控制函数已暴露');
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  assert.ok(css.includes('.lightbox-overlay') && css.includes('.reading-progress') && css.includes('.toc-list a.active'), '阅读增强样式齐全');
+}]);
+
 tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));
   assert.strictEqual(manifest.display, 'standalone');

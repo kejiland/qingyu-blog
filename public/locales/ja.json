@@ -667,5 +667,9 @@
   "post.backlinks": "引用元",
   "admin.editor.wiki": "双方向リンク",
   "admin.editor.savedOffline": "オフライン保存しました。オンライン時に自動同期します。",
-  "admin.editor.syncedOffline": "オフライン変更をクラウドへ同期しました"
+  "admin.editor.syncedOffline": "オフライン変更をクラウドへ同期しました",
+  "lightbox.close": "画像プレビューを閉じる",
+  "lightbox.prev": "前の画像",
+  "lightbox.next": "次の画像",
+  "lightbox.counter": "{current} / {total} 枚"
 }

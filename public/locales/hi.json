@@ -667,5 +667,9 @@
   "post.backlinks": "इनसे लिंक",
   "admin.editor.wiki": "दो-तरफ़ा लिंक",
   "admin.editor.savedOffline": "ऑफ़लाइन सहेजा गया, ऑनलाइन होने पर स्वतः सिंक होगा",
-  "admin.editor.syncedOffline": "ऑफ़लाइन बदलाव क्लाउड पर सिंक हो गए"
+  "admin.editor.syncedOffline": "ऑफ़लाइन बदलाव क्लाउड पर सिंक हो गए",
+  "lightbox.close": "छवि पूर्वावलोकन बंद करें",
+  "lightbox.prev": "पिछली छवि",
+  "lightbox.next": "अगली छवि",
+  "lightbox.counter": "{current} / {total}"
 }

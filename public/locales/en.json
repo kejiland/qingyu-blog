@@ -667,5 +667,9 @@
   "post.backlinks": "Linked from",
   "admin.editor.wiki": "Wiki link",
   "admin.editor.savedOffline": "Saved offline. It will sync automatically when online.",
-  "admin.editor.syncedOffline": "Offline changes synced to the cloud"
+  "admin.editor.syncedOffline": "Offline changes synced to the cloud",
+  "lightbox.close": "Close image preview",
+  "lightbox.prev": "Previous image",
+  "lightbox.next": "Next image",
+  "lightbox.counter": "{current} / {total}"
 }

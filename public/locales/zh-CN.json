@@ -667,5 +667,9 @@
   "post.backlinks": "引用本文",
   "admin.editor.wiki": "双向链接",
   "admin.editor.savedOffline": "已离线保存，联网后会自动同步",
-  "admin.editor.syncedOffline": "离线内容已同步到云端"
+  "admin.editor.syncedOffline": "离线内容已同步到云端",
+  "lightbox.close": "关闭图片预览",
+  "lightbox.prev": "上一张",
+  "lightbox.next": "下一张",
+  "lightbox.counter": "第 {current} / {total} 张"
 }
