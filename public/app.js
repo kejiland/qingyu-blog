@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.9.0';
+var BLOG_VERSION = '2.9.1';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1314,6 +1314,7 @@ function buildPostsJs() {
       tags: normalizeTags(d),
       excerpt: d.excerpt || '',
       cover: d.cover || '',
+      ogImage: d.ogImage || '',
       category: d.category || '',
       series: d.series || '',
       seriesOrder: Number(d.seriesOrder) || 0,
@@ -3585,7 +3586,7 @@ function updateSEO(path) {
       pageType = 'article';
       pageTitle = (post.title || t('post.untitled')) + ' · ' + n;
       pageDesc = post.excerpt || stripMd(post.content || '').slice(0, 200);
-      if (post.cover) pageImage = post.cover;
+      pageImage = post.ogImage || post.cover || '';
       pageUrl = base + '/posts/' + encodeURIComponent(post.id) + '/';
     }
   } else if (path.indexOf('/admin') === 0 || path === '/write') {
@@ -3646,7 +3647,7 @@ function updateSEO(path) {
         'publisher': { '@type': 'Organization', 'name': n },
         'mainEntityOfPage': pageUrl
       };
-      if (p.cover) jsonLd.image = p.cover;
+      if (p.ogImage || p.cover) jsonLd.image = p.ogImage || p.cover;
       if (p.tags) jsonLd.keywords = p.tags;
       _setJsonLd(jsonLd);
     }

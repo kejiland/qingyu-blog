@@ -642,5 +642,14 @@
   "admin.subscribers.deleteConfirm": "यह सदस्य हटाएँ?",
   "admin.subscribers.deleted": "हटाया गया",
   "admin.subscribers.deleteFail": "हटाना विफल: ",
-  "admin.subscribers.exportFail": "निर्यात विफल: "
+  "admin.subscribers.exportFail": "निर्यात विफल: ",
+  "admin.editor.ogLabel": "साझा छवि",
+  "admin.editor.ogGenerate": "साझा छवि बनाएँ",
+  "admin.editor.ogAuto": "सहेजते समय स्वतः बनाएँ",
+  "admin.editor.ogHint": "सोशल लिंक पूर्वावलोकन के लिए; न होने पर कवर छवि उपयोग होगी।",
+  "admin.editor.ogEmpty": "अभी साझा छवि नहीं बनी",
+  "admin.editor.ogGenerating": "बन रही है…",
+  "admin.editor.ogGenerated": "साझा छवि बन गई",
+  "admin.editor.ogFail": "साझा छवि विफल: ",
+  "admin.editor.ogCloudOnly": "साझा छवि के लिए क्लाउड मोड और R2 मीडिया बकेट चाहिए"
 }

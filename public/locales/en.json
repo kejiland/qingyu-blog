@@ -642,5 +642,14 @@
   "admin.subscribers.deleteConfirm": "Delete this subscriber?",
   "admin.subscribers.deleted": "Deleted",
   "admin.subscribers.deleteFail": "Delete failed: ",
-  "admin.subscribers.exportFail": "Export failed: "
+  "admin.subscribers.exportFail": "Export failed: ",
+  "admin.editor.ogLabel": "Social share image",
+  "admin.editor.ogGenerate": "Generate share image",
+  "admin.editor.ogAuto": "Generate automatically on save",
+  "admin.editor.ogHint": "Used for link previews on social platforms; falls back to the cover when absent.",
+  "admin.editor.ogEmpty": "No share image generated yet",
+  "admin.editor.ogGenerating": "Generating…",
+  "admin.editor.ogGenerated": "Share image generated",
+  "admin.editor.ogFail": "Share image failed: ",
+  "admin.editor.ogCloudOnly": "Share image generation requires cloud mode and an R2 media bucket"
 }

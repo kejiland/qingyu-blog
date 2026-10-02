@@ -225,7 +225,7 @@
     var idx = -1;
     for (var i = 0; i < drafts.length; i++) if (drafts[i] && drafts[i].id === post.id) idx = i;
     var item = { id: post.id, title: post.title, date: post.date, tags: post.tags || [], excerpt: post.excerpt || '',
-      cover: post.cover || '', category: post.category || '', series: post.series || '', seriesOrder: Number(post.seriesOrder) || 0, status: post.status || 'published',
+      cover: post.cover || '', ogImage: post.ogImage || '', category: post.category || '', series: post.series || '', seriesOrder: Number(post.seriesOrder) || 0, status: post.status || 'published',
       pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null,
       publishAt: post.publishAt || null, content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
@@ -1267,7 +1267,7 @@
   }
   function transferPostMarkdown(post) {
     var lines = ['---'];
-    var stringKeys = ['id', 'title', 'date', 'excerpt', 'cover', 'category', 'series'];
+    var stringKeys = ['id', 'title', 'date', 'excerpt', 'cover', 'og_image', 'category', 'series'];
     stringKeys.forEach(function (key) {
       var value = String(post[key] == null ? '' : post[key]);
       if (value !== '') lines.push(key + ': ' + JSON.stringify(value));
@@ -1325,6 +1325,7 @@
       tags: transferTags(meta.tags),
       excerpt: meta.excerpt || '',
       cover: meta.cover || '',
+      ogImage: meta.og_image || '',
       category: meta.category || '',
       series: meta.series || '',
       seriesOrder: Number(meta.series_order) || 0,
@@ -1367,6 +1368,7 @@
       tags: transferTags(post.tags),
       excerpt: String(post.excerpt || ''),
       cover: String(post.cover || ''),
+      ogImage: String(post.ogImage || post.og_image || ''),
       category: String(post.category || ''),
       series: String(post.series || ''),
       seriesOrder: Math.max(0, Math.floor(Number(post.seriesOrder || post.series_order) || 0)),
@@ -1885,6 +1887,71 @@
     });
   }
 
+  function ogSourceFingerprint(title, date, tags, series) {
+    return JSON.stringify([String(title || ''), String(date || ''), (tags || []).join('\u0001'), String(series || '')]);
+  }
+  function wrapCanvasText(ctx, text, maxWidth, maxLines) {
+    var out = [], line = '';
+    Array.from(String(text || '')).forEach(function (ch) {
+      var next = line + ch;
+      if (ctx.measureText(next).width > maxWidth && line) {
+        out.push(line); line = ch;
+      } else line = next;
+    });
+    if (line) out.push(line);
+    if (out.length > maxLines) {
+      out = out.slice(0, maxLines);
+      while (out.length && ctx.measureText(out[out.length - 1] + '…').width > maxWidth) out[out.length - 1] = out[out.length - 1].slice(0, -1);
+      out[out.length - 1] += '…';
+    }
+    return out;
+  }
+  function canvasBlob(canvas) {
+    return new Promise(function (resolve, reject) {
+      canvas.toBlob(function (blob) { blob ? resolve(blob) : reject(new Error('图片生成失败')); }, 'image/png', 0.94);
+    });
+  }
+  async function generateShareImage(content, postId, title, date, tags, series) {
+    if (!cloudOn()) throw new Error(t('admin.editor.ogCloudOnly'));
+    var canvas = document.createElement('canvas');
+    canvas.width = 1200; canvas.height = 630;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas 不可用');
+    var accent = getComputedStyle(document.documentElement).getPropertyValue('--ab-primary').trim() || '#c25e3a';
+    var grad = ctx.createLinearGradient(0, 0, 1200, 630);
+    grad.addColorStop(0, '#f8f2e9');
+    grad.addColorStop(0.55, '#ffffff');
+    grad.addColorStop(1, '#efe3d4');
+    ctx.fillStyle = grad; ctx.fillRect(0, 0, 1200, 630);
+    ctx.globalAlpha = 0.12; ctx.fillStyle = accent;
+    ctx.beginPath(); ctx.arc(1050, 80, 260, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(80, 590, 230, 0, Math.PI * 2); ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = accent; ctx.fillRect(92, 86, 8, 108);
+    ctx.fillStyle = '#332b25'; ctx.font = '700 72px "Microsoft YaHei","PingFang SC",sans-serif';
+    var lines = wrapCanvasText(ctx, title || t('admin.postList.noTitle'), 960, 3);
+    lines.forEach(function (line, i) { ctx.fillText(line, 130, 150 + i * 86); });
+    ctx.font = '28px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.fillStyle = '#766b61';
+    var meta = [date, series, (tags || []).slice(0, 3).join(' · ')].filter(Boolean).join('  ·  ');
+    ctx.fillText(meta, 132, 500);
+    ctx.font = '600 28px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.fillStyle = accent;
+    ctx.fillText(getSiteName ? getSiteName() : 'Qingyu\'Blog', 132, 555);
+    ctx.fillStyle = '#c9b9a8'; ctx.fillRect(132, 580, 936, 2);
+    ctx.font = '20px "Microsoft YaHei","PingFang SC",sans-serif'; ctx.fillStyle = '#9a8d80';
+    ctx.fillText('1200 × 630  ·  Open Graph', 760, 602);
+    var blob = await canvasBlob(canvas);
+    var signed = await api('api/admin/og-upload-url', { method: 'POST', body: JSON.stringify({ postId: postId }) });
+    if (!signed || !signed.uploadUrl || !signed.publicUrl) throw new Error('分享图上传地址获取失败');
+    var up = await fetch(signed.uploadUrl, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: blob });
+    if (!up.ok) throw new Error('分享图上传失败 HTTP ' + up.status);
+    return signed.publicUrl;
+  }
+  function updateOgPreview(content, url) {
+    var preview = content.querySelector('#abOgPreview');
+    if (!preview) return;
+    preview.innerHTML = url ? '<img src="' + esc(url) + '" alt="" style="max-width:360px;max-height:190px;border-radius:8px;border:1px solid var(--ab-border)">' : '<span class="ab-muted">' + t('admin.editor.ogEmpty') + '</span>';
+  }
+
   /* ====================== 编辑器 ====================== */
   function pageEditor(content, route) {
     content.innerHTML =
@@ -1898,6 +1965,7 @@
           (cloudOn() ? '<div class="ab-field" style="margin:0"><label class="ab-label" for="abSchedule">' + t('admin.editor.scheduleLabel') + '</label><input class="ab-input" id="abSchedule" type="datetime-local" step="60"><label class="ab-hint">' + t('admin.editor.scheduleHint') + '</label></div>' : '') +
         '</div>' +
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.coverPlaceholder') + '</label><div class="ab-row"><input class="ab-input" id="abCover" placeholder="https://…"><button class="ab-btn sm" id="abPickCover">' + t('admin.editor.selectMedia') + '</button></div></div>' +
+        '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.ogLabel') + '</label><input type="hidden" id="abOgImage"><div class="ab-row" style="align-items:center;gap:10px;flex-wrap:wrap"><button class="ab-btn sm" id="abOgGenerate">' + icon('image', 13) + ' ' + t('admin.editor.ogGenerate') + '</button><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="abOgAuto" checked> ' + t('admin.editor.ogAuto') + '</label></div><div id="abOgPreview" style="margin-top:8px"></div><label class="ab-hint">' + t('admin.editor.ogHint') + '</label></div>' +
         '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0">' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="abPinned"> ' + icon('pin', 14) + ' ' + t('admin.editor.pin') + '</label>' +
         '</div>' +
@@ -1954,6 +2022,21 @@
     if (scheduleBtn) scheduleBtn.addEventListener('click', function () { saveEditor(content, route, 'scheduled'); });
     var historyBtn = content.querySelector('#abHistory');
     if (historyBtn) historyBtn.addEventListener('click', function () { openRevisionHistory(content, route); });
+    var ogBtn = content.querySelector('#abOgGenerate');
+    if (ogBtn) ogBtn.addEventListener('click', function () {
+      var title = content.querySelector('#abTitle').value.trim();
+      if (!title) { toast(t('admin.editor.noTitle'), 'err'); return; }
+      var tags = content.querySelector('#abTags').value.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
+      var date = normalizeEditorDate(content.querySelector('#abDate').value).slice(0, 10);
+      var postId = route.id || slug(title);
+      ogBtn.disabled = true; ogBtn.innerHTML = icon('spinner', 12) + ' ' + t('admin.editor.ogGenerating');
+      generateShareImage(content, postId, title, date, tags, content.querySelector('#abSeries').value.trim()).then(function (url) {
+        content.querySelector('#abOgImage').value = url;
+        content.__ogSource = ogSourceFingerprint(title, date, tags, content.querySelector('#abSeries').value.trim());
+        updateOgPreview(content, url); toast(t('admin.editor.ogGenerated'), 'ok');
+      }).catch(function (e) { toast(t('admin.editor.ogFail') + (e.message || e), 'err'); })
+        .finally(function () { ogBtn.disabled = false; ogBtn.innerHTML = icon('image', 13) + ' ' + t('admin.editor.ogGenerate'); });
+    });
     var exp = content.querySelector('#abExport');
     if (exp) exp.addEventListener('click', downloadAllStatic);
     var pick = content.querySelector('#abPickCover');
@@ -1998,6 +2081,9 @@
     content.querySelector('#abSeries').value = p.series || '';
     content.querySelector('#abSeriesOrder').value = p.seriesOrder ? String(p.seriesOrder) : '';
     content.querySelector('#abCover').value = p.cover || '';
+    content.querySelector('#abOgImage').value = p.ogImage || '';
+    content.__ogSource = ogSourceFingerprint(p.title, p.date, (p.tags || []), p.series || '');
+    updateOgPreview(content, p.ogImage || '');
     var dateInput = content.querySelector('#abDate');
     if (dateInput) dateInput.value = toDateTimeLocal(p.date || '');
     var scheduleInput = content.querySelector('#abSchedule');
@@ -2023,9 +2109,22 @@
       if (!publishAt || publishAt <= Date.now()) { toast(t('admin.editor.scheduleRequired'), 'err'); return; }
     }
 
+    var seriesValue = content.querySelector('#abSeries').value.trim();
+    var ogImage = content.querySelector('#abOgImage').value || '';
+    var ogFingerprint = ogSourceFingerprint(title, dateValue, tags, seriesValue);
+    if (cloudOn() && content.querySelector('#abOgAuto').checked && (!ogImage || content.__ogSource !== ogFingerprint)) {
+      try {
+        ogImage = await generateShareImage(content, id, title, dateValue.slice(0, 10), tags, seriesValue);
+        content.querySelector('#abOgImage').value = ogImage;
+        content.__ogSource = ogFingerprint;
+        updateOgPreview(content, ogImage);
+      } catch (e) { /* 分享图失败不阻塞文章保存 */ }
+    }
+
     var post = Object.assign({}, content.__editingPost || {}, {
       id: id, title: title, date: dateValue, publishAt: publishAt,
-      series: content.querySelector('#abSeries').value.trim(),
+      series: seriesValue,
+      ogImage: ogImage,
       seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: body, cover: content.querySelector('#abCover').value.trim(),

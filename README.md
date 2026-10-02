@@ -156,7 +156,7 @@ npx wrangler kv namespace create BLOG
 推送代码或手动运行 Actions，工作流会自动：
 
 1. ✅ 安装 Wrangler CLI
-2. ✅ 运行三套测试（`smoke-test.js` 84 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
+2. ✅ 运行三套测试（`smoke-test.js` 85 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
 3. ✅ 校验必要 Secrets 与 ID 格式
 4. ✅ 执行 D1 迁移（`schema_migrations` 记账表 + 列预检 + 报错兜底，三层幂等）
 5. ✅ 部署 Worker 到 Cloudflare
@@ -224,6 +224,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | **备份与恢复** | 云端可手动备份，Worker Cron 每天北京时间 03:00 自动备份文章、版本、评论、媒体元数据、音乐、设置和统计到私有 R2；保留最近 30 份，支持下载、删除和一键恢复（恢复前自动生成安全快照） |
 | **系列 / 专栏** | 文章可设置系列名称和系列序号；前台 `/series` 汇总全部系列，系列详情按序号排列并显示系列内上一篇/下一篇；后台支持系列重命名和移除 |
 | **邮件订阅** | 前台 `/subscribe` 邮箱订阅；双重确认后，新文章发布自动进入发件箱并由 Cron 异步发送；后台可查看、导出和删除订阅者 |
+| **自动分享图** | 编辑器可根据标题、日期、系列和标签自动生成 1200×630 PNG 分享图，上传到 R2；前台自动输出 `og:image` 与 `twitter:image`，无分享图时回退封面 |
 | 编辑器 | 标题 / 发布时间（精确到分钟，编辑时保留原时间）/ 标签 / 封面（可从媒体库选）/ 置顶 / Markdown 正文；**右侧实时预览**、输入框自动增高、工具栏（加粗、斜体、标题、引用、代码、列表、链接、图片、表情）；存草稿或直接发布 |
 | **AI 写作助手** | 编辑器内一键：标题建议 / 润色 / 翻译（5 种目标语言），结果可应用到标题、替换原文、插入正文末尾或复制；AI 不可用时整条栏位不渲染 |
 | 评论管理 | 全局评论列表（评论人 / 内容 / 所属文章 / 时间 / 状态 / 操作）、关键字搜索、状态筛选、**通过审核**（就地更新徽章，不整表重载）、删除（行级淡出）；侧栏「待审核评论」带实时数量徽章 |
@@ -369,7 +370,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── index.html                         # 根跳转页（自动跳 public/index.html）
 ├── wrangler.toml                      # Cloudflare Pages 配置
 ├── wrangler.workers.toml              # Cloudflare Workers 配置（部署使用）
-├── smoke-test.js                      # 冒烟测试（84 例）
+├── smoke-test.js                      # 冒烟测试（85 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
 ├── search-verify.js                   # 搜索专项验证（13 例）
 ├── README.md                          # 中文说明（本文件）
@@ -606,7 +607,7 @@ window.BLOG_CONFIG = {
 ## 🧪 测试
 
 ```bash
-node smoke-test.js      # 冒烟测试 84 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
+node smoke-test.js      # 冒烟测试 85 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
 node gb-verify.js       # 留言板专项验证 18 例
 node search-verify.js   # 搜索专项验证 13 例
 ```

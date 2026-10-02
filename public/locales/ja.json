@@ -642,5 +642,14 @@
   "admin.subscribers.deleteConfirm": "この購読者を削除しますか？",
   "admin.subscribers.deleted": "削除しました",
   "admin.subscribers.deleteFail": "削除失敗：",
-  "admin.subscribers.exportFail": "出力失敗："
+  "admin.subscribers.exportFail": "出力失敗：",
+  "admin.editor.ogLabel": "共有画像",
+  "admin.editor.ogGenerate": "共有画像を生成",
+  "admin.editor.ogAuto": "保存時に自動生成",
+  "admin.editor.ogHint": "SNS のリンクプレビュー用。未生成の場合はカバー画像を使用します。",
+  "admin.editor.ogEmpty": "共有画像は未生成です",
+  "admin.editor.ogGenerating": "生成中…",
+  "admin.editor.ogGenerated": "共有画像を生成しました",
+  "admin.editor.ogFail": "共有画像生成失敗：",
+  "admin.editor.ogCloudOnly": "共有画像の生成にはクラウドモードと R2 メディアバケットが必要です"
 }

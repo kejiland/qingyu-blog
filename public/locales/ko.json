@@ -642,5 +642,14 @@
   "admin.subscribers.deleteConfirm": "이 구독자를 삭제할까요?",
   "admin.subscribers.deleted": "삭제했습니다",
   "admin.subscribers.deleteFail": "삭제 실패: ",
-  "admin.subscribers.exportFail": "내보내기 실패: "
+  "admin.subscribers.exportFail": "내보내기 실패: ",
+  "admin.editor.ogLabel": "공유 이미지",
+  "admin.editor.ogGenerate": "공유 이미지 생성",
+  "admin.editor.ogAuto": "저장 시 자동 생성",
+  "admin.editor.ogHint": "SNS 링크 미리보기에 사용되며 없으면 커버 이미지를 사용합니다.",
+  "admin.editor.ogEmpty": "아직 공유 이미지가 없습니다",
+  "admin.editor.ogGenerating": "생성 중…",
+  "admin.editor.ogGenerated": "공유 이미지를 생성했습니다",
+  "admin.editor.ogFail": "공유 이미지 생성 실패: ",
+  "admin.editor.ogCloudOnly": "공유 이미지 생성에는 클라우드 모드와 R2 미디어 버킷이 필요합니다"
 }

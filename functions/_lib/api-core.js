@@ -158,6 +158,7 @@ export function normalizePost(p) {
     date: String(out.date || ''),
     excerpt: String(out.excerpt || '').trim(),
     cover: String(out.cover || '').trim(),
+    ogImage: String(out.ogImage || out.og_image || '').trim().slice(0, 1000),
     // 加密文章：正文存于 enc（AES-GCM 密文），content 恒为空，避免明文外泄
     content: protectedPost ? '' : String(out.content || ''),
     pinned: !!out.pinned,
@@ -191,6 +192,7 @@ function postFromRow(r) {
     date: String(r.date || ''),
     excerpt: String(r.excerpt || ''),
     cover: String(r.cover || ''),
+    ogImage: String(r.og_image || ''),
     content: isProtected ? '' : String(r.content || ''),
     pinned: !!r.pinned,
     protected: isProtected,
@@ -209,6 +211,7 @@ function postToParams(p) {
   return [
     p.id, p.title, p.date, p.excerpt, p.content,
     p.cover || '',
+    p.ogImage || '',
     p.pinned ? 1 : 0, p.protected ? 1 : 0,
     p.enc ? JSON.stringify(p.enc) : null,
     JSON.stringify(p.tags || []),
@@ -377,7 +380,7 @@ export async function handlePosts(request, env) {
     const exist = await dbFirst(env.DB, 'SELECT 1 FROM posts WHERE id = ?', p.id);
     if (exist) return json({ error: '已存在相同 id（' + p.id + '），请用 PUT 更新' }, 409, request, env);
     await dbRun(env.DB,
-      'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'create').catch(() => {});
     if ((p.status || 'published') === 'published') await queuePostNotifications(env, p).catch(() => {});
@@ -414,7 +417,7 @@ export async function handlePostId(request, env, id) {
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
     if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,
-      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'update').catch(() => {});
     const oldStatus = exist ? normalizePostStatus(exist.status) : '';
@@ -607,6 +610,7 @@ function revisionFromRow(r) {
     excerpt: String(r.excerpt || ''),
     content: String(r.content || ''),
     cover: String(r.cover || ''),
+    ogImage: String(r.og_image || ''),
     pinned: !!r.pinned,
     protected: !!r.protected,
     enc: enc,
@@ -629,7 +633,7 @@ function revisionMetaFromRow(r) {
 }
 function revisionFingerprint(post) {
   return JSON.stringify([
-    post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
+    post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '', post.ogImage || '',
     post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc || null,
     post.tags || [], post.category || '', post.series || '', Number(post.seriesOrder) || 0,
     normalizePostStatus(post.status), post.publishAt || null
@@ -643,8 +647,8 @@ async function recordPostRevision(env, post, reason) {
   if (last && revisionFingerprint(revisionFromRow(last)) === revisionFingerprint(post)) return;
   const createdAt = Date.now();
   await dbRun(env.DB,
-    'INSERT INTO post_revisions (post_id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-    post.id, post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
+    'INSERT INTO post_revisions (post_id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    post.id, post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '', post.ogImage || '',
     post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc ? JSON.stringify(post.enc) : null,
     JSON.stringify(post.tags || []), post.category || '', post.series || '', Number(post.seriesOrder) || 0,
     normalizePostStatus(post.status), post.status === 'scheduled' ? normalizePublishAt(post.publishAt) : null,
@@ -662,7 +666,7 @@ export async function handlePostRevisions(request, env, postId) {
   if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
   const rows = await dbAll(env.DB,
-    'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC',
+    'SELECT id,post_id,title,date,excerpt,cover,og_image,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC',
     postId).catch(() => []);
   return json({ ok: true, revisions: rows.map(revisionMetaFromRow).filter(Boolean) }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
@@ -695,6 +699,7 @@ export async function handlePostRevisionRestore(request, env, postId, revisionId
     id: postId, title: revision.title, date: revision.date, excerpt: revision.excerpt,
     content: revision.content, cover: revision.cover, pinned: revision.pinned,
     protected: revision.protected, enc: revision.enc, tags: revision.tags,
+    cover: revision.cover, ogImage: revision.ogImage,
     category: revision.category, series: revision.series, seriesOrder: revision.seriesOrder,
     status: revision.status, publishAt: revision.publishAt
   };

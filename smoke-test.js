@@ -460,7 +460,7 @@ function makeD1() {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
@@ -482,7 +482,7 @@ function makeD1() {
     if (s === 'SELECT id FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
       return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id).map((r) => ({ id: r.id }));
     }
-    if (s === 'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
+    if (s === 'SELECT id,post_id,title,date,excerpt,cover,og_image,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
       return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id);
     }
     if (s === 'SELECT * FROM post_revisions WHERE post_id = ? AND id = ?') {
@@ -490,8 +490,8 @@ function makeD1() {
     }
     if (/^INSERT INTO post_revisions/.test(s)) {
       const id = ++seq;
-      const [post_id,title,date,excerpt,content,cover,pinned,protectedFlag,enc,tags,category,series,series_order,status,publish_at,reason,created_at] = params;
-      t.post_revisions.set(id, { id, post_id, title, date, excerpt, content, cover, pinned, protected: protectedFlag, enc, tags, category, series, series_order, status, publish_at, reason, created_at });
+      const [post_id,title,date,excerpt,content,cover,og_image,pinned,protectedFlag,enc,tags,category,series,series_order,status,publish_at,reason,created_at] = params;
+      t.post_revisions.set(id, { id, post_id, title, date, excerpt, content, cover, og_image, pinned, protected: protectedFlag, enc, tags, category, series, series_order, status, publish_at, reason, created_at });
       return { success: true };
     }
     if (s === 'DELETE FROM post_revisions WHERE id = ?') { t.post_revisions.delete(Number(params[0])); return { success: true }; }
@@ -872,6 +872,29 @@ tests.push(['订阅：确认邮箱并发送新文章通知', async () => {
   } finally {
     global.fetch = originalFetch;
   }
+}]);
+
+tests.push(['API：OG 分享图上传签名与文章字段', async () => {
+  const { env, token, core } = await authEnv();
+  env.R2_ACCESS_KEY_ID = 'test-key';
+  env.R2_SECRET_ACCESS_KEY = 'test-secret';
+  env.R2_ENDPOINT = 'https://r2.example';
+  env.R2_MEDIA_BUCKET = 'blog-media';
+  env.R2_MEDIA_PUBLIC_BASE = 'https://media.example';
+  const og = await import('./functions/_lib/og.js');
+  const r = await og.handleOgUploadUrl(new Request('http://t/api/admin/og-upload-url', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ postId: 'og-post' })
+  }), env);
+  const data = await r.json();
+  assert.strictEqual(r.status, 200);
+  assert.ok(data.uploadUrl && data.publicUrl.indexOf('https://media.example/og/og-post-') === 0);
+  const create = await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ id: 'og-post', title: '分享图文章', content: 'A', ogImage: data.publicUrl })
+  }), env);
+  const created = await create.json();
+  assert.strictEqual(created.post.ogImage, data.publicUrl);
 }]);
 
 tests.push(['API：PUT 更新 / PUT 未知 id 新建 / DELETE / 404 / 无 DB 500', async () => {

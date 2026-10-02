@@ -11,8 +11,8 @@ const BACKUP_FORMAT = 'qingyu-blog-backup';
 const BACKUP_VERSION = 2;
 const MAX_BACKUPS = 30;
 const TABLES = {
-  posts: ['id','title','date','excerpt','content','cover','pinned','protected','enc','tags','category','series','series_order','status','publish_at'],
-  post_revisions: ['id','post_id','title','date','excerpt','content','cover','pinned','protected','enc','tags','category','series','series_order','status','publish_at','reason','created_at'],
+  posts: ['id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at'],
+  post_revisions: ['id','post_id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at','reason','created_at'],
   comments: ['id','post_id','author','content','date','status','parent_id'],
   media: ['id','name','url','type','size','created_at'],
   music: ['id','title','artist','url','cover','size','duration','sort','created_at'],

@@ -14,6 +14,7 @@ import { onRequest as aiComments } from './functions/api/ai/comments.js';
 import { handleMusic, handleMusicId, handleMusicUploadUrl } from './functions/_lib/music.js';
 import { handleBackups, handleBackupId, handleBackupRestore, createBackup } from './functions/_lib/backup.js';
 import { handleSubscribe, handleSubscribeConfirm, handleUnsubscribe, handleSubscribersAdmin, handleSubscriberId, processMailOutbox } from './functions/_lib/subscribe.js';
+import { handleOgUploadUrl } from './functions/_lib/og.js';
 import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.js';
 
 export default {
@@ -72,6 +73,9 @@ export default {
     }
     if (url.pathname === '/api/subscribe/unsubscribe') {
       return handleUnsubscribe(request, env);
+    }
+    if (url.pathname === '/api/admin/og-upload-url') {
+      return handleOgUploadUrl(request, env);
     }
     if (url.pathname === '/api/admin/subscribers') {
       return handleSubscribersAdmin(request, env);
