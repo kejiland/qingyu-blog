@@ -694,5 +694,8 @@
   "admin.analytics.colLikes": "좋아요",
   "admin.analytics.colComments": "댓글",
   "admin.analytics.colScore": "종합 점수",
-  "admin.analytics.empty": "글 데이터가 없습니다"
+  "admin.analytics.empty": "글 데이터가 없습니다",
+  "admin.analytics.colTrend": "추이",
+  "admin.analytics.exportCsv": "CSV 내보내기",
+  "admin.analytics.exported": "CSV를 내보냈습니다"
 }

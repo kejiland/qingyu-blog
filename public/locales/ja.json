@@ -694,5 +694,8 @@
   "admin.analytics.colLikes": "いいね",
   "admin.analytics.colComments": "コメント",
   "admin.analytics.colScore": "総合スコア",
-  "admin.analytics.empty": "記事データがありません"
+  "admin.analytics.empty": "記事データがありません",
+  "admin.analytics.colTrend": "推移",
+  "admin.analytics.exportCsv": "CSVを出力",
+  "admin.analytics.exported": "CSVを出力しました"
 }

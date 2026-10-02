@@ -857,6 +857,8 @@ tests.push(['API：后台文章数据分析与权限', async () => {
   assert.strictEqual(data.items.length, 2, '后台分析包含草稿');
   assert.strictEqual(data.items.find((p) => p.id === 'ana-a').score, 20, '综合得分为浏览 + 点赞×3 + 评论×5');
   assert.strictEqual(data.summary.posts, 2, '汇总文章数正确');
+  assert.strictEqual(data.trendDays, 30, '默认返回近 30 天趋势');
+  assert.strictEqual(data.items[0].trend.length, 30, '每篇文章都带趋势数据');
 }]);
 
 tests.push(['备份：创建 R2 备份并登记列表', async () => {
@@ -2064,6 +2066,7 @@ tests.push(['后台：文章数据分析页已完整接入', async () => {
   assert.ok(src.includes('function pageAnalytics') && src.includes('abAnalyticsSummary') && src.includes('abAnalyticsBody'), '分析页主体已接入');
   assert.ok(src.includes("key: 'analytics'") && src.includes("href: '/admin/analytics'"), '侧边栏分析入口已接入');
   assert.ok(src.includes('api/admin/post-analytics'), '分析接口已接线');
+  assert.ok(src.includes('analyticsSparkline') && src.includes('exportAnalyticsCsv'), '趋势图和 CSV 导出已接入');
 }]);
 tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async () => {
   const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));

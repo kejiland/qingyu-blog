@@ -1191,17 +1191,50 @@
       return '<div class="ab-stat"><span class="ab-stat-ico">' + icon(c.icon, 17) + '</span><span class="ab-stat-num' + (c.small ? ' small' : '') + '">' + esc(String(c.value)) + '</span><span class="ab-stat-label">' + esc(c.label) + '</span></div>';
     }).join('');
   }
+  function analyticsSparkline(trend) {
+    var points = Array.isArray(trend) ? trend : [];
+    if (points.length < 2) return '<span class="ab-muted">—</span>';
+    var values = points.map(function (p) { return Number(p.views) || 0; });
+    var max = Math.max.apply(Math, values.concat([1]));
+    var w = 96, h = 26;
+    var coords = values.map(function (v, i) {
+      var x = (i / (values.length - 1)) * w;
+      var y = h - (v / max) * (h - 4) - 2;
+      return x.toFixed(1) + ',' + y.toFixed(1);
+    }).join(' ');
+    return '<svg class="ab-sparkline" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none" aria-hidden="true"><polyline points="' + coords + '"></polyline></svg>';
+  }
+  function exportAnalyticsCsv(content) {
+    var items = (content && content.__analyticsItems) || [];
+    if (!items.length) return;
+    var header = ['id', 'title', 'status', 'date', 'views', 'likes', 'comments', 'score'];
+    var lines = [header.join(',')];
+    items.forEach(function (p) {
+      lines.push(header.map(function (key) {
+        var val = p[key] == null ? '' : String(p[key]);
+        return '"' + val.replace(/"/g, '""') + '"';
+      }).join(','));
+    });
+    var blob = new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'post-analytics-' + new Date().toISOString().slice(0, 10) + '.csv';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); if (a.remove) a.remove(); }, 0);
+    toast(t('admin.analytics.exported'), 'ok');
+  }
   function renderAnalyticsTable(items) {
     var body = document.querySelector('#abAnalyticsBody');
     if (!body) return;
     if (!items || !items.length) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.analytics.empty') + '</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.analytics.empty') + '</td></tr>';
       return;
     }
     body.innerHTML = items.map(function (p) {
       var status = p.status === 'draft' ? t('admin.dashboard.drafts') : (p.status === 'scheduled' ? t('admin.dashboard.scheduled') : '');
       return '<tr><td><a class="ab-post-title" data-link="/admin/posts/' + enc(p.id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a>' + (status ? ' <span class="ab-chip">' + esc(status) + '</span>' : '') + '</td>'
-        + '<td>' + (Number(p.views) || 0) + '</td><td>' + (Number(p.likes) || 0) + '</td><td>' + (Number(p.comments) || 0) + '</td><td><b class="ab-analytics-score">' + (Number(p.score) || 0) + '</b></td></tr>';
+        + '<td>' + (Number(p.views) || 0) + '</td><td>' + (Number(p.likes) || 0) + '</td><td>' + (Number(p.comments) || 0) + '</td><td><b class="ab-analytics-score">' + (Number(p.score) || 0) + '</b></td><td class="ab-td-trend">' + analyticsSparkline(p.trend) + '</td></tr>';
     }).join('');
     body.querySelectorAll('[data-link]').forEach(function (a) {
       a.addEventListener('click', function (e) { e.preventDefault(); go(a.getAttribute('data-link')); });
@@ -1209,7 +1242,7 @@
   }
   async function loadAnalytics(content, range) {
     var body = content.querySelector('#abAnalyticsBody');
-    if (body) body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    if (body) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
     var data = null;
     if (cloudOn()) {
       try { data = await api('api/admin/post-analytics?range=' + encodeURIComponent(range || 'all')); } catch (e) {}
@@ -1217,14 +1250,18 @@
     if (!data) {
       try { data = localPostAnalytics(await listPosts()); } catch (e) { data = { summary: {}, items: [] }; }
     }
+    content.__analyticsItems = data.items || [];
     renderAnalyticsSummary(data.summary || {}, data.items || []);
     renderAnalyticsTable(data.items || []);
   }
   function pageAnalytics(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.analytics.title') + '</h1><p class="ab-page-sub">' + t('admin.analytics.desc') + '</p></div></div>'
       + (cloudOn() ? '<div class="ab-analytics-tabs"><button class="ab-btn sm active" data-analytics-range="all">' + t('admin.analytics.all') + '</button><button class="ab-btn sm" data-analytics-range="30">' + t('admin.analytics.last30') + '</button><button class="ab-btn sm" data-analytics-range="7">' + t('admin.analytics.last7') + '</button></div>' : '')
+      + '<div class="ab-row" style="justify-content:flex-end;margin-bottom:10px"><button class="ab-btn sm" id="abAnalyticsExport">' + icon('download', 13) + ' ' + t('admin.analytics.exportCsv') + '</button></div>'
       + '<div class="ab-grid cols-4" id="abAnalyticsSummary"></div>'
-      + '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.analytics.colTitle') + '</th><th>' + t('admin.analytics.colViews') + '</th><th>' + t('admin.analytics.colLikes') + '</th><th>' + t('admin.analytics.colComments') + '</th><th>' + t('admin.analytics.colScore') + '</th></tr></thead><tbody id="abAnalyticsBody"></tbody></table></div></div>';
+      + '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.analytics.colTitle') + '</th><th>' + t('admin.analytics.colViews') + '</th><th>' + t('admin.analytics.colLikes') + '</th><th>' + t('admin.analytics.colComments') + '</th><th>' + t('admin.analytics.colScore') + '</th><th>' + t('admin.analytics.colTrend') + '</th></tr></thead><tbody id="abAnalyticsBody"></tbody></table></div></div>';
+    var exportBtn = content.querySelector('#abAnalyticsExport');
+    if (exportBtn) exportBtn.addEventListener('click', function () { exportAnalyticsCsv(content); });
     content.querySelectorAll('[data-analytics-range]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         content.querySelectorAll('[data-analytics-range]').forEach(function (b) { b.classList.remove('active'); });
@@ -1268,9 +1305,9 @@
   async function loadPosts(content, page, silent) {
     var body = content.querySelector('#abPostBody');
     // silent：删除/审核后的静默校准刷新，不打断当前视图（不闪加载行）
-    if (!silent) body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    if (!silent) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
     var posts = [];
-    try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
+    try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
 
     var kw = content.querySelector('#abPostKw').value.trim().toLowerCase();
     var st = content.querySelector('#abPostStatus').value;
@@ -1821,11 +1858,11 @@
   }
   async function loadImportExport(content) {
     var body = content.querySelector('#abIeTableBody');
-    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.transfer.loading') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.transfer.loading') + '</td></tr>';
     var posts = [];
     try { posts = await listFullPosts(); content.__iePosts = posts; }
     catch (e) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
       return;
     }
     posts.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });

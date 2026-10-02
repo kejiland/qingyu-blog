@@ -694,5 +694,8 @@
   "admin.analytics.colLikes": "点赞",
   "admin.analytics.colComments": "评论",
   "admin.analytics.colScore": "综合得分",
-  "admin.analytics.empty": "暂无文章数据"
+  "admin.analytics.empty": "暂无文章数据",
+  "admin.analytics.colTrend": "趋势",
+  "admin.analytics.exportCsv": "导出 CSV",
+  "admin.analytics.exported": "已导出 CSV"
 }

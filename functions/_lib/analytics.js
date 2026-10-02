@@ -59,7 +59,7 @@ export async function handlePostAnalytics(request, env) {
   try { rows = await dbAll(env.DB, 'SELECT * FROM posts'); } catch (e) { rows = []; }
   try { statsRows = await dbAll(env.DB, 'SELECT * FROM stats'); } catch (e) { statsRows = []; }
   try { commentRows = await dbAll(env.DB, 'SELECT post_id,status,date FROM comments'); } catch (e) { commentRows = []; }
-  try { dailyRows = days ? await dbAll(env.DB, 'SELECT * FROM stats_daily') : []; } catch (e) { dailyRows = []; }
+  try { dailyRows = await dbAll(env.DB, 'SELECT * FROM stats_daily'); } catch (e) { dailyRows = []; }
 
   var stats = {};
   if (days) {
@@ -87,7 +87,29 @@ export async function handlePostAnalytics(request, env) {
     stats[key].comments++;
   });
 
-  var items = (rows || []).map(function (row) { return metricsFor(row, stats[String(row.id)] || {}); });
+  var trendDays = days || 30;
+  var trendStart = cutoffDate(trendDays - 1);
+  var trendDates = [];
+  for (var di = trendDays - 1; di >= 0; di--) trendDates.push(cutoffDate(di));
+  var trendMap = {};
+  trendDates.forEach(function (date) { trendMap[date] = { views: 0, likes: 0, comments: 0 }; });
+  dailyRows.forEach(function (row) {
+    if (!row || String(row.date || '') < trendStart || !trendMap[row.date]) return;
+    trendMap[row.date].views += Number(row.views) || 0;
+    trendMap[row.date].likes += Number(row.likes) || 0;
+  });
+  commentRows.forEach(function (row) {
+    var status = row.status || 'approved';
+    if (status !== 'approved' && status !== null) return;
+    if (!row || !row.date || String(row.date) < trendStart || !trendMap[row.date]) return;
+    trendMap[row.date].comments += 1;
+  });
+
+  var items = (rows || []).map(function (row) {
+    var item = metricsFor(row, stats[String(row.id)] || {});
+    item.trend = trendDates.map(function (date) { return { date: date, views: trendMap[date].views, likes: trendMap[date].likes, comments: trendMap[date].comments }; });
+    return item;
+  });
   items.sort(function (a, b) { return b.score - a.score || b.views - a.views || String(b.date || '').localeCompare(String(a.date || '')); });
   var summary = items.reduce(function (acc, item) {
     acc.views += item.views;
@@ -95,5 +117,5 @@ export async function handlePostAnalytics(request, env) {
     acc.comments += item.comments;
     return acc;
   }, { views: 0, likes: 0, comments: 0, posts: items.length });
-  return json({ ok: true, range: days ? String(days) : 'all', summary: summary, items: items }, 200, request, env, { 'Cache-Control': 'no-store' });
+  return json({ ok: true, range: days ? String(days) : 'all', trendDays: trendDays, summary: summary, items: items }, 200, request, env, { 'Cache-Control': 'no-store' });
 }

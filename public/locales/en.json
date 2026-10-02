@@ -694,5 +694,8 @@
   "admin.analytics.colLikes": "Likes",
   "admin.analytics.colComments": "Comments",
   "admin.analytics.colScore": "Score",
-  "admin.analytics.empty": "No post analytics yet"
+  "admin.analytics.empty": "No post analytics yet",
+  "admin.analytics.colTrend": "Trend",
+  "admin.analytics.exportCsv": "Export CSV",
+  "admin.analytics.exported": "CSV exported"
 }
