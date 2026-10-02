@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.8.2';
+var BLOG_VERSION = '2.8.3';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -168,6 +168,7 @@ function svgIcon(name, size) {
     question: '<svg ' + s + ' ' + c + '><circle cx="12" cy="12" r="9"/><path d="M9.2 9.6a2.8 2.8 0 0 1 5.4 1c0 1.8-2.6 2-2.6 3.6M12 17h.01"/></svg>',
     doc: '<svg ' + s + ' ' + c + '><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h5M9.5 15h5"/></svg>',
     top: '<svg ' + s + ' ' + c + '><path d="M12 20V6"/><path d="M6 11.5 12 5.5l6 6"/></svg>',
+    'arrow-left': '<svg ' + s + ' ' + c + '><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
     pen: '<svg ' + s + ' ' + c + '><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     logout: '<svg ' + s + ' ' + c + '><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
     trash: '<svg ' + s + ' ' + c + '><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/></svg>',
@@ -1314,6 +1315,8 @@ function buildPostsJs() {
       excerpt: d.excerpt || '',
       cover: d.cover || '',
       category: d.category || '',
+      series: d.series || '',
+      seriesOrder: Number(d.seriesOrder) || 0,
       status: d.status || 'published',
       publishAt: d.publishAt || null,
       pinned: !!d.pinned,
@@ -1405,6 +1408,7 @@ function app() { return document.querySelector('#app'); }
   var NAV = [
     { i18n: 'nav.home',     url: '/',          path: '/' },
     { i18n: 'nav.tags',     url: '/tags',      path: '/tags' },
+    { i18n: 'nav.series',   url: '/series',    path: '/series' },
     { i18n: 'nav.archive',  url: '/archive',   path: '/archive' },
     { i18n: 'nav.guestbook',url: '/guestbook', path: '/guestbook' },
     { i18n: 'nav.about',    url: '/about',     path: '/about' }
@@ -1423,6 +1427,7 @@ function app() { return document.querySelector('#app'); }
   var NAV_DEFAULT_ZH = {
     '/': '首页',
     '/tags': '标签',
+    '/series': '系列',
     '/archive': '归档',
     '/guestbook': '留言板',
     '/about': '关于'
@@ -2043,7 +2048,8 @@ async function renderPost(id) {
   var tocHeadings = tocRes.headings;
   var tags = normalizeTags(post).map(function (t) { return '<a href="' + esc(href('/', { tag: t })) + '" data-tag-link>' + esc(t) + '</a>'; }).join('');
   var minutes = Math.max(1, Math.ceil((stripMd(content || '').length / 400)));
-  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span><span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
+  var seriesMeta = post.series ? '<a class="pin" href="' + esc(href(seriesUrl(post.series))) + '">' + svgIcon('list', 13) + ' ' + esc(post.series) + '</a>' : '';
+  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span><span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
   html += aiPostSlot(post);
   html += toc;
   html += '<article class="article">' + bodyHtml + '</article>';
@@ -2054,6 +2060,18 @@ async function renderPost(id) {
     ? '<a class="btn" href="' + esc(href(postUrl(post.id) + 'edit')) + '">' + svgIcon('pen', 13) + ' ' + t('post.edit') + '</a>'
     : '';
   html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + '<button class="btn" id="btnCopyLink">' + svgIcon('link', 14) + ' ' + t('post.copyLink') + '</button></div></div>';
+
+  // 系列内上一篇 / 下一篇
+  if (post.series) {
+    var seriesPosts = posts.filter(function (p) { return String(p.series || '').trim() === String(post.series).trim(); }).sort(seriesSort);
+    var si = seriesPosts.findIndex(function (p) { return p.id === post.id; });
+    var sp = si > 0 ? seriesPosts[si - 1] : null;
+    var sn = si >= 0 && si < seriesPosts.length - 1 ? seriesPosts[si + 1] : null;
+    html += '<div class="series-nav"><div class="series-nav-title">' + svgIcon('list', 15) + ' ' + t('post.inSeries') + ': <a href="' + esc(href(seriesUrl(post.series))) + '">' + esc(post.series) + '</a></div><div class="pn-nav">';
+    if (sp) html += '<a class="pn-item" href="' + esc(href(postUrl(sp.id))) + '"><span class="pn-dir">' + t('post.prev') + '</span><span class="pn-title">' + esc(sp.title || '') + '</span></a>';
+    if (sn) html += '<a class="pn-item" href="' + esc(href(postUrl(sn.id))) + '"><span class="pn-dir">' + t('post.next') + '</span><span class="pn-title">' + esc(sn.title || '') + '</span></a>';
+    html += '</div></div>';
+  }
 
   // prev / next
   var sorted = posts.slice().sort(sortPosts);
@@ -2272,6 +2290,68 @@ function renderAbout() {
   html += '<div class="stat-grid"><div class="stat"><b>' + posts.length + '</b><span>' + t('about.posts') + '</span></div><div class="stat"><b>' + Object.keys(tags).length + '</b><span>' + t('about.tags') + '</span></div><div class="stat"><b>' + totalWords + '</b><span>' + t('about.totalWords') + '</span></div><div class="stat"><b>' + esc(latest || '-') + '</b><span>' + t('about.latestUpdate') + '</span></div></div>';
   html += '<h3>' + t('about.version') + '</h3><p>v' + esc(BLOG_VERSION) + '</p><h3>' + t('about.dataMode') + '</h3><p>' + (_cloudOn() ? t('about.cloudMode') : t('about.staticMode')) + '</p><h3>' + t('about.firstUse') + '</h3><p>' + t('about.firstUseHint') + '</p>';
   html += '</div></main>' + renderFooter();
+  return html;
+}
+
+/* ---------- 文章系列 / 专栏 ---------- */
+function seriesUrl(name) {
+  return '/series/' + encodeURIComponent(String(name || '')) + '/';
+}
+function seriesSort(a, b) {
+  var ao = Number(a.seriesOrder) || 0, bo = Number(b.seriesOrder) || 0;
+  if (ao > 0 && bo > 0 && ao !== bo) return ao - bo;
+  if (ao > 0 && bo <= 0) return -1;
+  if (ao <= 0 && bo > 0) return 1;
+  return (a.date || '').localeCompare(b.date || '') || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+function getSeriesGroups() {
+  var groups = {};
+  getPublishedPosts().forEach(function (p) {
+    var name = String(p.series || '').trim();
+    if (!name) return;
+    if (!groups[name]) groups[name] = { name: name, posts: [] };
+    groups[name].posts.push(p);
+  });
+  return Object.keys(groups).map(function (k) {
+    groups[k].posts.sort(seriesSort);
+    return groups[k];
+  }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+}
+function renderSeriesList() {
+  var groups = getSeriesGroups();
+  var html = renderNav(currentRoute().path);
+  html += '<main class="container page-fade"><h2 class="page-title">' + svgIcon('list', 20) + ' ' + t('series.title') + '</h2>';
+  html += '<p class="admin-head-sub" style="margin:-8px 0 20px">' + esc(t('series.desc')) + '</p>';
+  if (!groups.length) {
+    html += '<div class="empty"><div class="big">' + svgIcon('list', 36) + '</div><p>' + t('series.empty') + '</p></div>';
+  } else {
+    html += '<div class="list-container">';
+    groups.forEach(function (g, idx) {
+      var first = g.posts[0] || {};
+      html += '<a class="post-card" href="' + esc(href(seriesUrl(g.name))) + '"><div class="post-card-main">' +
+        '<div class="meta"><span class="date">' + esc(t('series.count', { count: g.posts.length })) + '</span><span class="pin">' + svgIcon('list', 13) + ' ' + esc(t('series.label')) + '</span></div>' +
+        '<h2>' + esc(g.name) + '</h2><div class="excerpt">' + esc(g.posts.slice(0, 4).map(function (p) { return p.title || ''; }).join(' · ')) + '</div>' +
+        '<div class="mini-tags"><span>' + esc(t('series.part')) + '</span></div></div>' + renderPostThumb(first, idx) + '</a>';
+    });
+    html += '</div>';
+  }
+  html += '</main>' + renderFooter();
+  return html;
+}
+function renderSeriesDetail(name) {
+  var decoded = String(name || '');
+  var posts = getPublishedPosts().filter(function (p) { return String(p.series || '').trim() === decoded; }).sort(seriesSort);
+  var html = renderNav(currentRoute().path);
+  html += '<main class="container page-fade"><div class="list-head"><div><h2 class="page-title">' + svgIcon('list', 20) + ' ' + esc(decoded) + '</h2><p class="admin-head-sub">' + esc(t('series.count', { count: posts.length })) + '</p></div><a class="btn" href="' + esc(href('/series')) + '">' + svgIcon('arrow-left', 14) + ' ' + t('series.title') + '</a></div>';
+  if (!posts.length) html += '<div class="empty"><div class="big">' + svgIcon('list', 36) + '</div><p>' + t('series.empty') + '</p></div>';
+  else {
+    html += '<div class="list-container">';
+    posts.forEach(function (p, idx) {
+      html += renderCard(p, idx);
+    });
+    html += '</div>';
+  }
+  html += '</main>' + renderFooter();
   return html;
 }
 
@@ -3405,6 +3485,8 @@ async function route() {
   else if (path === '/archive') { app().innerHTML = renderArchive(); }
   else if (path === '/about') { app().innerHTML = renderAbout(); }
   else if (path === '/tags') { app().innerHTML = renderTags(); }
+  else if (path === '/series') { app().innerHTML = renderSeriesList(); fitCardLineClamps(); }
+  else if (path.indexOf('/series/') === 0) { var seriesName = ''; try { seriesName = decodeURIComponent(path.slice('/series/'.length)); } catch (e) { seriesName = path.slice('/series/'.length); } app().innerHTML = renderSeriesDetail(seriesName); fitCardLineClamps(); }
   else if (path === '/guestbook') { app().innerHTML = renderGuestbook(); bindGuestbook(); }
   else {
     app().innerHTML = renderNav(path) + '<main class="container page-fade"><div class="empty"><div class="big">' + svgIcon('question', 36) + '</div><p>' + t('post.notFound') + '</p><p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>' + renderFooter();

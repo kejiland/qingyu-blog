@@ -225,7 +225,7 @@
     var idx = -1;
     for (var i = 0; i < drafts.length; i++) if (drafts[i] && drafts[i].id === post.id) idx = i;
     var item = { id: post.id, title: post.title, date: post.date, tags: post.tags || [], excerpt: post.excerpt || '',
-      cover: post.cover || '', category: post.category || '', status: post.status || 'published',
+      cover: post.cover || '', category: post.category || '', series: post.series || '', seriesOrder: Number(post.seriesOrder) || 0, status: post.status || 'published',
       pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null,
       publishAt: post.publishAt || null, content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
@@ -558,7 +558,8 @@
       { group: t('admin.sidebar.postManage'), items: [
         { key: 'posts', label: t('admin.sidebar.allPosts'), icon: 'list', href: '/admin/posts' },
         { key: 'write', label: t('admin.sidebar.writeNew'), icon: 'pen', href: '/admin/posts/new' },
-        { key: 'tags', label: t('admin.sidebar.tagManage'), icon: 'tag', href: '/admin/tags' }
+        { key: 'tags', label: t('admin.sidebar.tagManage'), icon: 'tag', href: '/admin/tags' },
+        { key: 'series', label: t('admin.sidebar.seriesManage'), icon: 'list', href: '/admin/series' }
       ] },
       { group: t('admin.sidebar.commentManage'), items: [
         { key: 'comments', label: t('admin.sidebar.allComments'), icon: 'quote', href: '/admin/comments' },
@@ -711,6 +712,7 @@
     if (path === '/admin' || path === '/admin/') return { key: 'dashboard', page: 'dashboard' };
     if (path === '/admin/posts') return { key: 'posts', page: 'posts' };
     if (path === '/admin/tags') return { key: 'tags', page: 'tags' };
+    if (path === '/admin/series') return { key: 'series', page: 'series' };
     if (path === '/admin/comments') return { key: 'comments', page: 'comments', filter: 'all' };
     if (path === '/admin/comments/pending') return { key: 'comments-pending', page: 'comments', filter: 'pending' };
     if (path === '/admin/media') return { key: 'media', page: 'media' };
@@ -860,6 +862,7 @@
     if (route.page === 'posts') return pagePosts(content);
     if (route.page === 'editor') return pageEditor(content, route);
     if (route.page === 'tags') return pageTags(content);
+    if (route.page === 'series') return pageSeries(content);
     if (route.page === 'comments') return pageComments(content, route.filter);
     if (route.page === 'media') return pageMedia(content);
     if (route.page === 'music') return pageMusic(content);
@@ -1134,7 +1137,7 @@
       else if (p.pinned) statusBadge = '<span class="ab-status published">' + icon('pin', 11) + ' ' + t('admin.postList.pin') + '</span>';
       else statusBadge = '<span class="ab-status ' + (postStatus === 'draft' ? 'draft' : 'published') + '">' + (postStatus === 'draft' ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
       return '<tr>' +
-        '<td><a class="ab-post-title" data-link="/admin/posts/' + enc(id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a></td>' +
+        '<td><a class="ab-post-title" data-link="/admin/posts/' + enc(id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a>' + (p.series ? ' <span class="ab-chip">' + icon('list', 11) + ' ' + esc(p.series) + (p.seriesOrder ? ' #' + esc(String(p.seriesOrder)) : '') + '</span>' : '') + '</td>' +
         '<td class="ab-td-tags">' + (p.tags && p.tags.length ? '<div class="ab-tag-row">' + p.tags.map(function (t) { return '<span class="ab-chip">' + esc(t) + '</span>'; }).join('') + '</div>' : '<span class="ab-muted">—</span>') + '</td>' +
         '<td class="ab-td-date">' + esc(fmtPostDate(p.date)) + '</td>' +
         '<td class="ab-td-status">' + statusBadge + '</td>' +
@@ -1261,12 +1264,13 @@
   }
   function transferPostMarkdown(post) {
     var lines = ['---'];
-    var stringKeys = ['id', 'title', 'date', 'excerpt', 'cover', 'category'];
+    var stringKeys = ['id', 'title', 'date', 'excerpt', 'cover', 'category', 'series'];
     stringKeys.forEach(function (key) {
       var value = String(post[key] == null ? '' : post[key]);
       if (value !== '') lines.push(key + ': ' + JSON.stringify(value));
     });
     lines.push('tags: ' + JSON.stringify(post.tags || []));
+    lines.push('series_order: ' + JSON.stringify(Number(post.seriesOrder) || 0));
     lines.push('pinned: ' + (post.pinned ? 'true' : 'false'));
     lines.push('status: ' + JSON.stringify(post.status === 'draft' ? 'draft' : (post.status === 'scheduled' ? 'scheduled' : 'published')));
     if (post.publishAt) lines.push('publish_at: ' + JSON.stringify(new Date(Number(post.publishAt)).toISOString()));
@@ -1319,6 +1323,8 @@
       excerpt: meta.excerpt || '',
       cover: meta.cover || '',
       category: meta.category || '',
+      series: meta.series || '',
+      seriesOrder: Number(meta.series_order) || 0,
       status: meta.status,
       publishAt: meta.publish_at ? Date.parse(String(meta.publish_at)) : null,
       pinned: meta.pinned,
@@ -1359,6 +1365,8 @@
       excerpt: String(post.excerpt || ''),
       cover: String(post.cover || ''),
       category: String(post.category || ''),
+      series: String(post.series || ''),
+      seriesOrder: Math.max(0, Math.floor(Number(post.seriesOrder || post.series_order) || 0)),
       status: postStatus,
       publishAt: postStatus === 'scheduled' ? publishAt : null,
       pinned: !!post.pinned,
@@ -1882,6 +1890,7 @@
         '<div class="ab-editor-meta">' +
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.tagsPlaceholder') + '</label><input class="ab-input" id="abTags" placeholder="' + t('admin.editor.tagsExample') + '" autocomplete="off"></div>' +
+          '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.seriesLabel') + '</label><div class="ab-row"><input class="ab-input" id="abSeries" placeholder="' + t('admin.editor.seriesPlaceholder') + '" autocomplete="off"><input class="ab-input" id="abSeriesOrder" type="number" min="0" step="1" style="max-width:110px" placeholder="' + t('admin.editor.seriesOrder') + '"></div><label class="ab-hint">' + t('admin.editor.seriesHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label" for="abDate">' + t('admin.editor.dateLabel') + '</label><div class="ab-row"><input class="ab-input" id="abDate" type="datetime-local" step="60"><button class="ab-btn sm" id="abNow">' + t('admin.editor.setNow') + '</button></div><label class="ab-hint">' + t('admin.editor.dateHint') + '</label></div>' +
           (cloudOn() ? '<div class="ab-field" style="margin:0"><label class="ab-label" for="abSchedule">' + t('admin.editor.scheduleLabel') + '</label><input class="ab-input" id="abSchedule" type="datetime-local" step="60"><label class="ab-hint">' + t('admin.editor.scheduleHint') + '</label></div>' : '') +
         '</div>' +
@@ -1983,6 +1992,8 @@
     content.__editingPost = p;
     content.querySelector('#abTitle').value = p.title || '';
     content.querySelector('#abTags').value = (p.tags || []).join(', ');
+    content.querySelector('#abSeries').value = p.series || '';
+    content.querySelector('#abSeriesOrder').value = p.seriesOrder ? String(p.seriesOrder) : '';
     content.querySelector('#abCover').value = p.cover || '';
     var dateInput = content.querySelector('#abDate');
     if (dateInput) dateInput.value = toDateTimeLocal(p.date || '');
@@ -2011,6 +2022,8 @@
 
     var post = Object.assign({}, content.__editingPost || {}, {
       id: id, title: title, date: dateValue, publishAt: publishAt,
+      series: content.querySelector('#abSeries').value.trim(),
+      seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: body, cover: content.querySelector('#abCover').value.trim(),
       pinned: wantPinned, tags: tags,
@@ -2052,6 +2065,66 @@
         content.querySelector('#abCover').value = c.getAttribute('data-url'); mask.remove(); toast(t('admin.editor.selectMedia'), 'ok');
       }); });
     }).catch(function (e) { mask.querySelector('#abPickerGrid').innerHTML = '<div class="ab-empty"><p>' + t('admin.media.readFail') + '</p></div>'; });
+  }
+
+  /* ====================== 文章系列 / 专栏 ====================== */
+  function pageSeries(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.series.title') + '</h1><p class="ab-page-sub">' + t('admin.series.desc') + '</p></div>' +
+      '<button class="ab-btn primary" data-link="/admin/posts/new">' + icon('pen', 15) + ' ' + t('admin.series.write') + '</button></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.series.colName') + '</th><th>' + t('admin.series.colCount') + '</th><th>' + t('admin.series.colOrder') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSeriesBody"></tbody></table></div></div>';
+    content.querySelectorAll('[data-link]').forEach(function (a) { a.addEventListener('click', function (e) { e.preventDefault(); go(a.getAttribute('data-link')); }); });
+    loadSeries(content);
+  }
+  async function loadSeries(content) {
+    var body = content.querySelector('#abSeriesBody');
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    var posts = [];
+    try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
+    var groups = {};
+    posts.forEach(function (p) {
+      var name = String(p.series || '').trim();
+      if (!name) return;
+      if (!groups[name]) groups[name] = { name: name, posts: [] };
+      groups[name].posts.push(p);
+    });
+    var list = Object.keys(groups).map(function (k) { return groups[k]; }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+    if (!list.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.series.empty') + '</td></tr>'; return; }
+    body.innerHTML = list.map(function (g) {
+      var orders = g.posts.map(function (p) { return Number(p.seriesOrder) || 0; }).sort(function (a, b) { return a - b; });
+      return '<tr><td><b>' + esc(g.name) + '</b></td><td>' + g.posts.length + '</td><td>' + esc(orders.join(', ')) + '</td>' +
+        '<td class="col-actions"><button class="ab-btn sm" data-series-rename="' + esc(enc(g.name)) + '">' + icon('pen', 12) + ' ' + t('admin.tags.rename') + '</button> ' +
+        '<button class="ab-btn sm danger" data-series-delete="' + esc(enc(g.name)) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
+    }).join('');
+    body.querySelectorAll('[data-series-rename]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var oldName = dec(btn.getAttribute('data-series-rename'));
+        var newName = window.prompt(t('admin.series.renamePrompt'), oldName);
+        if (newName == null || !newName.trim() || newName.trim() === oldName) return;
+        updateSeriesPosts(content, oldName, newName.trim());
+      });
+    });
+    body.querySelectorAll('[data-series-delete]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var name = dec(btn.getAttribute('data-series-delete'));
+        confirmModal(t('admin.series.delete'), '<p class="ab-muted">' + t('admin.series.deleteConfirm', { name: esc(name) }) + '</p>', function () { updateSeriesPosts(content, name, ''); }, t('admin.comments.delete'));
+      });
+    });
+  }
+  async function updateSeriesPosts(content, oldName, newName) {
+    var all = [];
+    try { all = await listPosts(); } catch (e) { toast(t('admin.series.updateFail') + (e.message || e), 'err'); return; }
+    var targets = all.filter(function (p) { return String(p.series || '').trim() === oldName; });
+    try {
+      for (var i = 0; i < targets.length; i++) {
+        var full = await getPost(targets[i].id);
+        if (!full) continue;
+        full.series = newName;
+        if (!newName) full.seriesOrder = 0;
+        await savePost(full, false);
+      }
+      toast(t('admin.series.updated'), 'ok');
+      loadSeries(content);
+    } catch (e) { toast(t('admin.series.updateFail') + (e.message || e), 'err'); }
   }
 
   async function pageTags(content) {

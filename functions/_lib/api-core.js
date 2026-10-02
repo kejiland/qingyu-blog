@@ -164,6 +164,8 @@ export function normalizePost(p) {
     protected: !!out.protected,
     enc: protectedPost ? out.enc : null,
     category: String(out.category || '').trim(),
+    series: String(out.series || '').trim().slice(0, 80),
+    seriesOrder: Math.max(0, Math.floor(Number(out.seriesOrder || out.series_order) || 0)),
     status: status,
     publishAt: publishAt,
     tags: Array.isArray(out.tags)
@@ -194,6 +196,8 @@ function postFromRow(r) {
     protected: isProtected,
     enc: enc,
     category: String(r.category || ''),
+    series: String(r.series || ''),
+    seriesOrder: Number(r.series_order) || 0,
     status: normalizePostStatus(r.status),
     publishAt: normalizePublishAt(r.publish_at),
     tags: tags
@@ -209,6 +213,8 @@ function postToParams(p) {
     p.enc ? JSON.stringify(p.enc) : null,
     JSON.stringify(p.tags || []),
     p.category || '',
+    p.series || '',
+    p.seriesOrder || 0,
     normalizePostStatus(p.status),
     p.status === 'scheduled' ? normalizePublishAt(p.publishAt) : null
   ];
@@ -371,7 +377,7 @@ export async function handlePosts(request, env) {
     const exist = await dbFirst(env.DB, 'SELECT 1 FROM posts WHERE id = ?', p.id);
     if (exist) return json({ error: '已存在相同 id（' + p.id + '），请用 PUT 更新' }, 409, request, env);
     await dbRun(env.DB,
-      'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'create').catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + p.id]);
@@ -407,7 +413,7 @@ export async function handlePostId(request, env, id) {
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
     if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,
-      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'update').catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + id]);
@@ -589,6 +595,8 @@ function revisionFromRow(r) {
     enc: enc,
     tags: tags,
     category: String(r.category || ''),
+    series: String(r.series || ''),
+    seriesOrder: Number(r.series_order) || 0,
     status: normalizePostStatus(r.status),
     publishAt: normalizePublishAt(r.publish_at),
     reason: String(r.reason || 'save'),
@@ -606,7 +614,8 @@ function revisionFingerprint(post) {
   return JSON.stringify([
     post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
     post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc || null,
-    post.tags || [], post.category || '', normalizePostStatus(post.status), post.publishAt || null
+    post.tags || [], post.category || '', post.series || '', Number(post.seriesOrder) || 0,
+    normalizePostStatus(post.status), post.publishAt || null
   ]);
 }
 async function recordPostRevision(env, post, reason) {
@@ -617,11 +626,12 @@ async function recordPostRevision(env, post, reason) {
   if (last && revisionFingerprint(revisionFromRow(last)) === revisionFingerprint(post)) return;
   const createdAt = Date.now();
   await dbRun(env.DB,
-    'INSERT INTO post_revisions (post_id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO post_revisions (post_id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at,reason,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     post.id, post.title || '', post.date || '', post.excerpt || '', post.content || '', post.cover || '',
     post.pinned ? 1 : 0, post.protected ? 1 : 0, post.enc ? JSON.stringify(post.enc) : null,
-    JSON.stringify(post.tags || []), post.category || '', normalizePostStatus(post.status),
-    post.status === 'scheduled' ? normalizePublishAt(post.publishAt) : null, reason || 'save', createdAt);
+    JSON.stringify(post.tags || []), post.category || '', post.series || '', Number(post.seriesOrder) || 0,
+    normalizePostStatus(post.status), post.status === 'scheduled' ? normalizePublishAt(post.publishAt) : null,
+    reason || 'save', createdAt);
   // Each post keeps at most 50 revisions, newest first.
   const rows = await dbAll(env.DB, 'SELECT id FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC', post.id).catch(() => []);
   for (const row of rows.slice(50)) {
@@ -635,7 +645,7 @@ export async function handlePostRevisions(request, env, postId) {
   if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
   if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
   const rows = await dbAll(env.DB,
-    'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC',
+    'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC',
     postId).catch(() => []);
   return json({ ok: true, revisions: rows.map(revisionMetaFromRow).filter(Boolean) }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
@@ -668,10 +678,11 @@ export async function handlePostRevisionRestore(request, env, postId, revisionId
     id: postId, title: revision.title, date: revision.date, excerpt: revision.excerpt,
     content: revision.content, cover: revision.cover, pinned: revision.pinned,
     protected: revision.protected, enc: revision.enc, tags: revision.tags,
-    category: revision.category, status: revision.status, publishAt: revision.publishAt
+    category: revision.category, series: revision.series, seriesOrder: revision.seriesOrder,
+    status: revision.status, publishAt: revision.publishAt
   };
   await dbRun(env.DB,
-    'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
     ...postToParams(post));
   await recordPostRevision(env, post, 'restore');
   await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + postId]);

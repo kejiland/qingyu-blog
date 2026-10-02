@@ -460,7 +460,7 @@ function makeD1() {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'status', 'publish_at'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
@@ -482,7 +482,7 @@ function makeD1() {
     if (s === 'SELECT id FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
       return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id).map((r) => ({ id: r.id }));
     }
-    if (s === 'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
+    if (s === 'SELECT id,post_id,title,date,excerpt,cover,pinned,protected,tags,category,series,series_order,status,publish_at,reason,created_at FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC') {
       return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id);
     }
     if (s === 'SELECT * FROM post_revisions WHERE post_id = ? AND id = ?') {
@@ -490,8 +490,8 @@ function makeD1() {
     }
     if (/^INSERT INTO post_revisions/.test(s)) {
       const id = ++seq;
-      const [post_id,title,date,excerpt,content,cover,pinned,protectedFlag,enc,tags,category,status,publish_at,reason,created_at] = params;
-      t.post_revisions.set(id, { id, post_id, title, date, excerpt, content, cover, pinned, protected: protectedFlag, enc, tags, category, status, publish_at, reason, created_at });
+      const [post_id,title,date,excerpt,content,cover,pinned,protectedFlag,enc,tags,category,series,series_order,status,publish_at,reason,created_at] = params;
+      t.post_revisions.set(id, { id, post_id, title, date, excerpt, content, cover, pinned, protected: protectedFlag, enc, tags, category, series, series_order, status, publish_at, reason, created_at });
       return { success: true };
     }
     if (s === 'DELETE FROM post_revisions WHERE id = ?') { t.post_revisions.delete(Number(params[0])); return { success: true }; }
@@ -724,7 +724,7 @@ tests.push(['API：文章版本历史与恢复', async () => {
   const authHeaders = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   let r = await core.handlePosts(new Request('http://t/api/posts', {
     method: 'POST', headers: authHeaders,
-    body: JSON.stringify({ id: 'rev1', title: '第一版', date: '2026-10-01', content: '旧内容' })
+    body: JSON.stringify({ id: 'rev1', title: '第一版', date: '2026-10-01', content: '旧内容', series: '测试系列', seriesOrder: 1 })
   }), env);
   assert.strictEqual(r.status, 201);
   r = await core.handlePostId(new Request('http://t/api/posts/rev1', {
@@ -744,6 +744,8 @@ tests.push(['API：文章版本历史与恢复', async () => {
   const current = await (await core.handlePostId(new Request('http://t/api/posts/rev1', { headers: authHeaders }), env, 'rev1')).json();
   assert.strictEqual(current.post.title, '第一版');
   assert.strictEqual(current.post.content, '旧内容');
+  assert.strictEqual(current.post.series, '测试系列');
+  assert.strictEqual(current.post.seriesOrder, 1);
 }]);
 
 tests.push(['备份：创建 R2 备份并登记列表', async () => {
@@ -1758,7 +1760,7 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.ok(resolved[2].text, 'i18n key 解析出文本（' + resolved[2].text + '）');
   // 默认 NAV 常量解析后 5 项且不崩溃
   const def = b.ctx.resolveNav(b.ctx.NAV);
-  assert.strictEqual(def.length, 5, '默认 NAV 5 项');
+  assert.strictEqual(def.length, 6, '默认 NAV 6 项');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
@@ -1919,6 +1921,19 @@ tests.push(['标签页：标签云 + 计数 + 点击进入筛选', async () => {
   // 筛选态标签高亮
   const f = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/tags');
   void f;
+}]);
+
+tests.push(['系列页：分组、顺序与详情导航', async () => {
+  const posts = [
+    { id: 's2', title: '系列第二篇', date: '2026-02-02', series: '测试系列', seriesOrder: 2, content: 'B', tags: [] },
+    { id: 's1', title: '系列第一篇', date: '2026-02-01', series: '测试系列', seriesOrder: 1, content: 'A', tags: [] },
+    { id: 'other', title: '普通文章', date: '2026-02-03', content: 'C', tags: [] }
+  ];
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/series');
+  assert.ok(b.html.includes('测试系列') && b.html.includes('2 篇文章'), '系列列表分组计数');
+  const detail = b.ctx.renderSeriesDetail('测试系列');
+  assert.ok(detail.indexOf('系列第一篇') < detail.indexOf('系列第二篇'), '系列内按 seriesOrder 升序');
+  assert.ok(detail.includes('测试系列'), '系列详情标题正确');
 }]);
 
 tests.push(['API：RSS /api/feed.xml 生成与 XML 转义', async () => {
