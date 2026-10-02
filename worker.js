@@ -13,6 +13,7 @@ import { onRequest as aiAssist } from './functions/api/ai/assist.js';
 import { onRequest as aiComments } from './functions/api/ai/comments.js';
 import { handleMusic, handleMusicId, handleMusicUploadUrl } from './functions/_lib/music.js';
 import { handleBackups, handleBackupId, handleBackupRestore, createBackup } from './functions/_lib/backup.js';
+import { handleSubscribe, handleSubscribeConfirm, handleUnsubscribe, handleSubscribersAdmin, handleSubscriberId, processMailOutbox } from './functions/_lib/subscribe.js';
 import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.js';
 
 export default {
@@ -45,6 +46,8 @@ export default {
       if (result && result.published) {
         console.log('[cron] scheduled posts published:', result.published, result.ids.join(','));
       }
+      const mail = await processMailOutbox(env, 20);
+      if (mail && (mail.sent || mail.failed)) console.log('[cron] subscriber mail:', mail.sent, mail.failed);
       if (event && event.cron === '0 19 * * *') {
         const backup = await createBackup(env, 'auto');
         console.log('[cron] daily backup created:', backup.id, backup.size);
@@ -60,6 +63,22 @@ export default {
     // API 路由
     if (url.pathname === '/api/posts') {
       return handlePosts(request, env);
+    }
+    if (url.pathname === '/api/subscribe') {
+      return handleSubscribe(request, env);
+    }
+    if (url.pathname === '/api/subscribe/confirm') {
+      return handleSubscribeConfirm(request, env);
+    }
+    if (url.pathname === '/api/subscribe/unsubscribe') {
+      return handleUnsubscribe(request, env);
+    }
+    if (url.pathname === '/api/admin/subscribers') {
+      return handleSubscribersAdmin(request, env);
+    }
+    let subscriberMatch = url.pathname.match(/^\/api\/admin\/subscribers\/([^/]+)$/);
+    if (subscriberMatch) {
+      return handleSubscriberId(request, env, decodeURIComponent(subscriberMatch[1]));
     }
     if (url.pathname === '/api/admin/backups') {
       return handleBackups(request, env);

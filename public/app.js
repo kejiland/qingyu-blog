@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.8.3';
+var BLOG_VERSION = '2.9.0';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1593,6 +1593,7 @@ function renderFooter() {
   if (!adminOk()) {
     var rssHref = _cloudOn() ? '/api/feed.xml' : (useHashMode() ? 'feed.xml' : '/feed.xml');
     navHtml += '<span class="footer-dot footer-rss">·</span><a class="footer-rss" href="' + esc(rssHref) + '">RSS</a>';
+    navHtml += '<span class="footer-dot">·</span><a href="' + esc(href('/subscribe')) + '">' + esc(t('subscribe.title')) + '</a>';
   }
   // 电脑端专属区块：自定义文字 / 站点声明 / 联系方式 / 友情链接
   var extra = '';
@@ -2353,6 +2354,57 @@ function renderSeriesDetail(name) {
   }
   html += '</main>' + renderFooter();
   return html;
+}
+
+/* ---------- 邮件订阅 ---------- */
+function renderSubscribe() {
+  var q = currentRoute().query;
+  var notice = '';
+  if (q.confirmed === '1') notice = '<div class="subscribe-notice ok">' + t('subscribe.confirmed') + '</div>';
+  else if (q.confirmed === '0') notice = '<div class="subscribe-notice err">' + t('subscribe.invalid') + '</div>';
+  else if (q.unsubscribed === '1') notice = '<div class="subscribe-notice ok">' + t('subscribe.unsubscribed') + '</div>';
+  else if (q.unsubscribed === '0') notice = '<div class="subscribe-notice err">' + t('subscribe.invalid') + '</div>';
+  var html = renderNav('/subscribe');
+  html += '<main class="container page-fade"><h2 class="page-title">' + svgIcon('send', 20) + ' ' + t('subscribe.title') + '</h2>';
+  html += '<div class="card subscribe-card"><p class="subscribe-desc">' + t('subscribe.desc') + '</p>' + notice;
+  html += '<div class="subscribe-form"><input class="subscribe-input" id="subscribeEmail" type="email" maxlength="254" placeholder="' + t('subscribe.emailPlaceholder') + '" autocomplete="email"><button class="btn btn-primary" id="subscribeBtn">' + t('subscribe.button') + '</button></div><p class="subscribe-status" id="subscribeStatus"></p>';
+  html += '<p class="subscribe-privacy">' + t('subscribe.privacy') + '</p></div></main>';
+  html += renderFooter();
+  return html;
+}
+function bindSubscribe() {
+  var btn = document.getElementById('subscribeBtn');
+  var input = document.getElementById('subscribeEmail');
+  var status = document.getElementById('subscribeStatus');
+  if (!btn || !input || !status) return;
+  apiFetch('api/subscribe').then(function (d) {
+    if (d && d.enabled === false) {
+      btn.disabled = true;
+      input.disabled = true;
+      status.textContent = t('subscribe.disabled');
+    }
+  }).catch(function () {
+    btn.disabled = true;
+    input.disabled = true;
+    status.textContent = t('subscribe.disabled');
+  });
+  function submit() {
+    var email = String(input.value || '').trim();
+    if (!email) { status.textContent = t('subscribe.emailRequired'); return; }
+    btn.disabled = true;
+    status.textContent = t('site.loading') + '…';
+    apiFetch('api/subscribe', { method: 'POST', body: JSON.stringify({ email: email, locale: (window.__i18n && window.__i18n.getLocale ? window.__i18n.getLocale() : 'zh-CN') }) })
+      .then(function (d) {
+        status.textContent = d && d.already ? t('subscribe.already') : t('subscribe.sent');
+        btn.disabled = false;
+      })
+      .catch(function (e) {
+        status.textContent = (e && e.message) || t('subscribe.fail');
+        btn.disabled = false;
+      });
+  }
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
 }
 
 function renderTags() {
@@ -3483,6 +3535,7 @@ async function route() {
     }
   }
   else if (path === '/archive') { app().innerHTML = renderArchive(); }
+  else if (path === '/subscribe') { app().innerHTML = renderSubscribe(); bindSubscribe(); }
   else if (path === '/about') { app().innerHTML = renderAbout(); }
   else if (path === '/tags') { app().innerHTML = renderTags(); }
   else if (path === '/series') { app().innerHTML = renderSeriesList(); fitCardLineClamps(); }

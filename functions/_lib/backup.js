@@ -16,13 +16,14 @@ const TABLES = {
   comments: ['id','post_id','author','content','date','status','parent_id'],
   media: ['id','name','url','type','size','created_at'],
   music: ['id','title','artist','url','cover','size','duration','sort','created_at'],
+  subscribers: ['id','email','status','token','locale','created_at','confirmed_at','unsubscribed_at','last_notified_at'],
   site_settings: ['k','v'],
   site_files: ['name','content','updated_at'],
   stats: ['post_id','likes','views'],
   stats_daily: ['post_id','date','views','likes']
 };
-const DELETE_ORDER = ['post_revisions','comments','stats_daily','stats','media','music','site_files','site_settings','posts'];
-const INSERT_ORDER = ['posts','post_revisions','comments','stats','stats_daily','media','music','site_settings','site_files'];
+const DELETE_ORDER = ['post_revisions','comments','stats_daily','stats','media','music','subscribers','site_files','site_settings','posts'];
+const INSERT_ORDER = ['posts','post_revisions','comments','stats','stats_daily','media','music','subscribers','site_settings','site_files'];
 
 function backupId() {
   return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);

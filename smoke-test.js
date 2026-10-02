@@ -457,7 +457,7 @@ tests.push(['stripMd 生成纯文本摘要', async () => {
 function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
-    posts: new Map(), post_revisions: new Map(), backups: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
+    posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
@@ -471,8 +471,8 @@ function makeD1() {
       const cols = postColumns[1].split(',');
       return [...t.posts.values()].map((row) => { const o = {}; cols.forEach((c) => { o[c] = row[c] === undefined ? null : row[c]; }); return o; });
     }
-    if (s === "SELECT id FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?") {
-      return [...t.posts.values()].filter((r) => r.status === 'scheduled' && Number(r.publish_at) <= Number(params[0])).map((r) => ({ id: r.id }));
+    if (s === "SELECT * FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?") {
+      return [...t.posts.values()].filter((r) => r.status === 'scheduled' && Number(r.publish_at) <= Number(params[0])).slice();
     }
     if (s === 'SELECT 1 FROM posts WHERE id = ?') return t.posts.has(params[0]) ? { '1': 1 } : null;
     if (s === 'SELECT * FROM posts WHERE id = ?') return t.posts.get(params[0]) || null;
@@ -505,6 +505,54 @@ function makeD1() {
       return { success: true };
     }
     if (s === 'DELETE FROM posts WHERE id = ?') { t.posts.delete(params[0]); return { success: true }; }
+    /* subscribers / mail outbox */
+    if (s === 'SELECT * FROM subscribers WHERE email = ?') {
+      return [...t.subscribers.values()].find((r) => r.email === params[0]) || null;
+    }
+    if (s === 'SELECT * FROM subscribers WHERE token = ?') {
+      return [...t.subscribers.values()].find((r) => r.token === params[0]) || null;
+    }
+    if (s === "SELECT email FROM subscribers WHERE status = 'active'") {
+      return [...t.subscribers.values()].filter((r) => r.status === 'active').map((r) => ({ email: r.email }));
+    }
+    if (s === 'SELECT * FROM subscribers ORDER BY created_at DESC') {
+      return [...t.subscribers.values()].sort((a, b) => b.created_at - a.created_at);
+    }
+    if (/^INSERT INTO subscribers/.test(s)) {
+      const [id,email,status,token,locale,created_at,confirmed_at,unsubscribed_at,last_notified_at] = params;
+      const old = [...t.subscribers.values()].find((r) => r.email === email);
+      t.subscribers.set(old ? old.id : id, { id: old ? old.id : id, email, status, token, locale, created_at, confirmed_at, unsubscribed_at, last_notified_at });
+      return { success: true };
+    }
+    if (s === "UPDATE subscribers SET status = 'active', confirmed_at = ?, unsubscribed_at = NULL WHERE id = ?") {
+      const row = t.subscribers.get(params[1]); if (row) { row.status = 'active'; row.confirmed_at = params[0]; row.unsubscribed_at = null; } return { success: true };
+    }
+    if (s === "UPDATE subscribers SET status = 'unsubscribed', unsubscribed_at = ? WHERE id = ?") {
+      const row = t.subscribers.get(params[1]); if (row) { row.status = 'unsubscribed'; row.unsubscribed_at = params[0]; } return { success: true };
+    }
+    if (s === 'UPDATE subscribers SET last_notified_at = ? WHERE email = ?') {
+      const row = [...t.subscribers.values()].find((r) => r.email === params[1]); if (row) row.last_notified_at = params[0]; return { success: true };
+    }
+    if (s === 'DELETE FROM subscribers WHERE id = ?') { t.subscribers.delete(params[0]); return { success: true }; }
+    if (/^INSERT OR IGNORE INTO mail_outbox/.test(s)) {
+      const [post_id,to_email,status,attempts,error,created_at] = params;
+      const key = post_id + ' ' + to_email;
+      if (!t.mail_outbox.has(key)) t.mail_outbox.set(key, { id: ++seq, post_id, to_email, status, attempts, error, created_at, sent_at: null });
+      return { success: true };
+    }
+    if (/^SELECT \* FROM mail_outbox WHERE status = 'pending' ORDER BY created_at ASC LIMIT \d+$/.test(s)) {
+      const limit = Number(s.split('LIMIT ')[1]) || 20;
+      return [...t.mail_outbox.values()].filter((r) => r.status === 'pending').sort((a, b) => a.created_at - b.created_at).slice(0, limit);
+    }
+    if (s === "UPDATE mail_outbox SET status = 'skipped', error = 'article or subscriber unavailable', sent_at = ? WHERE id = ?") {
+      const row = t.mail_outbox.get([...t.mail_outbox.keys()].find((k) => t.mail_outbox.get(k).id === params[1])); if (row) { row.status = 'skipped'; row.error = 'article or subscriber unavailable'; row.sent_at = params[0]; } return { success: true };
+    }
+    if (s === "UPDATE mail_outbox SET status = 'sent', sent_at = ?, attempts = attempts + 1, error = '' WHERE id = ?") {
+      const row = [...t.mail_outbox.values()].find((r) => r.id === params[1]); if (row) { row.status = 'sent'; row.sent_at = params[0]; row.attempts++; row.error = ''; } return { success: true };
+    }
+    if (s === 'UPDATE mail_outbox SET attempts = attempts + 1, error = ? WHERE id = ?') {
+      const row = [...t.mail_outbox.values()].find((r) => r.id === params[1]); if (row) { row.attempts++; row.error = params[0]; } return { success: true };
+    }
     /* backups */
     if (s === 'SELECT id,object_key FROM backups ORDER BY created_at DESC, id DESC') {
       return [...t.backups.values()].sort((a, b) => b.created_at - a.created_at || (a.id < b.id ? 1 : -1));
@@ -779,6 +827,48 @@ tests.push(['备份：创建 R2 备份并登记列表', async () => {
     assert.strictEqual(data.backups.length, 1);
     assert.strictEqual(data.backups[0].reason, 'manual');
     assert.strictEqual(data.backups[0].counts.posts, 1);
+  } finally {
+    global.fetch = originalFetch;
+  }
+}]);
+
+tests.push(['订阅：确认邮箱并发送新文章通知', async () => {
+  const { env, token, core } = await authEnv();
+  env.RESEND_API_KEY = 're_test';
+  env.BLOG_MAIL_FROM = 'blog@example.com';
+  env.SITE_URL = 'https://blog.example';
+  const subscribe = await import('./functions/_lib/subscribe.js');
+  const originalFetch = global.fetch;
+  const emails = [];
+  global.fetch = async function (url, opts) {
+    if (String(url).indexOf('api.resend.com') >= 0) {
+      emails.push(JSON.parse(opts.body));
+      return new Response(JSON.stringify({ id: 'mail-' + emails.length }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+    }
+    return originalFetch(url, opts);
+  };
+  try {
+    let r = await subscribe.handleSubscribe(new Request('http://t/api/subscribe', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'reader@example.com', locale: 'zh-CN' })
+    }), env);
+    assert.strictEqual(r.status, 200);
+    assert.strictEqual(emails.length, 1, '发送确认邮件');
+    const sub = [...env._d1.subscribers.values()][0];
+    assert.ok(sub && sub.token, '生成订阅 token');
+    r = await subscribe.handleSubscribeConfirm(new Request('http://t/api/subscribe/confirm?token=' + sub.token), env);
+    assert.strictEqual(r.status, 302);
+    assert.strictEqual((await env.DB.prepare('SELECT * FROM subscribers WHERE email = ?').bind('reader@example.com').first()).status, 'active');
+
+    await core.handlePosts(new Request('http://t/api/posts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+      body: JSON.stringify({ id: 'newsletter-post', title: '订阅通知文章', content: '正文', status: 'published' })
+    }), env);
+    assert.strictEqual(env._d1.mail_outbox.size, 1, '发布后进入发件箱');
+    const result = await subscribe.processMailOutbox(env, 20);
+    assert.strictEqual(result.sent, 1, '异步发送通知邮件');
+    assert.ok(emails[1] && emails[1].to[0] === 'reader@example.com' && emails[1].subject.includes('订阅通知文章'), '通知内容正确');
   } finally {
     global.fetch = originalFetch;
   }

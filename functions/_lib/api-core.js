@@ -380,6 +380,7 @@ export async function handlePosts(request, env) {
       'INSERT INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'create').catch(() => {});
+    if ((p.status || 'published') === 'published') await queuePostNotifications(env, p).catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + p.id]);
     return json({ ok: true, post: p }, 201, request, env);
   }
@@ -416,6 +417,8 @@ export async function handlePostId(request, env, id) {
       'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'update').catch(() => {});
+    const oldStatus = exist ? normalizePostStatus(exist.status) : '';
+    if (oldStatus !== 'published' && (p.status || 'published') === 'published') await queuePostNotifications(env, p).catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + id]);
     return json({ ok: true, post: p }, 200, request, env);
   }
@@ -573,6 +576,20 @@ export async function handleCommentId(request, env, postId, cid) {
   return json({ ok: true }, 200, request, env);
 }
 
+/** 将已发布文章加入订阅通知发件箱；发送由 Cron 异步完成。 */
+export async function queuePostNotifications(env, post) {
+  if (!env || !env.DB || !post || !post.id || (post.status || 'published') !== 'published') return { queued: 0 };
+  const subscribers = await dbAll(env.DB, "SELECT email FROM subscribers WHERE status = 'active'").catch(() => []);
+  if (!subscribers.length) return { queued: 0 };
+  const now = Date.now();
+  const stmts = subscribers.map((row) => ({
+    sql: 'INSERT OR IGNORE INTO mail_outbox (post_id,to_email,status,attempts,error,created_at) VALUES (?,?,?,?,?,?)',
+    params: [post.id, row.email, 'pending', 0, '', now]
+  }));
+  for (let i = 0; i < stmts.length; i += 100) await dbBatch(env.DB, stmts.slice(i, i + 100));
+  return { queued: subscribers.length };
+}
+
 /* ============================================================
  * 文章版本历史
  * ============================================================ */
@@ -696,7 +713,7 @@ export async function publishScheduledPosts(env, nowMs) {
   if (!env || !env.DB) return { published: 0, ids: [] };
   const now = Number(nowMs) || Date.now();
   const due = await dbAll(env.DB,
-    "SELECT id FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?",
+    "SELECT * FROM posts WHERE status = 'scheduled' AND publish_at IS NOT NULL AND publish_at <= ?",
     now).catch(() => []);
   if (!due.length) return { published: 0, ids: [] };
   await dbBatch(env.DB, due.map((row) => ({
@@ -704,6 +721,10 @@ export async function publishScheduledPosts(env, nowMs) {
     params: [row.id]
   })));
   await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP].concat(due.map((row) => 'post:' + row.id)));
+  for (const row of due) {
+    const post = postFromRow(row);
+    if (post) { post.status = 'published'; post.publishAt = null; await queuePostNotifications(env, post).catch(() => {}); }
+  }
   return { published: due.length, ids: due.map((row) => String(row.id)) };
 }
 

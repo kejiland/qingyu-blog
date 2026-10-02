@@ -1851,6 +1851,16 @@ kbd {
 
 /* ---------- 上一篇 / 下一篇 ---------- */
 
+/* 邮件订阅 */
+.subscribe-card { max-width: 720px; margin: 0 auto; padding: 30px; }
+.subscribe-desc { color: var(--muted); line-height: 1.8; margin: 0 0 18px; }
+.subscribe-form { display: flex; gap: 10px; flex-wrap: wrap; }
+.subscribe-input { flex: 1 1 280px; min-width: 0; padding: 11px 13px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--text); outline: none; }
+.subscribe-status { min-height: 22px; margin: 12px 0 0; color: var(--muted); }
+.subscribe-privacy { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+.subscribe-notice { padding: 11px 13px; border-radius: 8px; margin: 0 0 16px; }
+.subscribe-notice.ok { color: #2e7d5b; background: rgba(46,125,91,.10); }
+.subscribe-notice.err { color: #c0392b; background: rgba(192,57,43,.10); }
 /* 文章系列导航 */
 .series-nav { margin: 22px 0; padding: 16px 18px; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--bg-soft) 72%, transparent); }
 .series-nav-title { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

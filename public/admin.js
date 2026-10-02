@@ -568,6 +568,7 @@
       { group: t('admin.sidebar.contentSettings'), items: [
         { key: 'media', label: t('admin.sidebar.media'), icon: 'image', href: '/admin/media' },
         { key: 'music', label: t('admin.sidebar.musicManage'), icon: 'music', href: '/admin/music' },
+        { key: 'subscribers', label: t('admin.sidebar.subscribers'), icon: 'send', href: '/admin/subscribers' },
         { key: 'backup', label: t('admin.sidebar.backups'), icon: 'save', href: '/admin/backups' },
         { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
@@ -717,6 +718,7 @@
     if (path === '/admin/comments/pending') return { key: 'comments-pending', page: 'comments', filter: 'pending' };
     if (path === '/admin/media') return { key: 'media', page: 'media' };
     if (path === '/admin/music') return { key: 'music', page: 'music' };
+    if (path === '/admin/subscribers') return { key: 'subscribers', page: 'subscribers' };
     if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
@@ -866,6 +868,7 @@
     if (route.page === 'comments') return pageComments(content, route.filter);
     if (route.page === 'media') return pageMedia(content);
     if (route.page === 'music') return pageMusic(content);
+    if (route.page === 'subscribers') return pageSubscribers(content);
     if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
@@ -2338,6 +2341,59 @@
       } catch (e) { toast(t('admin.media.uploadFail') + (e.message || e), 'err'); }
     }
     loadMedia(content);
+  }
+
+  /* ====================== 邮件订阅管理 ====================== */
+  function subscriberStatusLabel(status) {
+    if (status === 'active') return t('admin.subscribers.active');
+    if (status === 'pending') return t('admin.subscribers.pending');
+    return t('admin.subscribers.unsubscribed');
+  }
+  function pageSubscribers(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.subscribers.title') + '</h1><p class="ab-page-sub">' + t('admin.subscribers.desc') + '</p></div>' +
+      '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abSubExport">' + icon('download', 14) + ' ' + t('admin.subscribers.export') + '</button><button class="ab-btn" id="abSubRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div></div>' +
+      '<div class="ab-grid cols-3" id="abSubStats"></div><div class="ab-card" id="abSubNotice" style="margin-bottom:16px"></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.subscribers.colEmail') + '</th><th>' + t('admin.subscribers.colStatus') + '</th><th>' + t('admin.subscribers.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSubBody"></tbody></table></div></div>';
+    content.querySelector('#abSubRefresh').addEventListener('click', function () { loadSubscribers(content); });
+    content.querySelector('#abSubExport').addEventListener('click', function () { exportSubscribers(content); });
+    loadSubscribers(content);
+  }
+  async function loadSubscribers(content) {
+    var body = content.querySelector('#abSubBody');
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    try {
+      var d = await api('api/admin/subscribers');
+      var counts = (d && d.counts) || { total: 0, active: 0, pending: 0, unsubscribed: 0 };
+      content.querySelector('#abSubStats').innerHTML = [
+        { label: t('admin.subscribers.total'), value: counts.total, icon: 'send' },
+        { label: t('admin.subscribers.active'), value: counts.active, icon: 'check' },
+        { label: t('admin.subscribers.pending'), value: counts.pending, icon: 'clock' }
+      ].map(function (x) { return '<div class="ab-card ab-stat"><div class="ab-stat-label">' + icon(x.icon, 16) + esc(x.label) + '</div><div class="ab-stat-value">' + esc(String(x.value)) + '</div></div>'; }).join('');
+      content.querySelector('#abSubNotice').innerHTML = d && d.enabled ? '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + icon('send', 13) + ' Resend</span><b>' + t('admin.subscribers.enabled') + '</b></div>' : '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + t('admin.backup.disabledChip') + '</span><b>' + t('admin.subscribers.disabled') + '</b><span class="ab-muted">RESEND_API_KEY / BLOG_MAIL_FROM / SITE_URL</span></div>';
+      var list = (d && d.subscribers) || [];
+      if (!list.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.subscribers.empty') + '</td></tr>'; return; }
+      body.innerHTML = list.map(function (sub) {
+        return '<tr><td>' + esc(sub.email) + '</td><td><span class="ab-status ' + (sub.status === 'active' ? 'published' : sub.status === 'pending' ? 'scheduled' : 'draft') + '">' + esc(subscriberStatusLabel(sub.status)) + '</span></td><td>' + esc(fmtTimestamp(sub.created_at)) + '</td><td class="col-actions"><button class="ab-btn sm danger" data-sub-delete="' + esc(sub.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
+      }).join('');
+      body.querySelectorAll('[data-sub-delete]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = btn.getAttribute('data-sub-delete');
+          confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.subscribers.deleteConfirm') + '</p>', async function () {
+            try { await api('api/admin/subscribers/' + enc(id), { method: 'DELETE' }); toast(t('admin.subscribers.deleted'), 'ok'); loadSubscribers(content); }
+            catch (e) { toast(t('admin.subscribers.deleteFail') + (e.message || e), 'err'); }
+          }, t('admin.comments.delete'));
+        });
+      });
+    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+  }
+  async function exportSubscribers(content) {
+    try {
+      var d = await api('api/admin/subscribers');
+      var rows = [['email', 'status', 'created_at']];
+      ((d && d.subscribers) || []).forEach(function (s) { rows.push([s.email, s.status, new Date(Number(s.created_at) || 0).toISOString()]); });
+      var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+      transferDownloadText('subscribers-' + transferStamp() + '.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');
+    } catch (e) { toast(t('admin.subscribers.exportFail') + (e.message || e), 'err'); }
   }
 
   /* ====================== 备份与恢复 ====================== */

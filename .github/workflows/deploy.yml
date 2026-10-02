@@ -240,6 +240,10 @@ jobs:
           R2_MEDIA_BUCKET: ${{ secrets.R2_MEDIA_BUCKET }}
           R2_MEDIA_PUBLIC_BASE: ${{ secrets.R2_MEDIA_PUBLIC_BASE }}
           R2_BACKUP_BUCKET: ${{ secrets.R2_BACKUP_BUCKET }}
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          BLOG_MAIL_FROM: ${{ secrets.BLOG_MAIL_FROM }}
+          BLOG_MAIL_REPLY_TO: ${{ secrets.BLOG_MAIL_REPLY_TO }}
+          SITE_URL: ${{ secrets.SITE_URL }}
           NAME_ARG: ${{ secrets.PAGES_PROJECT_NAME != '' && format('--name {0}', secrets.PAGES_PROJECT_NAME) || '' }}
         run: |
           if [ -n "$BLOG_ADMIN_SETUP_KEY" ]; then
@@ -274,5 +278,13 @@ jobs:
           # R2 私有备份桶（自动备份）：与媒体/音乐桶分开，未配置时备份功能停用
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ] && [ -n "$R2_ENDPOINT" ] && [ -n "$R2_BACKUP_BUCKET" ]; then
             echo "$R2_BACKUP_BUCKET" | wrangler secret put R2_BACKUP_BUCKET --config wrangler.workers.ci.toml $NAME_ARG
+          fi
+          # 邮件订阅（Resend）：三项齐全才写入，未配置时订阅入口显示为未启用
+          if [ -n "$RESEND_API_KEY" ] && [ -n "$BLOG_MAIL_FROM" ] && [ -n "$SITE_URL" ]; then
+            echo "$RESEND_API_KEY" | wrangler secret put RESEND_API_KEY --config wrangler.workers.ci.toml $NAME_ARG
+            echo "$BLOG_MAIL_FROM" | wrangler secret put BLOG_MAIL_FROM --config wrangler.workers.ci.toml $NAME_ARG
+            if [ -n "$BLOG_MAIL_REPLY_TO" ]; then
+              echo "$BLOG_MAIL_REPLY_TO" | wrangler secret put BLOG_MAIL_REPLY_TO --config wrangler.workers.ci.toml $NAME_ARG
+            fi
           fi
           rm -f wrangler.workers.ci.toml
