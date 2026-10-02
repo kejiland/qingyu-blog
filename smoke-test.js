@@ -2007,6 +2007,7 @@ tests.push(['PWA：安装清单 / 图标 / Service Worker 配置齐全', async (
   const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'manifest.webmanifest'), 'utf8'));
   assert.strictEqual(manifest.display, 'standalone');
   assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2, '包含安装图标');
+  assert.ok(manifest.icons.some((icon) => String(icon.purpose || '').includes('maskable')), '包含 maskable 安装图标');
   const pngSize = (name) => {
     const buf = fs.readFileSync(path.join(PUB, 'icons', name));
     assert.strictEqual(buf.slice(1, 4).toString('ascii'), 'PNG');
