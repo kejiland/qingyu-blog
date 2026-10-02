@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.9.3';
+var BLOG_VERSION = '2.9.4';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -596,6 +596,15 @@ function inlineMd(s) {
   t = t.replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (m, txt, url) {
     if (/^\s*(javascript|data|vbscript):/i.test(String(url).trim())) return m;
     return '<a href="' + url + '">' + txt + '</a>';
+  });
+  // Wiki 双向链接：[[文章标题]] 或 [[文章标题|显示文字]]
+  t = t.replace(/\[\[([^\[\]\n]{1,160})\]\]/g, function (m, raw) {
+    var parts = String(raw || '').split('|');
+    var target = String(parts[0] || '').trim().replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    var label = String(parts.length > 1 ? parts[1] : parts[0] || '').trim();
+    var hit = resolveWikiLink(target);
+    if (!hit) return '<span class="wiki-link missing">' + label + '</span>';
+    return '<a class="wiki-link" href="' + esc(href(postUrl(hit.id))) + '">' + label + '</a>';
   });
   // 恢复遮罩
   t = t.replace(/\u0001([*_`~\[\]])/g, '$1');
@@ -2084,6 +2093,137 @@ function renderCommentTree(list, canDel) {
   return roots.map(function (c) { return renderOne(c, 0); }).join('');
 }
 
+function relationTitleKey(value) {
+  return String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+function resolveWikiLink(label) {
+  var raw = String(label || '').trim();
+  if (!raw) return null;
+  var posts = getPublishedPosts();
+  var hit = posts.find(function (p) { return String(p.id) === raw; });
+  if (!hit) {
+    var key = relationTitleKey(raw);
+    hit = posts.find(function (p) { return relationTitleKey(p.title) === key; });
+  }
+  if (!hit) {
+    var sl = slug(raw);
+    hit = posts.find(function (p) { return slug(p.title || '') === sl; });
+  }
+  return hit || null;
+}
+function postIdFromLinkUrl(url) {
+  var value = String(url || '').trim().replace(/^<|>$/g, '');
+  if (!value) return '';
+  if (value.indexOf('#/') === 0) value = value.slice(1);
+  try {
+    var pathname = /^https?:\/\//i.test(value) ? new URL(value).pathname : value.split(/[?#]/)[0];
+    var parts = pathname.split('/').filter(Boolean);
+    if (parts[0] === 'posts' && parts[1]) {
+      try { return decodeURIComponent(parts[1]); } catch (e) { return parts[1]; }
+    }
+  } catch (e) { /* malformed URL */ }
+  return '';
+}
+function collectPostLinkTargets(content) {
+  var posts = getPublishedPosts();
+  var refs = [];
+  var src = String(content || '');
+  var wikiRe = /\[\[([^\[\]\n]{1,160})\]\]/g;
+  var match;
+  while ((match = wikiRe.exec(src)) !== null) refs.push(String(match[1]).split('|')[0].trim());
+  var mdRe = /\[[^\]]*\]\(\s*([^)\s]+)(?:\s+["'][^"']*["'])?\s*\)/g;
+  while ((match = mdRe.exec(src)) !== null) {
+    var id = postIdFromLinkUrl(match[1]);
+    if (id) refs.push(id);
+  }
+  var out = [];
+  var seen = {};
+  refs.forEach(function (ref) {
+    var hit = resolveWikiLink(ref);
+    if (!hit && posts.some(function (p) { return String(p.id) === ref; })) hit = { id: ref };
+    if (hit && !seen[hit.id]) { seen[hit.id] = true; out.push(hit.id); }
+  });
+  return out;
+}
+function relationScore(current, other) {
+  var currentTags = normalizeTags(current).map(relationTitleKey);
+  var otherTags = normalizeTags(other).map(relationTitleKey);
+  var shared = currentTags.filter(function (tag) { return otherTags.indexOf(tag) >= 0; }).length;
+  var sameSeries = current.series && other.series && String(current.series).trim() === String(other.series).trim() ? 1 : 0;
+  return shared * 5 + sameSeries * 8;
+}
+function relationSortRecent(a, b) {
+  return String(b.date || '').localeCompare(String(a.date || '')) || String(a.id || '').localeCompare(String(b.id || ''));
+}
+function getLocalPostRelations(postId) {
+  var posts = getPublishedPosts();
+  var current = posts.find(function (p) { return String(p.id) === String(postId); });
+  if (!current) return { related: [], backlinks: [] };
+  var backlinks = [];
+  var backIds = {};
+  var others = posts.filter(function (p) { return String(p.id) !== String(postId); });
+  others.forEach(function (p) {
+    if (collectPostLinkTargets(p.content || p.search || '').indexOf(String(postId)) >= 0) {
+      backlinks.push(p);
+      backIds[String(p.id)] = true;
+    }
+  });
+  backlinks.sort(relationSortRecent);
+  var related = others
+    .filter(function (p) { return !backIds[String(p.id)]; })
+    .map(function (p) { return { post: p, score: relationScore(current, p) }; })
+    .filter(function (item) { return item.score > 0; })
+    .sort(function (a, b) { return b.score - a.score || relationSortRecent(a.post, b.post); })
+    .slice(0, 4)
+    .map(function (item) { return item.post; });
+  if (related.length < 4) {
+    var used = {};
+    related.forEach(function (p) { used[String(p.id)] = true; });
+    backlinks.forEach(function (p) { used[String(p.id)] = true; });
+    others.slice().sort(relationSortRecent).forEach(function (p) {
+      if (related.length >= 4 || used[String(p.id)]) return;
+      used[String(p.id)] = true;
+      related.push(p);
+    });
+  }
+  return { related: related.slice(0, 4), backlinks: backlinks.slice(0, 8) };
+}
+function renderRelationsHtml(relations) {
+  var related = (relations && relations.related) || [];
+  var backlinks = (relations && relations.backlinks) || [];
+  if (!related.length && !backlinks.length) return '';
+  var html = '<div class="relations-box">';
+  if (related.length) {
+    html += '<section class="relations-section related-posts"><div class="relations-title">' + svgIcon('link', 15) + ' ' + esc(t('post.related')) + '</div><div class="related-grid">';
+    related.forEach(function (p) {
+      var tags = normalizeTags(p).slice(0, 2).join(' · ');
+      html += '<a class="related-card" href="' + esc(href(postUrl(p.id))) + '"><div class="related-card-title">' + esc(p.title || t('post.untitled')) + '</div><div class="related-card-meta">' + esc(tags || p.date || '') + '</div></a>';
+    });
+    html += '</div></section>';
+  }
+  if (backlinks.length) {
+    html += '<section class="relations-section backlinks"><div class="relations-title">' + svgIcon('arrow-left', 15) + ' ' + esc(t('post.backlinks')) + '</div><ul class="backlink-list">';
+    backlinks.forEach(function (p) {
+      html += '<li class="backlink-item"><a href="' + esc(href(postUrl(p.id))) + '"><span class="backlink-title">' + esc(p.title || t('post.untitled')) + '</span><span class="backlink-date">' + esc(p.date || '') + '</span></a></li>';
+    });
+    html += '</ul></section>';
+  }
+  return html + '</div>';
+}
+async function loadPostRelations(postId) {
+  var box = document.querySelector('#postRelations');
+  if (!box) return;
+  var relations = getLocalPostRelations(postId);
+  if (_cloudOn()) {
+    try {
+      var data = await apiFetch('api/posts/' + encodeURIComponent(postId) + '/relations');
+      if (data) relations = { related: Array.isArray(data.related) ? data.related : [], backlinks: Array.isArray(data.backlinks) ? data.backlinks : [] };
+    } catch (e) { /* 网络失败时使用本地推断 */ }
+  }
+  var target = document.querySelector('#postRelations');
+  if (target && target === box) target.innerHTML = renderRelationsHtml(relations);
+}
+
 async function renderPost(id) {
   var cur = currentRoute();
   var html = renderNav(cur.path);
@@ -2180,6 +2320,8 @@ async function renderPost(id) {
     ? '<a class="btn" href="' + esc(href(postUrl(post.id) + 'edit')) + '">' + svgIcon('pen', 13) + ' ' + t('post.edit') + '</a>'
     : '';
   html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + '<button class="btn" id="btnCopyLink">' + svgIcon('link', 14) + ' ' + t('post.copyLink') + '</button></div></div>';
+  // 双向链接与相关文章（静态模式本地计算，云端异步拉取）
+  html += '<div class="relations-slot" id="postRelations"></div>';
 
   // 系列内上一篇 / 下一篇
   if (post.series) {
@@ -2325,6 +2467,8 @@ async function renderPost(id) {
       submit.disabled = false;
     }
   });
+
+  loadPostRelations(post.id);
 }
 
 /* 正文加载失败（网络/超时）时渲染的静态失败页：保留标题，提供手动重试，不再自动循环拉取 */

@@ -2028,6 +2028,7 @@
             '<button class="ab-tool" data-md="ul" title="' + t('admin.editor.list') + '">≡</button>' +
             '<button class="ab-tool" data-md="link" title="' + t('admin.editor.link') + '">' + icon('link', 15) + '</button>' +
             '<button class="ab-tool" data-md="img" title="' + t('admin.editor.image') + '">' + icon('image', 15) + '</button>' +
+            '<button class="ab-tool" data-md="wiki" title="' + t('admin.editor.wiki') + '">[[ ]]</button>' +
             '<button class="ab-tool" id="abSmoji" title="' + t('admin.editor.emoji') + '" aria-label="' + t('admin.editor.emoji') + '">😊</button>' +
           '</div>' +
           '<textarea class="ab-editor-area" id="abBody" placeholder="' + t('admin.editor.writeHint') + '"></textarea>' +
@@ -2141,6 +2142,7 @@
     else if (type === 'ul') { pre = '- '; }
     else if (type === 'link') { rep = '[' + (sel || t('editor.linkBtn')) + '](https://)'; }
     else if (type === 'img') { rep = '![' + (sel || t('editor.imgBtn')) + '](https://)'; }
+    else if (type === 'wiki') { rep = '[[' + (sel || t('admin.editor.wiki')) + ']]'; }
     area.value = v.slice(0, s) + pre + rep + post + v.slice(e);
     area.selectionStart = area.selectionEnd = s + pre.length + rep.length;
   }

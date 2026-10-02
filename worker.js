@@ -7,6 +7,7 @@
  * 部署：npx wrangler deploy
  * ============================================================ */
 import { handleSearch } from './functions/_lib/search.js';
+import { handlePostRelations } from './functions/_lib/relations.js';
 import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
@@ -176,6 +177,10 @@ export default {
     match = url.pathname.match(/^\/api\/posts\/([^/]+)\/stats$/);
     if (match) {
       return handleStats(request, env, decodeURIComponent(match[1]));
+    }
+    match = url.pathname.match(/^\/api\/posts\/([^/]+)\/relations$/);
+    if (match) {
+      return handlePostRelations(request, env, decodeURIComponent(match[1]));
     }
     match = url.pathname.match(/^\/api\/posts\/([^/]+)$/);
     if (match) {

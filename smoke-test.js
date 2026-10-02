@@ -797,6 +797,24 @@ tests.push(['API：文章版本历史与恢复', async () => {
   assert.strictEqual(current.post.ogImage, 'https://example.com/old-og.png', '恢复版本时保留分享图');
 }]);
 
+tests.push(['API：文章双向链接与相关文章推荐', async () => {
+  const { env, token, core } = await authEnv();
+  const authHeaders = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const create = (body) => core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: authHeaders, body: JSON.stringify(body) }), env);
+  await create({ id: 'rel-target', title: '目标文章', date: '2026-04-03', content: '目标正文', tags: ['共享标签'], series: '示例系列' });
+  await create({ id: 'rel-related', title: '相关文章', date: '2026-04-02', content: '共同标签文章', tags: ['共享标签'], series: '示例系列' });
+  await create({ id: 'rel-backlink', title: '引用文章', date: '2026-04-04', content: '参见 [[目标文章]] 的详细说明', tags: ['其他'] });
+  await create({ id: 'rel-markdown', title: 'Markdown 引用', date: '2026-04-01', content: '阅读 [目标文章](/posts/rel-target/) 继续了解', tags: ['其他'] });
+  const relationsLib = await import('./functions/_lib/relations.js');
+  const res = await relationsLib.handlePostRelations(new Request('http://t/api/posts/rel-target/relations'), env, 'rel-target');
+  assert.strictEqual(res.status, 200, '关系接口可访问');
+  const data = await res.json();
+  assert.ok(data.related.some((p) => p.id === 'rel-related'), '共同标签/系列进入相关文章');
+  assert.ok(data.backlinks.some((p) => p.id === 'rel-backlink'), 'Wiki 链接生成反向链接');
+  assert.ok(data.backlinks.some((p) => p.id === 'rel-markdown'), 'Markdown 站内链接生成反向链接');
+}]);
+
+
 tests.push(['备份：创建 R2 备份并登记列表', async () => {
   const { env, token, core } = await authEnv();
   env.R2_ACCESS_KEY_ID = 'test-key';
@@ -1990,6 +2008,26 @@ tests.push(['导航栏搜索：图标点击展开，实时命中并带摘要', a
   // 无关键词返回空
   assert.strictEqual(ctx.globalSearch('', 8).length, 0, '空关键词无结果');
 }]);
+
+tests.push(['双向链接：Wiki 语法解析、反向链接与相关文章', async () => {
+  const posts = [
+    { id: 'rel-target', title: '目标文章', date: '2026-01-03', content: '目标正文', tags: ['共享'], series: '系列', status: 'published' },
+    { id: 'rel-related', title: '相关文章', date: '2026-01-02', content: '共同标签', tags: ['共享'], status: 'published' },
+    { id: 'rel-backlink', title: '引用文章', date: '2026-01-01', content: '参见 [[目标文章]]', tags: ['其他'], status: 'published' },
+    { id: 'rel-markdown', title: 'Markdown 引用', date: '2025-12-31', content: '阅读 [目标文章](/posts/rel-target/)', tags: ['其他'], status: 'published' }
+  ];
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/posts/rel-target/');
+  const wiki = b.ctx.renderMarkdown('参见 [[相关文章|相关]]');
+  assert.ok(wiki.includes('class="wiki-link"') && wiki.includes('/posts/rel-related/'), 'Wiki 链接解析为站内文章链接');
+  assert.ok(b.ctx.renderMarkdown('[[不存在的文章]]').includes('wiki-link missing'), '未知 Wiki 链接显示缺失样式');
+  const rel = b.ctx.getLocalPostRelations('rel-target');
+  assert.ok(rel.related.some((p) => p.id === 'rel-related'), '共同标签文章进入相关推荐');
+  assert.ok(rel.backlinks.some((p) => p.id === 'rel-backlink'), 'Wiki 引用进入反向链接');
+  assert.ok(rel.backlinks.some((p) => p.id === 'rel-markdown'), 'Markdown 站内链接进入反向链接');
+  assert.ok(b.html.includes('id="postRelations"'), '详情页预留双向链接区域');
+  assert.ok(b.ctx.renderRelationsHtml(rel).includes('引用本文'), '双向链接区域包含反向链接标题');
+}]);
+
 
 tests.push(['file:// 本地预览：顶部导航与页脚链接均为 hash 且点击可跳转', async () => {
   // 构造 file:// 环境（本地双击 index.html 直开）

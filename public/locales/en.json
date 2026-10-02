@@ -111,7 +111,7 @@
   "editor.coverPlaceholder": "Cover image URL (optional, thumbnail on list)",
   "editor.pin": "Pin",
   "editor.preview": "Preview",
-  "editor.markdownHint": "Supports Markdown with live preview",
+  "editor.markdownHint": "Markdown with live preview; use [[Post title]] for bidirectional links",
   "editor.writeHint": "Write with Markdown…",
   "editor.cloudPublish": "Publish to Cloud",
   "editor.savePost": "Save Post",
@@ -662,5 +662,8 @@
   "search.results": "{count} results",
   "search.more": "Load more",
   "search.loading": "Searching…",
-  "search.fail": "Search is temporarily unavailable"
+  "search.fail": "Search is temporarily unavailable",
+  "post.related": "Related posts",
+  "post.backlinks": "Linked from",
+  "admin.editor.wiki": "Wiki link"
 }

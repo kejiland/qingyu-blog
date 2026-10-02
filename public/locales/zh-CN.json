@@ -111,7 +111,7 @@
   "editor.coverPlaceholder": "封面图 URL（可选，列表卡片右侧缩略图）",
   "editor.pin": "置顶",
   "editor.preview": "预览",
-  "editor.markdownHint": "支持 Markdown，右侧实时预览",
+  "editor.markdownHint": "支持 Markdown，右侧实时预览；用 [[文章标题]] 建立双向链接",
   "editor.writeHint": "用 Markdown 写作…",
   "editor.cloudPublish": "发布到云端",
   "editor.savePost": "保存文章",
@@ -662,5 +662,8 @@
   "search.results": "找到 {count} 条结果",
   "search.more": "加载更多",
   "search.loading": "正在搜索…",
-  "search.fail": "搜索暂时不可用"
+  "search.fail": "搜索暂时不可用",
+  "post.related": "相关文章",
+  "post.backlinks": "引用本文",
+  "admin.editor.wiki": "双向链接"
 }

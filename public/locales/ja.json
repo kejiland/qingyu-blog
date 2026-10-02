@@ -111,7 +111,7 @@
   "editor.coverPlaceholder": "カバー画像URL（省略可、一覧にサムネイル表示）",
   "editor.pin": "ピン留め",
   "editor.preview": "プレビュー",
-  "editor.markdownHint": "Markdown対応、ライブプレビューあり",
+  "editor.markdownHint": "Markdown対応、右側でプレビュー。[[記事タイトル]] で双方向リンク",
   "editor.writeHint": "Markdownで書く…",
   "editor.cloudPublish": "クラウドに公開",
   "editor.savePost": "記事を保存",
@@ -662,5 +662,8 @@
   "search.results": "{count} 件見つかりました",
   "search.more": "もっと見る",
   "search.loading": "検索中…",
-  "search.fail": "検索を一時的に利用できません"
+  "search.fail": "検索を一時的に利用できません",
+  "post.related": "関連記事",
+  "post.backlinks": "引用元",
+  "admin.editor.wiki": "双方向リンク"
 }

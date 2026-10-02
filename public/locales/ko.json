@@ -111,7 +111,7 @@
   "editor.coverPlaceholder": "커버 이미지 URL (선택 사항, 목록에서 썸네일 표시)",
   "editor.pin": "고정",
   "editor.preview": "미리보기",
-  "editor.markdownHint": "Markdown 지원 및 실시간 미리보기",
+  "editor.markdownHint": "Markdown 지원, 오른쪽 실시간 미리보기. [[글 제목]]으로 양방향 링크",
   "editor.writeHint": "Markdown으로 작성하세요…",
   "editor.cloudPublish": "클라우드에 발행",
   "editor.savePost": "글 저장",
@@ -662,5 +662,8 @@
   "search.results": "{count}개 결과",
   "search.more": "더 보기",
   "search.loading": "검색 중…",
-  "search.fail": "검색을 일시적으로 사용할 수 없습니다"
+  "search.fail": "검색을 일시적으로 사용할 수 없습니다",
+  "post.related": "관련 글",
+  "post.backlinks": "인용한 글",
+  "admin.editor.wiki": "양방향 링크"
 }

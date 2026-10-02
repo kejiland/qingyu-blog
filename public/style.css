@@ -1906,6 +1906,28 @@ kbd {
   white-space: nowrap;
 }
 
+
+/* ---------- 双向链接与相关文章 ---------- */
+.relations-slot:empty { display: none; }
+.relations-box { margin: 24px 0; }
+.relations-section + .relations-section { margin-top: 18px; }
+.relations-title { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; color: var(--muted); font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.related-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.related-card { display: flex; flex-direction: column; gap: 5px; min-width: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--card); box-shadow: var(--shadow); text-decoration: none; transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease; }
+.related-card:hover { border-color: var(--accent); box-shadow: var(--shadow-hover); transform: translateY(-1px); text-decoration: none; }
+.related-card-title { color: var(--fg); font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.related-card-meta { color: var(--muted); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.backlink-list { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: color-mix(in srgb, var(--bg-soft) 58%, transparent); }
+.backlink-item + .backlink-item { border-top: 1px solid var(--border); }
+.backlink-item a { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 9px 13px; text-decoration: none; }
+.backlink-item a:hover { background: var(--card); text-decoration: none; }
+.backlink-title { color: var(--fg); font-size: 13.5px; font-weight: 600; }
+.backlink-date { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.wiki-link { color: var(--accent); font-weight: 600; border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent); text-decoration: none; }
+.wiki-link:hover { border-bottom-color: var(--accent); text-decoration: none; }
+.wiki-link.missing { color: var(--muted); border-bottom: 1px dashed var(--border); font-weight: 400; }
+@media (max-width: 700px) { .related-grid { grid-template-columns: 1fr; } }
+
 /* ---------- 管理员门禁（登录页） ---------- */
 .gate-card {
   max-width: 520px;

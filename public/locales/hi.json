@@ -111,7 +111,7 @@
   "editor.coverPlaceholder": "कवर इमेज URL (वैकल्पिक, सूची में थंबनेल)",
   "editor.pin": "पिन करें",
   "editor.preview": "पूर्वावलोकन",
-  "editor.markdownHint": "लाइव पूर्वावलोकन के साथ Markdown समर्थित",
+  "editor.markdownHint": "Markdown और लाइव प्रीव्यू; [[लेख शीर्षक]] से दो-तरफ़ा लिंक",
   "editor.writeHint": "Markdown में लिखें…",
   "editor.cloudPublish": "क्लाउड पर प्रकाशित करें",
   "editor.savePost": "लेख सहेजें",
@@ -662,5 +662,8 @@
   "search.results": "{count} परिणाम",
   "search.more": "और दिखाएँ",
   "search.loading": "खोजा जा रहा है…",
-  "search.fail": "खोज अभी उपलब्ध नहीं है"
+  "search.fail": "खोज अभी उपलब्ध नहीं है",
+  "post.related": "संबंधित लेख",
+  "post.backlinks": "इनसे लिंक",
+  "admin.editor.wiki": "दो-तरफ़ा लिंक"
 }
