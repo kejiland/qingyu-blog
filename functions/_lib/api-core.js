@@ -417,7 +417,8 @@ export async function handlePostId(request, env, id) {
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
     if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,
-      'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+      'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at',
       ...postToParams(p));
     await recordPostRevision(env, p, 'update').catch(() => {});
     const oldStatus = exist ? normalizePostStatus(exist.status) : '';
@@ -697,14 +698,14 @@ export async function handlePostRevisionRestore(request, env, postId, revisionId
   if (current) await recordPostRevision(env, current, 'update');
   const post = {
     id: postId, title: revision.title, date: revision.date, excerpt: revision.excerpt,
-    content: revision.content, cover: revision.cover, pinned: revision.pinned,
-    protected: revision.protected, enc: revision.enc, tags: revision.tags,
-    cover: revision.cover, ogImage: revision.ogImage,
+    content: revision.content, cover: revision.cover, ogImage: revision.ogImage,
+    pinned: revision.pinned, protected: revision.protected, enc: revision.enc, tags: revision.tags,
     category: revision.category, series: revision.series, seriesOrder: revision.seriesOrder,
     status: revision.status, publishAt: revision.publishAt
   };
   await dbRun(env.DB,
-    'INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,cover,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+    'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+    'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at',
     ...postToParams(post));
   await recordPostRevision(env, post, 'restore');
   await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + postId]);

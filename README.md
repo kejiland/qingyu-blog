@@ -193,7 +193,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | 阅读体验 | 阅读时长估算、浏览数、点赞（含本机去重）、置顶徽章、**复制链接**、返回顶部 |
 | 评论系统 | 云端 D1 全局评论 + 审核模式；**最多 3 层嵌套回复**；孤儿回复自动提升；**删除文章级联清理**评论/点赞/浏览量；**重复发送拦截**（同分区同昵称同内容 409）与频率限制（每 IP 5 条/分钟） |
 | 留言板 | 导航直达 `/guestbook`，「留言 / 优化方案」双分区，云端存储，复用评论安全管道；支持 `Ctrl/⌘ + Enter` 发送 |
-| 站内搜索 | 实时匹配标题 / 标签 / 摘要 / 正文，结果展示**关键字所在完整句子上下文**并**高亮关键字**，无命中给空态提示 |
+| **全文搜索** | 云端基于 D1 FTS5（trigram）索引标题 / 标签 / 摘要 / 正文，支持中英文子串、相关度排序、关键字高亮和“加载更多”分页；短关键词自动回退 LIKE，静态模式仍有本地搜索 |
 | 标签与归档 | 首页标签筛选（`?tag=`，支持回退清除）、标签云（含计数）、归档按「年 → 月」分组 |
 | 精选文章 | 评论区下方自动推荐（**点赞×3 + 浏览×1 + 评论×5**，取前 2 篇，排除当前文章与草稿） |
 | RSS / Sitemap | `/feed.xml`、`/sitemap.xml` 云端动态生成，随文章增删改查自动更新；草稿与加密文章自动排除 |
@@ -201,7 +201,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | 卡片式列表 | 封面缩略图（自动取 cover 或正文首图）、置顶徽章、标签贴底、加载骨架屏、分页（`?page=`） |
 | **深色 / 浅色主题** | 一键切换，跟随系统偏好，无首屏闪白；顶栏会随滚动加深阴影 |
 | **主题色切换** | **4 种强调色**：赭橙（terra）/ 黛蓝（indigo）/ 竹青（bamboo）/ 凝夜紫（dusk）。桌面为图标按钮 + 色板弹层，手机端为原生下拉；每种配色会连带调整背景与边框色 |
-| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 498 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
+| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 664 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
 | **背景动画** | canvas 手绘四季粒子（春日樱花瓣 / 夏日嫩绿叶片 / 秋叶 / 六向分叉雪花），仅首页运行、页面隐藏时暂停；桌面默认开、触屏默认关，顶栏可一键开关，尊重 `prefers-reduced-motion`。预览：`/?season=spring\|summer\|autumn\|winter&bg=1` |
 | **Smoji 表情** | 评论、留言板、编辑器三处都内置表情选择器，按需懒加载，支持正文内联渲染 |
 | **AI 文章摘要** | 文章页一键生成内容摘要（单篇缓存 30 天）；AI 不可用时入口自动隐藏 |
@@ -301,7 +301,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── bg-anim.js / bg-anim.min.js    # 四季 canvas 背景动画
 │   ├── i18n.js / i18n.min.js          # 国际化模块（中/英/日/韩/印地，内置中文兜底）
 │   ├── posts.js / posts.min.js        # 静态模式文章数据（由「导出 posts.js」生成）
-│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 498 键）
+│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 664 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
 │   ├── fonts/dreamserif/              # ⚠️ 历史遗留的本地衬线字体分片（当前版本不再加载，见「已知限制」）
@@ -472,6 +472,7 @@ KV 不是文章存储，而是**限流与去重**设施：
 | `site_settings` | 站点设置 | k, v |
 | `site_files` | 站点产物 | name, content, updated_at |
 | `music` | 音乐元数据 | id, title, artist, url, cover, size, duration, sort, created_at |
+| `posts_fts` | D1 FTS5 全文索引（external-content，自动同步 posts） | id, title, excerpt, content, tags |
 | `schema_migrations` | CI 记账表 | name, applied_at |
 
 `0015_hot_path_indexes.sql` 补充了 5 个热点索引：`idx_comments_post_id`、`idx_comments_status_date`、`idx_music_sort`、`idx_media_created_id`、`idx_admin_sessions_exp`。
@@ -567,7 +568,7 @@ window.BLOG_CONFIG = {
 
 ### 多语言（i18n）
 
-`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **498 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
+`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **664 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
 
 ---
 

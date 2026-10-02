@@ -658,5 +658,9 @@
   "admin.media.pasteUploading": "붙여넣은 이미지 업로드 중…",
   "admin.media.pastedAlt": "붙여넣은 이미지",
   "admin.media.pasteUploaded": "붙여넣은 이미지를 업로드하고 본문에 삽입했습니다",
-  "admin.media.pasteUploadFail": "붙여넣은 이미지 업로드 실패: "
+  "admin.media.pasteUploadFail": "붙여넣은 이미지 업로드 실패: ",
+  "search.results": "{count}개 결과",
+  "search.more": "더 보기",
+  "search.loading": "검색 중…",
+  "search.fail": "검색을 일시적으로 사용할 수 없습니다"
 }

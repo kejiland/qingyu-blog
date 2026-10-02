@@ -658,5 +658,9 @@
   "admin.media.pasteUploading": "Uploading pasted image…",
   "admin.media.pastedAlt": "Pasted image",
   "admin.media.pasteUploaded": "Pasted image uploaded and inserted",
-  "admin.media.pasteUploadFail": "Pasted image upload failed: "
+  "admin.media.pasteUploadFail": "Pasted image upload failed: ",
+  "search.results": "{count} results",
+  "search.more": "Load more",
+  "search.loading": "Searching…",
+  "search.fail": "Search is temporarily unavailable"
 }

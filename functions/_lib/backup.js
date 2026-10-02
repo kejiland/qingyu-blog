@@ -116,6 +116,8 @@ export async function restoreBackup(env, id) {
   const safety = await createBackup(env, 'pre-restore');
   for (const table of DELETE_ORDER) await dbBatch(env.DB, [{ sql: 'DELETE FROM ' + table, params: [] }]);
   for (const table of INSERT_ORDER) await replaceTable(env, table, loaded.data.tables[table] || []);
+  // 恢复完成后重建全文索引，确保 posts_fts 与 posts 完全一致
+  await dbRun(env.DB, "INSERT INTO posts_fts(posts_fts) VALUES ('rebuild')").catch(() => {});
   return { restored: true, safety: safety, counts: loaded.data.counts || {} };
 }
 export async function handleBackups(request, env) {

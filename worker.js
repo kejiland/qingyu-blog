@@ -6,6 +6,7 @@
  *   · 其余请求 → 静态资源（由 wrangler.workers.toml [assets] 绑定提供）
  * 部署：npx wrangler deploy
  * ============================================================ */
+import { handleSearch } from './functions/_lib/search.js';
 import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
@@ -62,6 +63,9 @@ export default {
     const url = new URL(request.url);
 
     // API 路由
+    if (url.pathname === '/api/search') {
+      return handleSearch(request, env);
+    }
     if (url.pathname === '/api/posts') {
       return handlePosts(request, env);
     }

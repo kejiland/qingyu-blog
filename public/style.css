@@ -693,6 +693,12 @@ main { flex: 1 0 auto; width: 100%; padding: 34px 0 60px; }
 .sh-snip { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
 .sh-snip .sh-hl { color: var(--accent); font-weight: 600; background: var(--accent-soft); border-radius: 3px; padding: 0 1px; }
 .search-empty { padding: 16px 18px; color: var(--muted); font-size: 13px; }
+.search-meta { padding: 8px 18px; color: var(--muted); font-size: 12px; border-bottom: 1px solid var(--border); background: color-mix(in srgb, var(--bg-soft) 55%, transparent); }
+.search-more { display: block; width: 100%; padding: 11px 18px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--accent); font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.search-more:hover, .search-more:focus { background: var(--bg-soft); }
+.search-more:disabled { color: var(--muted); cursor: wait; }
+.sh-tags { margin-top: 5px; color: var(--muted); font-size: 11.5px; }
+.sh-tags .sh-hl { color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0 1px; }
 
 /* ============================================================
  * 留言板（Guestbook）

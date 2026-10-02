@@ -772,12 +772,12 @@ tests.push(['API：文章版本历史与恢复', async () => {
   const authHeaders = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   let r = await core.handlePosts(new Request('http://t/api/posts', {
     method: 'POST', headers: authHeaders,
-    body: JSON.stringify({ id: 'rev1', title: '第一版', date: '2026-10-01', content: '旧内容', series: '测试系列', seriesOrder: 1 })
+    body: JSON.stringify({ id: 'rev1', title: '第一版', date: '2026-10-01', content: '旧内容', ogImage: 'https://example.com/old-og.png', series: '测试系列', seriesOrder: 1 })
   }), env);
   assert.strictEqual(r.status, 201);
   r = await core.handlePostId(new Request('http://t/api/posts/rev1', {
     method: 'PUT', headers: authHeaders,
-    body: JSON.stringify({ title: '第二版', date: '2026-10-01', content: '新内容' })
+    body: JSON.stringify({ title: '第二版', date: '2026-10-01', content: '新内容', ogImage: 'https://example.com/new-og.png' })
   }), env, 'rev1');
   assert.strictEqual(r.status, 200);
   const listRes = await core.handlePostRevisions(new Request('http://t/api/posts/rev1/revisions', { headers: authHeaders }), env, 'rev1');
@@ -794,6 +794,7 @@ tests.push(['API：文章版本历史与恢复', async () => {
   assert.strictEqual(current.post.content, '旧内容');
   assert.strictEqual(current.post.series, '测试系列');
   assert.strictEqual(current.post.seriesOrder, 1);
+  assert.strictEqual(current.post.ogImage, 'https://example.com/old-og.png', '恢复版本时保留分享图');
 }]);
 
 tests.push(['备份：创建 R2 备份并登记列表', async () => {

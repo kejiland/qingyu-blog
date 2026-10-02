@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.9.2';
+var BLOG_VERSION = '2.9.3';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -791,16 +791,38 @@ function sortPagePosts(posts) {
 }
 
 /* ---------- 搜索 ---------- */
-function globalSearch(query, limit) {
+function localSearchHits(query) {
   var q = String(query || '').trim().toLowerCase();
   if (!q) return [];
   var posts = sortPagePosts(getPublishedPosts());
   var hits = [];
   posts.forEach(function (p) {
-    var hay = ((p.search || '') + ' ' + (p.title || '') + ' ' + (p.excerpt || '') + ' ' + (p.content || '') + ' ' + (p.tags || []).join(' ')).toLowerCase();
+    var tags = Array.isArray(p.tags) ? p.tags.join(' ') : String(p.tags || '');
+    var hay = ((p.search || '') + ' ' + (p.title || '') + ' ' + (p.excerpt || '') + ' ' + (p.content || '') + ' ' + tags).toLowerCase();
     if (hay.indexOf(q) >= 0) hits.push(p);
   });
-  return hits.slice(0, limit || 8);
+  return hits;
+}
+function globalSearch(query, limit, offset) {
+  var hits = localSearchHits(query);
+  var size = (limit === undefined || limit === null) ? 8 : Math.max(0, Number(limit) || 0);
+  var start = Math.max(0, Number(offset) || 0);
+  return hits.slice(start, start + size);
+}
+function globalSearchTotal(query) {
+  return localSearchHits(query).length;
+}
+function searchLocalPage(query, page) {
+  var size = 10;
+  var p = Math.max(1, Number(page) || 1);
+  var total = globalSearchTotal(query);
+  return {
+    hits: globalSearch(query, size, (p - 1) * size),
+    total: total,
+    page: p,
+    hasMore: p * size < total,
+    engine: 'local'
+  };
 }
 
 var _snipCache = {};
@@ -810,10 +832,13 @@ function searchSnippet(post, query) {
   var cacheKey = (post.id || '') + '|' + q.toLowerCase();
   if (_snipCache[cacheKey] !== undefined) return _snipCache[cacheKey];
   var qLow = q.toLowerCase();
-  var src = stripMd(post.content || '');
-  var idx = src.toLowerCase().indexOf(qLow);
-  if (idx < 0) { src = post.excerpt || ''; idx = src.toLowerCase().indexOf(qLow); }
-  if (idx < 0) { src = post.title || ''; idx = src.toLowerCase().indexOf(qLow); }
+  var fields = [post.snippet || '', post.content || '', post.excerpt || '', post.title || ''];
+  var src = '', idx = -1;
+  for (var i = 0; i < fields.length; i++) {
+    var candidate = stripMd(fields[i] || '');
+    var pos = candidate.toLowerCase().indexOf(qLow);
+    if (pos >= 0) { src = candidate; idx = pos; break; }
+  }
   if (idx < 0) { _snipCache[cacheKey] = ''; return ''; }
   var result = sentenceContext(src, idx, q.length);
   _snipCache[cacheKey] = result;
@@ -860,6 +885,99 @@ function highlightQuery(text, query) {
   var term = esc(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return safe.replace(new RegExp('(' + term + ')', 'gi'), '<mark class="sh-hl">$1</mark>');
 }
+
+/* 搜索分页与结果渲染：云端走 FTS5 API，静态模式走本地索引。 */
+var _searchRequestId = 0;
+var _searchState = null;
+async function fetchCloudSearchPage(query, page) {
+  var data = await apiFetch('api/search?q=' + encodeURIComponent(query) + '&page=' + page + '&pageSize=10');
+  return {
+    hits: Array.isArray(data && data.results) ? data.results : [],
+    total: Number(data && data.total) || 0,
+    page: Number(data && data.page) || page,
+    hasMore: !!(data && data.hasMore),
+    engine: (data && data.engine) || 'fts5'
+  };
+}
+function searchResultHtml(post, query) {
+  var snip = searchSnippet(post, query);
+  var tags = Array.isArray(post.tags) ? post.tags.join(' · ') : String(post.tags || '');
+  var qLow = String(query || '').toLowerCase();
+  var tagLine = tags && tags.toLowerCase().indexOf(qLow) >= 0
+    ? '<div class="sh-tags">' + highlightQuery(tags, query) + '</div>'
+    : '';
+  return '<a class="search-hit" href="' + esc(href(postUrl(post.id))) + '">'
+    + '<div class="sh-title">' + highlightQuery(post.title || '', query) + '</div>'
+    + (snip ? '<div class="sh-snip">' + highlightQuery(snip, query) + '</div>' : '')
+    + tagLine
+    + '</a>';
+}
+function paintSearchResults() {
+  var panel = document.querySelector('#searchPanel');
+  var state = _searchState;
+  if (!panel || !state) return;
+  if (!state.hits.length) {
+    panel.innerHTML = '<div class="search-empty">' + t('search.noMatch') + '</div>';
+  } else {
+    var html = '<div class="search-meta">' + esc(t('search.results', { count: state.total })) + '</div>';
+    html += state.hits.map(function (post) { return searchResultHtml(post, state.q); }).join('');
+    if (state.hasMore) html += '<button type="button" class="search-more" id="searchMore">' + esc(t('search.more')) + '</button>';
+    panel.innerHTML = html;
+    var more = panel.querySelector('#searchMore');
+    if (more) more.addEventListener('click', loadMoreSearchResults);
+  }
+  panel.classList.add('open');
+}
+async function renderSearchPanel(query) {
+  var panel = document.querySelector('#searchPanel');
+  if (!panel) return;
+  var q = String(query || '').trim();
+  if (!q) {
+    _searchRequestId++;
+    _searchState = null;
+    panel.innerHTML = '';
+    panel.classList.remove('open');
+    return;
+  }
+  var requestId = ++_searchRequestId;
+  _searchState = { q: q, hits: [], total: 0, page: 1, hasMore: false, engine: 'local', loading: true };
+  panel.innerHTML = '<div class="search-empty">' + t('search.loading') + '</div>';
+  panel.classList.add('open');
+  var data;
+  try {
+    data = _cloudOn() ? await fetchCloudSearchPage(q, 1) : searchLocalPage(q, 1);
+  } catch (e) {
+    if (requestId !== _searchRequestId) return;
+    data = searchLocalPage(q, 1);
+  }
+  if (requestId !== _searchRequestId) return;
+  _searchState = { q: q, hits: data.hits || [], total: data.total || 0, page: data.page || 1, hasMore: !!data.hasMore, engine: data.engine || 'local', loading: false };
+  paintSearchResults();
+}
+async function loadMoreSearchResults() {
+  var state = _searchState;
+  if (!state || state.loading || !state.hasMore) return;
+  var requestId = _searchRequestId;
+  var nextPage = (state.page || 1) + 1;
+  state.loading = true;
+  var more = document.querySelector('#searchMore');
+  if (more) { more.disabled = true; more.textContent = t('search.loading'); }
+  try {
+    var data = state.engine === 'local' ? searchLocalPage(state.q, nextPage) : await fetchCloudSearchPage(state.q, nextPage);
+    if (requestId !== _searchRequestId || _searchState !== state) return;
+    state.hits = state.hits.concat(data.hits || []);
+    state.total = Number(data.total) || state.total;
+    state.page = Number(data.page) || nextPage;
+    state.hasMore = !!data.hasMore;
+    state.loading = false;
+    paintSearchResults();
+  } catch (e) {
+    if (requestId !== _searchRequestId || _searchState !== state) return;
+    state.loading = false;
+    if (more) { more.disabled = false; more.textContent = t('search.more'); }
+  }
+}
+
 
 
 
@@ -4277,6 +4395,8 @@ function bindSearch() {
     _searchOpen = false;
     var bar = document.querySelector('.topbar');
     if (bar) bar.classList.remove('searching');
+    _searchRequestId++;
+    _searchState = null;
     if (input) input.value = '';
     if (panel) { panel.innerHTML = ''; panel.classList.remove('open'); }
     _snipCache = {};
@@ -4284,6 +4404,7 @@ function bindSearch() {
   if (input) {
     var _searchTimer = null;
     input.addEventListener('input', function () {
+      _searchRequestId++;
       clearTimeout(_searchTimer);
       _searchTimer = setTimeout(function () { renderSearchPanel(input.value); }, 200);
     });
@@ -4309,26 +4430,6 @@ function bindSearch() {
   }
 }
 
-/* 渲染搜索结果下拉面板（跨全部文章，非当前页过滤） */
-function renderSearchPanel(query) {
-  var panel = document.querySelector('#searchPanel');
-  if (!panel) return;
-  var q = String(query || '').trim();
-  if (!q) { panel.innerHTML = ''; panel.classList.remove('open'); return; }
-  var hits = globalSearch(q, 20);
-  if (!hits.length) {
-    panel.innerHTML = '<div class="search-empty">' + t('search.noMatch') + '</div>';
-  } else {
-    panel.innerHTML = hits.map(function (p) {
-      var snip = searchSnippet(p, q);
-      return '<a class="search-hit" href="' + esc(href(postUrl(p.id))) + '">'
-        + '<div class="sh-title">' + highlightQuery(p.title || '', q) + '</div>'
-        + (snip ? '<div class="sh-snip">' + highlightQuery(snip, q) + '</div>' : '')
-        + '</a>';
-    }).join('');
-  }
-  panel.classList.add('open');
-}
 
 /* AdSense 延迟加载：仅在广告位进入视口后才注入广告库，不与首屏渲染/API 抢带宽。
  * 策略：广告位进入视口（提前 150px 预判）后，最早 2.5s、空闲时 3.5s、兜底 5s 才开始加载广告；

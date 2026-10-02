@@ -658,5 +658,9 @@
   "admin.media.pasteUploading": "貼り付けた画像をアップロード中…",
   "admin.media.pastedAlt": "貼り付けた画像",
   "admin.media.pasteUploaded": "貼り付けた画像をアップロードして挿入しました",
-  "admin.media.pasteUploadFail": "貼り付け画像のアップロード失敗："
+  "admin.media.pasteUploadFail": "貼り付け画像のアップロード失敗：",
+  "search.results": "{count} 件見つかりました",
+  "search.more": "もっと見る",
+  "search.loading": "検索中…",
+  "search.fail": "検索を一時的に利用できません"
 }

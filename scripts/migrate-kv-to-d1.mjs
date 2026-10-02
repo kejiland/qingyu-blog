@@ -79,10 +79,10 @@ async function main() {
     const tagsJson = JSON.stringify(tags.filter(Boolean));
     const encJson = protectedPost ? JSON.stringify(p.enc) : null;
     lines.push(
-      `INSERT OR REPLACE INTO posts (id,title,date,excerpt,content,pinned,protected,enc,tags) VALUES (`
+      `INSERT INTO posts (id,title,date,excerpt,content,pinned,protected,enc,tags) VALUES (`
       + `${sqlStr(p.id)},${sqlStr(p.title)},${sqlStr(p.date)},${sqlStr(p.excerpt)},`
       + `${sqlStr(protectedPost ? '' : (p.content || ''))},${p.pinned ? 1 : 0},${protectedPost ? 1 : 0},`
-      + `${sqlStr(encJson)},${sqlStr(tagsJson)});`
+      + `${sqlStr(encJson)},${sqlStr(tagsJson)}) ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags;`
     );
   }
 

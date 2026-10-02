@@ -87,5 +87,85 @@ ok('超长片段含关键字', snip3.indexOf('目标词') >= 0);
 ok('超长片段被裁剪（远小于原文长度）', snip3.length < longContent.length);
 ok('超长片段前后有省略号', snip3.indexOf('…') >= 0);
 
-console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
-process.exit(fail > 0 ? 1 : 0);
+// ---- 7. 云端 API：D1 FTS5 / 短词回退 / 分页 / 权限边界 ----
+async function verifyCloudSearch() {
+  let sqlite;
+  try { sqlite = require('node:sqlite'); } catch (e) {
+    ok('D1 FTS5 集成（Node <22 跳过）', true);
+    return;
+  }
+  const { handleSearch } = await import('./functions/_lib/search.js');
+  const db = new sqlite.DatabaseSync(':memory:');
+  db.exec(`
+    CREATE TABLE posts (
+      id TEXT PRIMARY KEY, title TEXT NOT NULL, date TEXT DEFAULT '', excerpt TEXT DEFAULT '',
+      content TEXT DEFAULT '', cover TEXT DEFAULT '', og_image TEXT DEFAULT '', pinned INTEGER DEFAULT 0,
+      protected INTEGER DEFAULT 0, tags TEXT, category TEXT DEFAULT '', series TEXT DEFAULT '',
+      series_order INTEGER DEFAULT 0, status TEXT DEFAULT 'published', publish_at INTEGER
+    );
+  `);
+  db.exec(fs.readFileSync(path.join(dir, 'migrations', '0023_post_fts.sql'), 'utf8'));
+  const insert = db.prepare('INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  insert.run('fts-a', '云存储入门', '2026-01-03', '第一篇摘要', '正文介绍云存储和全文搜索功能', '', '', 0, 0, '["技术","存储"]', '', '', 0, 'published', null);
+  insert.run('fts-b', '备份指南', '2026-01-02', '第二篇摘要', '云存储备份与恢复实践', '', '', 1, 0, '["备份"]', '', '', 1, 'published', null);
+  insert.run('fts-draft', '草稿', '2026-01-01', '草稿摘要', '云存储草稿正文', '', '', 0, 0, '[]', '', '', 0, 'draft', null);
+  insert.run('fts-lock', '加密', '2026-01-01', '加密摘要', '云存储加密正文', '', '', 0, 1, '[]', '', '', 0, 'published', null);
+  function d1Adapter(sqliteDb) {
+    return {
+      prepare(sql) {
+        const stmt = sqliteDb.prepare(sql);
+        let params = [];
+        return {
+          bind(...args) { params = args; return this; },
+          all() { return { results: stmt.all(...params) }; },
+          first() { return stmt.get(...params) || null; },
+          run() { stmt.run(...params); return { success: true }; }
+        };
+      }
+    };
+  }
+  const env = { DB: d1Adapter(db) };
+  const search = async (query) => {
+    const res = await handleSearch(new Request('https://t/api/search?' + query), env);
+    return { status: res.status, data: await res.json() };
+  };
+
+  const first = await search('q=' + encodeURIComponent('云存储') + '&page=1&pageSize=1');
+  ok('FTS5：中文三字查询命中', first.status === 200 && first.data.engine === 'fts5');
+  ok('FTS5：只返回已发布且未加密文章', first.data.total === 2 && first.data.results.length === 1);
+  ok('FTS5：分页返回 hasMore', first.data.hasMore === true);
+  ok('FTS5：返回搜索片段', (first.data.results[0].snippet || '').includes('云存储'));
+
+  const second = await search('q=' + encodeURIComponent('云存储') + '&page=2&pageSize=1');
+  ok('FTS5：第二页结果正确', second.status === 200 && second.data.page === 2 && second.data.results.length === 1 && !second.data.hasMore);
+
+  const short = await search('q=' + encodeURIComponent('搜索') + '&page=1&pageSize=10');
+  ok('短词：自动回退 LIKE', short.status === 200 && short.data.engine === 'like');
+  ok('短词：正文命中', short.data.total >= 1 && short.data.results.some((item) => item.id === 'fts-a'));
+
+  const tag = await search('q=' + encodeURIComponent('技术') + '&page=1&pageSize=10');
+  ok('标签：可被全文搜索命中', tag.status === 200 && tag.data.results.some((item) => item.id === 'fts-a'));
+
+  const injected = await search('q=' + encodeURIComponent('云存储" OR *') + '&page=1&pageSize=10');
+  ok('FTS 查询语法注入不报错', injected.status === 200);
+
+  const upsert = db.prepare(`
+    INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,tags,category,series,series_order,status,publish_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(id) DO UPDATE SET title=excluded.title,excerpt=excluded.excerpt,content=excluded.content,tags=excluded.tags
+  `);
+  upsert.run('fts-a', '云存储进阶', '2026-01-04', '更新摘要', '更新后的全新文案', '', '', 0, 0, '["技术"]', '', '', 0, 'published', null);
+  const updated = await search('q=' + encodeURIComponent('全新文案') + '&page=1&pageSize=10');
+  const stale = await search('q=' + encodeURIComponent('全文搜索') + '&page=1&pageSize=10');
+  ok('文章更新后新关键词立即命中', updated.data.results.some((item) => item.id === 'fts-a'));
+  ok('文章更新后旧关键词不再残留', !stale.data.results.some((item) => item.id === 'fts-a'));
+
+  db.prepare('DELETE FROM posts WHERE id = ?').run('fts-a');
+  const removed = await search('q=' + encodeURIComponent('全新文案') + '&page=1&pageSize=10');
+  ok('删除文章后全文索引同步清理', !removed.data.results.some((item) => item.id === 'fts-a'));
+}
+
+verifyCloudSearch().then(function () {
+  console.log('\n结果: ' + pass + ' 通过, ' + fail + ' 失败');
+  process.exit(fail > 0 ? 1 : 0);
+});

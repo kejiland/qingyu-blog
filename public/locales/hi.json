@@ -658,5 +658,9 @@
   "admin.media.pasteUploading": "पेस्ट की गई छवि अपलोड हो रही है…",
   "admin.media.pastedAlt": "पेस्ट की गई छवि",
   "admin.media.pasteUploaded": "पेस्ट की गई छवि अपलोड और सम्मिलित हो गई",
-  "admin.media.pasteUploadFail": "पेस्ट छवि अपलोड विफल: "
+  "admin.media.pasteUploadFail": "पेस्ट छवि अपलोड विफल: ",
+  "search.results": "{count} परिणाम",
+  "search.more": "और दिखाएँ",
+  "search.loading": "खोजा जा रहा है…",
+  "search.fail": "खोज अभी उपलब्ध नहीं है"
 }

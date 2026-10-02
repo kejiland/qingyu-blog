@@ -658,5 +658,9 @@
   "admin.media.pasteUploading": "正在上传粘贴的图片…",
   "admin.media.pastedAlt": "粘贴的图片",
   "admin.media.pasteUploaded": "粘贴图片已上传并插入正文",
-  "admin.media.pasteUploadFail": "粘贴图片上传失败："
+  "admin.media.pasteUploadFail": "粘贴图片上传失败：",
+  "search.results": "找到 {count} 条结果",
+  "search.more": "加载更多",
+  "search.loading": "正在搜索…",
+  "search.fail": "搜索暂时不可用"
 }
