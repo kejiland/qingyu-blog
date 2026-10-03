@@ -2148,6 +2148,17 @@ tests.push(['路由：未知路径返回 404、已知路由仍 200', async () =>
   assert.ok(src.includes('archive|tags|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
 }]);
 
+tests.push(['音乐接口：Workers 与 Pages 双形态均可用', async () => {
+  const files = ['functions/api/music.js', 'functions/api/music/upload-url.js', 'functions/api/music/[id].js'];
+  for (const f of files) {
+    assert.ok(fs.existsSync(path.join(dir, f)), '存在 ' + f);
+    const src = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.ok(src.includes("from '../_lib/music.js'") || src.includes("from '../../_lib/music.js'"), f + ' 复用共享处理器');
+  }
+  const cap = fs.readFileSync(path.join(dir, 'functions/api/[[path]].js'), 'utf8');
+  assert.ok(cap.includes('api\\/music'), 'catch-all 白名单已登记音乐路由');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');
