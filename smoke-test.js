@@ -2022,6 +2022,13 @@ tests.push(['正文划线高亮：存储接口与渲染函数已接入', async (
   assert.strictEqual(typeof ctx.clearHighlights, 'function', '高亮清除函数');
 }]);
 
+tests.push(['高亮导出 / 导入 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  assert.ok(src.includes('btnHlExport'), '导出按钮');
+  assert.ok(src.includes('btnHlImport'), '导入按钮');
+  assert.ok(src.includes('post.hlImported'), '导入结果提示');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

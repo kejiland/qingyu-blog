@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.23';
+var BLOG_VERSION = '2.10.24';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2922,6 +2922,43 @@ async function renderPost(id) {
       clearBtn.type = 'button'; clearBtn.className = 'rt-btn'; clearBtn.id = 'btnClearHl';
       clearBtn.textContent = t('post.clearHl');
       tools.appendChild(clearBtn);
+      // 高亮导出 / 导入（JSON，便于跨设备迁移）
+      var expBtn = document.createElement('button');
+      expBtn.type = 'button'; expBtn.className = 'rt-btn'; expBtn.id = 'btnHlExport';
+      expBtn.textContent = t('post.hlExport');
+      expBtn.addEventListener('click', function () {
+        try {
+          var data = { v: 1, post: post.id, at: Date.now(), items: hlList(post.id) };
+          transferDownloadText('highlights-' + post.id + '.json', JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
+        } catch (e) { toast(t('post.hlImportFail'), 'err'); }
+      });
+      tools.appendChild(expBtn);
+      var impBtn = document.createElement('button');
+      impBtn.type = 'button'; impBtn.className = 'rt-btn'; impBtn.id = 'btnHlImport';
+      impBtn.textContent = t('post.hlImport');
+      var impFile = document.createElement('input');
+      impFile.type = 'file'; impFile.accept = '.json,application/json'; impFile.hidden = true;
+      impBtn.addEventListener('click', function () { impFile.click(); });
+      impFile.addEventListener('change', function () {
+        var f = impFile.files && impFile.files[0];
+        if (!f || !f.text) return;
+        f.text().then(function (txt) {
+          var parsed = null;
+          try { parsed = JSON.parse(txt); } catch (e) { parsed = null; }
+          var items = parsed && Array.isArray(parsed.items) ? parsed.items : (Array.isArray(parsed) ? parsed : null);
+          if (!items) { toast(t('post.hlImportFail'), 'err'); return; }
+          var cur = hlList(post.id);
+          var added = 0;
+          items.map(hlNorm).filter(Boolean).forEach(function (it) {
+            if (!cur.some(function (x) { return x.t === it.t; })) { cur.push(it); added++; }
+          });
+          hlSave(post.id, cur);
+          applyHighlights(article, cur);
+          toast(t('post.hlImported', { n: added }), 'ok');
+        }).catch(function () { toast(t('post.hlImportFail'), 'err'); });
+      });
+      tools.appendChild(impBtn);
+      if (document.body && document.body.appendChild) document.body.appendChild(impFile);
     }
     var panel = document.createElement('div');
     panel.className = 'hl-panel'; panel.id = 'hlPanel'; panel.hidden = true;
