@@ -968,6 +968,7 @@
         '<div class="ab-card"><div class="ab-section-title">' + icon('eye', 16) + ' ' + t('admin.dashboard.visitTrend') + '</div><div id="abTrendViews"></div></div>' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.commentTrend') + '</div><div id="abTrendCmt"></div></div>' +
       '</div>' +
+      '<div class="ab-card" id="abStorageCard"><div class="ab-section-title">' + icon('cloud', 16) + ' ' + t('admin.dashboard.storageTitle') + '</div><div id="abStorageBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>' +
       '<div class="ab-grid cols-2">' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('doc', 16) + ' ' + t('admin.dashboard.latestPosts') + '</div><div class="ab-feed" id="abRecentPosts"></div></div>' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.latestComments') + '</div><div class="ab-feed" id="abRecentCmt"></div></div>' +
@@ -1040,6 +1041,35 @@
       content.querySelector('#abTrendViews').innerHTML = '<div class="ab-empty"><p>' + t('admin.dashboard.cloudOnly') + '</p></div>';
       content.querySelector('#abTrendCmt').innerHTML = '<div class="ab-empty"><p>' + t('admin.dashboard.cloudOnly') + '</p></div>';
     }
+
+    loadStorageOverview(content);
+  }
+
+  /** 存储与订阅概览：媒体占用 / 音乐 / 订阅者 / 备份（异步加载，不阻塞首屏） */
+  async function loadStorageOverview(content) {
+    var box = content.querySelector('#abStorageBody');
+    if (!box) return;
+    if (!cloudOn()) {
+      box.innerHTML = '<div class="ab-empty"><p>' + t('admin.dashboard.cloudOnly') + '</p></div>';
+      return;
+    }
+    var media = [], music = [], subs = { total: 0, active: 0 }, backups = [];
+    await Promise.all([
+      api('api/media').then(function (d) { media = (d && d.media) || []; }).catch(function () {}),
+      api('api/music').then(function (d) { music = (d && d.music) || []; }).catch(function () {}),
+      api('api/admin/subscribers').then(function (d) { subs = (d && d.counts) || subs; }).catch(function () {}),
+      api('api/admin/backups').then(function (d) { backups = (d && d.backups) || []; }).catch(function () {})
+    ]);
+    var mediaSize = media.reduce(function (n, m) { return n + (Number(m.size) || 0); }, 0);
+    var items = [
+      { label: t('admin.dashboard.sMedia'), value: media.length, sub: fmtSize(mediaSize), icon: 'image' },
+      { label: t('admin.dashboard.sMusic'), value: music.length, sub: '', icon: 'music' },
+      { label: t('admin.dashboard.sSubs'), value: subs.total || 0, sub: t('admin.dashboard.sActive', { n: subs.active || 0 }), icon: 'send' },
+      { label: t('admin.dashboard.sBackups'), value: backups.length, sub: backups.length ? t('admin.dashboard.sLatest', { time: fmtTimestamp(backups[0].createdAt) }) : '', icon: 'save' }
+    ];
+    box.innerHTML = '<div class="ab-grid cols-4" style="margin:0">' + items.map(function (x) {
+      return '<div class="ab-card ab-stat" style="margin:0"><div class="ab-stat-label">' + icon(x.icon, 16) + esc(x.label) + '</div><div class="ab-stat-value">' + esc(String(x.value)) + '</div>' + (x.sub ? '<div class="ab-muted" style="font-size:12px">' + esc(x.sub) + '</div>' : '') + '</div>';
+    }).join('') + '</div>';
   }
 
   var _chartData = {}; // metric → days[]，供交互浮层读取

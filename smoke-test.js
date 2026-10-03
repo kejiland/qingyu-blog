@@ -1957,6 +1957,14 @@ tests.push(['后台备份：列表分页与内容摘要 已接入', async () => 
   assert.ok(src.includes('admin.backup.total'), '总数文案');
 }]);
 
+tests.push(['后台仪表盘：存储与订阅概览卡片 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abStorageCard'), '概览卡片容器');
+  assert.ok(src.includes('loadStorageOverview'), '概览加载函数');
+  assert.ok(src.includes('admin.dashboard.sMedia') && src.includes('admin.dashboard.sBackups'), '概览指标文案');
+  assert.ok(src.includes("api('api/admin/subscribers')") && src.includes("api('api/admin/backups')"), '数据来源');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
