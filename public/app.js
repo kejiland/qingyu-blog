@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.21';
+var BLOG_VERSION = '2.10.22';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -695,6 +695,56 @@ function updateReadingProgress() {
   var progress = height <= viewport ? (scrollY >= top ? 1 : 0) : (scrollY - top) / (end - top);
   progress = Math.max(0, Math.min(1, progress));
   bar.style.transform = 'scaleX(' + progress + ')';
+}
+
+/* ---------- 正文划线高亮（本机保存，按文章独立） ---------- */
+var HL_KEY = 'qingyu.highlights';
+function hlStore() {
+  try { return JSON.parse(localStorage.getItem(HL_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function hlList(id) {
+  var all = hlStore();
+  return Array.isArray(all[id]) ? all[id] : [];
+}
+function hlSave(id, list) {
+  try {
+    var all = hlStore();
+    if (list && list.length) all[id] = list; else delete all[id];
+    localStorage.setItem(HL_KEY, JSON.stringify(all));
+  } catch (e) {}
+}
+function applyHighlights(root, list) {
+  if (!root || !list || !list.length || !document.createTreeWalker) return;
+  list.forEach(function (text) {
+    if (!text) return;
+    var walker = document.createTreeWalker(root, 3, null);
+    var node;
+    while ((node = walker.nextNode())) {
+      var parent = node.parentNode;
+      if (parent && parent.classList && parent.classList.contains('hl')) continue;
+      var idx = String(node.nodeValue || '').indexOf(text);
+      if (idx < 0) continue;
+      var range = document.createRange();
+      try {
+        range.setStart(node, idx);
+        range.setEnd(node, idx + text.length);
+        var mark = document.createElement('mark');
+        mark.className = 'hl';
+        range.surroundContents(mark);
+      } catch (e) {}
+      break;
+    }
+  });
+}
+function clearHighlights(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('mark.hl').forEach(function (m) {
+    var parent = m.parentNode;
+    if (!parent) return;
+    while (m.firstChild) parent.insertBefore(m.firstChild, m);
+    parent.removeChild(m);
+    if (parent.normalize) parent.normalize();
+  });
 }
 
 /* ---------- 阅读位置记忆（每篇文章各自记忆，最多保留 50 篇 / 30 天） ---------- */
@@ -2845,6 +2895,61 @@ async function renderPost(id) {
     if (tocClose) tocClose.addEventListener('click', closeTocSheet);
     tocSheet.querySelectorAll('a[data-toc]').forEach(function (a) { a.addEventListener('click', closeTocSheet); });
   }
+
+  // 划线高亮：恢复历史高亮，选中正文后浮出「高亮」按钮（按钮动态创建，避免改动渲染模板）
+  (function initHighlight() {
+    var article = document.querySelector('.article');
+    if (!article || !document.createElement) return;
+    applyHighlights(article, hlList(post.id));
+
+    var tools = document.querySelector('.reading-tools');
+    var clearBtn = null;
+    if (tools && tools.appendChild) {
+      clearBtn = document.createElement('button');
+      clearBtn.type = 'button';
+      clearBtn.className = 'rt-btn';
+      clearBtn.id = 'btnClearHl';
+      clearBtn.textContent = t('post.clearHl');
+      tools.appendChild(clearBtn);
+    }
+    var bar = document.createElement('button');
+    bar.type = 'button';
+    bar.className = 'hl-btn';
+    bar.id = 'hlBar';
+    bar.hidden = true;
+    bar.textContent = t('post.highlight');
+    if (document.body && document.body.appendChild) document.body.appendChild(bar);
+
+    function hideHlBar() { bar.hidden = true; bar.removeAttribute('data-text'); }
+    bar.addEventListener('click', function () {
+      var text = bar.getAttribute('data-text') || '';
+      if (!text) return;
+      var cur = hlList(post.id);
+      if (cur.indexOf(text) < 0) { cur.push(text); hlSave(post.id, cur); }
+      applyHighlights(article, [text]);
+      hideHlBar();
+      toast(t('post.highlighted'), 'ok');
+    });
+    if (clearBtn) clearBtn.addEventListener('click', function () {
+      clearHighlights(article);
+      hlSave(post.id, []);
+      toast(t('post.hlCleared'), 'ok');
+    });
+    if (article.addEventListener) article.addEventListener('mouseup', function () {
+      setTimeout(function () {
+        var sel = window.getSelection ? window.getSelection() : null;
+        var text = sel ? String(sel).trim() : '';
+        if (!sel || !sel.rangeCount || text.length < 2 || text.length > 200) { hideHlBar(); return; }
+        var r = sel.getRangeAt(0);
+        var rect = r.getBoundingClientRect ? r.getBoundingClientRect() : null;
+        if (!rect || (!rect.width && !rect.height)) { hideHlBar(); return; }
+        bar.hidden = false;
+        bar.style.top = Math.max(8, rect.top - 44) + 'px';
+        bar.style.left = Math.max(8, rect.left + rect.width / 2 - 40) + 'px';
+        bar.setAttribute('data-text', text);
+      }, 10);
+    });
+  })();
 
   // 阅读位置记忆：先恢复上次位置，滚动过程中持续记录
   _readPosCurrent = post.id;

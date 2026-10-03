@@ -2011,6 +2011,16 @@ tests.push(['阅读位置记忆：保存 / 读取 / 清理', async () => {
   assert.ok(d.ctx.getReadPos('markdown-cheatsheet') >= 0, '文章页已接入位置记忆');
 }]);
 
+tests.push(['正文划线高亮：存储接口与渲染函数已接入', async () => {
+  const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  ctx.hlSave('p1', ['句子一']);
+  assert.strictEqual(JSON.stringify(ctx.hlList('p1')), JSON.stringify(['句子一']), '高亮可保存与读回');
+  ctx.hlSave('p1', []);
+  assert.strictEqual(JSON.stringify(ctx.hlList('p1')), '[]', '可清空');
+  assert.strictEqual(typeof ctx.applyHighlights, 'function', '高亮渲染函数');
+  assert.strictEqual(typeof ctx.clearHighlights, 'function', '高亮清除函数');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

@@ -3201,3 +3201,9 @@ html[data-theme="dark"] body.scrolled .topbar {
 .toc-sheet-list a { display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: 14px; }
 .toc-sheet-list a:hover, .toc-sheet-list a.active { color: var(--accent); background: var(--accent-soft, rgba(0,0,0,.05)); }
 @media (max-width: 991px) { .toc-fab { display: flex; } }
+
+/* 正文划线高亮 */
+.article mark.hl { background: color-mix(in srgb, var(--accent) 30%, transparent); color: inherit; border-radius: 3px; padding: 0 1px; }
+.hl-btn { position: fixed; z-index: 80; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface, var(--bg, #fff)); color: var(--text, inherit); font-size: 13px; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,.16); font-family: inherit; }
+.hl-btn:hover { color: var(--accent); border-color: var(--accent); }
+.hl-btn[hidden] { display: none; }
