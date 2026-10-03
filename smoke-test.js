@@ -695,8 +695,16 @@ function makeD1() {
     /* admin_auth */
     if (s === "SELECT * FROM admin_auth WHERE k = ?") return t.admin_auth.get(params[0]) || null;
     if (/^INSERT INTO admin_auth/.test(s)) {
-      const [k, salt, hash, iter] = params;
-      t.admin_auth.set(k, { k, salt, hash, iter }); return { success: true };
+      const [k, salt, hash, iter, must_change] = params;
+      const prev = t.admin_auth.get(k) || {};
+      const row = Object.assign({}, prev, { k, salt, hash, iter });
+      if (params.length > 4) row.must_change = must_change;
+      t.admin_auth.set(k, row); return { success: true };
+    }
+    if (s === 'UPDATE admin_auth SET must_change = 0 WHERE k = ?') {
+      const row = t.admin_auth.get(params[0]);
+      if (row) row.must_change = 0;
+      return { success: true };
     }
     /* admin_sessions */
     if (s === 'SELECT * FROM admin_sessions WHERE token = ?') return t.admin_sessions.get(params[0]) || null;
@@ -705,6 +713,7 @@ function makeD1() {
       t.admin_sessions.set(token, { token, exp }); return { success: true };
     }
     if (s === 'DELETE FROM admin_sessions WHERE token = ?') { t.admin_sessions.delete(params[0]); return { success: true }; }
+    if (s === 'DELETE FROM admin_sessions') { t.admin_sessions.clear(); return { success: true }; }
     /* admin_fails */
     if (s === 'SELECT * FROM admin_fails WHERE ip = ?') return t.admin_fails.get(params[0]) || null;
     if (/^INSERT INTO admin_fails/.test(s)) {
@@ -1294,6 +1303,65 @@ tests.push(['管理员认证：首次设置 / 密码验证 / 限流 429', async 
     body: JSON.stringify({ id: 't3', title: 'y' })
   }), env);
   assert.strictEqual(r.status, 401, '登出后 token 失效');
+}]);
+
+tests.push(['强制改密：mustChange 会话仅允许改密，完成后旧会话失效', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+
+  // 未配置安装密钥时，首次登录自动初始化随机默认密码。
+  let r = await core.handleAdminLogin(new Request('http://t/api/admin/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: 'anything' })
+  }), env);
+  assert.strictEqual(r.status, 200, '自动初始化登录成功');
+  const login = await r.json();
+  assert.strictEqual(login.mustChange, true, '自动初始化返回 mustChange=true');
+  assert.ok(login.defaultPassword && login.token, '返回默认密码与会话 token');
+
+  const bearer = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + login.token };
+  r = await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: bearer,
+    body: JSON.stringify({ id: 'force-1', title: '应被拦截' })
+  }), env);
+  assert.strictEqual(r.status, 403, '未改密时写操作 403');
+  const blocked = await r.json();
+  assert.strictEqual(blocked.code, 'PASSWORD_CHANGE_REQUIRED', '返回强制改密错误码');
+
+  // 改密接口本身仍可用，但必须校验当前密码。
+  r = await core.handleAdminPassword(new Request('http://t/api/admin/password', {
+    method: 'POST', headers: bearer,
+    body: JSON.stringify({ current: 'wrong-pass', password: 'new-strong-pass' })
+  }), env);
+  assert.strictEqual(r.status, 401, '当前密码错误 401');
+
+  r = await core.handleAdminPassword(new Request('http://t/api/admin/password', {
+    method: 'POST', headers: bearer,
+    body: JSON.stringify({ current: login.defaultPassword, password: 'new-strong-pass' })
+  }), env);
+  assert.strictEqual(r.status, 200, '使用默认密码完成强制改密');
+  assert.strictEqual(env._d1.admin_auth.get('auth').must_change, 0, 'must_change 已清零');
+
+  // 改密成功后所有旧 token 被撤销。
+  r = await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST', headers: bearer,
+    body: JSON.stringify({ id: 'force-2', title: '旧会话应失效' })
+  }), env);
+  assert.strictEqual(r.status, 401, '旧会话已失效');
+
+  r = await core.handleAdminLogin(new Request('http://t/api/admin/login', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password: 'new-strong-pass' })
+  }), env);
+  assert.strictEqual(r.status, 200, '新密码可登录');
+  const relogin = await r.json();
+  assert.strictEqual(relogin.mustChange, false, '新会话不再要求改密');
+  r = await core.handlePosts(new Request('http://t/api/posts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + relogin.token },
+    body: JSON.stringify({ id: 'force-3', title: '改密后可写' })
+  }), env);
+  assert.strictEqual(r.status, 201, '完成强制改密后可正常写操作');
 }]);
 
 tests.push(['安全加固：媒体 URL 白名单 / clientIp 忽略伪造 XFF / 响应携带安全头', async () => {

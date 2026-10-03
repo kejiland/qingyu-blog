@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.27';
+var BLOG_VERSION = '2.10.28';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1035,15 +1035,20 @@ async function apiFetch(url, opts) {
     // 优先透传后端返回的 error 文案（如「请勿重复发送相同内容」「评论太频繁」），
     // 便于用户直接理解失败原因；解析失败再退回 HTTP 状态码。
     var msg = 'HTTP ' + res.status;
+    var payload = null;
     try {
-      var j = await res.json();
-      if (j && j.error) msg = String(j.error);
+      payload = await res.json();
+      if (payload && payload.error) msg = String(payload.error);
     } catch (e) { /* 非 JSON 响应体，保留状态码提示 */ }
     var e401 = new Error(msg);
     e401.status = res.status;
-    // 全局会话失效处理：401 且非登录/首次设密端点 → 自动退出登录状态。
-    // 抛给调用方的同时派发事件，让当前 SPA（后台/前台编辑器）主动跳转或提示。
-    if (res.status === 401 && !/api\/admin\/(login|setup)/.test(String(url))) {
+    e401.code = (payload && payload.code) || '';
+    // 强制改密：保留当前会话，由后台展示不可跳过的改密界面。
+    if (res.status === 403 && e401.code === 'PASSWORD_CHANGE_REQUIRED') {
+      _setMustChange(true);
+      try { window.dispatchEvent(new CustomEvent('qy:password-change-required')); } catch (e2) { /* 无 CustomEvent 环境忽略 */ }
+    } else if (res.status === 401 && !/api\/admin\/(login|setup|password)/.test(String(url))) {
+      // 401 = 会话过期/清除；改密接口的 401 是「当前密码错误」，不能误退登录。
       handleSessionExpired(e401);
     }
     throw e401;
@@ -1057,6 +1062,8 @@ function handleSessionExpired(err) {
   var had = !!_sessionToken();
   _setSessionToken('');
   _setAdminSession(false);
+  _setMustChange(false);
+  _setInitialAdminPwd('');
   if (!had) return;
   try {
     window.dispatchEvent(new CustomEvent('qy:session-expired', { detail: (err && err.status) || 401 }));
@@ -1568,6 +1575,17 @@ function _localPwd() { try { return localStorage.getItem('qingyu.admin.pwd') || 
 function _setLocalPwd(v) { try { localStorage.setItem('qingyu.admin.pwd', String(v)); } catch (e) {} }
 function _adminSession() { try { return localStorage.getItem('qingyu.admin.ok') === '1'; } catch (e) { return false; } }
 function _setAdminSession(v) { try { localStorage.setItem('qingyu.admin.ok', v ? '1' : '0'); } catch (e) {} }
+function _mustChangeRequired() { try { return localStorage.getItem('qingyu.admin.mustChange') === '1'; } catch (e) { return false; } }
+function _setMustChange(v) {
+  try { if (v) localStorage.setItem('qingyu.admin.mustChange', '1'); else localStorage.removeItem('qingyu.admin.mustChange'); } catch (e) {}
+}
+function _initialAdminPwd() { try { return sessionStorage.getItem('qingyu.admin.initialPwd') || ''; } catch (e) { return ''; } }
+function _setInitialAdminPwd(v) {
+  try { if (v) sessionStorage.setItem('qingyu.admin.initialPwd', String(v)); else sessionStorage.removeItem('qingyu.admin.initialPwd'); } catch (e) {}
+}
+window._mustChangeRequired = _mustChangeRequired;
+window._setMustChange = _setMustChange;
+window._initialAdminPwd = _initialAdminPwd;
 /** 简单 SHA-256 哈希（前端 PBKDF2 不需要，用轻量版即可） */
 async function _hashLocalPwd(pwd) {
   var enc = new TextEncoder();
@@ -1635,6 +1653,8 @@ async function cloudLogin(pwd, setupKey) {
     if (!data || !data.token) return { ok: false, status: 0, message: (data && data.error) || t('admin.loginFail') };
     _setSessionToken(data.token);
     _setAdminSession(true);
+    _setMustChange(!!data.mustChange);
+    if (data.mustChange && data.defaultPassword) _setInitialAdminPwd(data.defaultPassword);
     return { ok: true, mustChange: !!data.mustChange, defaultPassword: data.defaultPassword || '' };
   } catch (e) {
     var status = (e && e.status) || 0;
@@ -1650,6 +1670,8 @@ async function cloudLogout() {
   var t = _sessionToken();
   _setSessionToken('');
   _setAdminSession(false);
+  _setMustChange(false);
+  _setInitialAdminPwd('');
   if (_cloudOn() && t) {
     try { await apiFetch('api/admin/logout', { method: 'POST', body: '{}' }); } catch (e) {}
   }
@@ -1677,7 +1699,7 @@ function adminLogout() {
 
 /**
  * 首次登录默认密码提示：模态框化、不会自动消失，确保随机默认密码清晰可读、可复制，
- * 避免以前“闪现一下看不清”的问题。用户可选择立刻改密或暂不改密进入后台。
+ * 避免以前“闪现一下看不清”的问题。用户必须先记下默认密码，再进入强制改密页。
  */
 function showFirstLoginPwd(defaultPassword) {
   var pwd = String(defaultPassword || '');
@@ -1688,7 +1710,6 @@ function showFirstLoginPwd(defaultPassword) {
   mask.className = 'flp-mask';
   mask.innerHTML =
     '<div class="flp-modal">'
-    + '<button class="flp-close" data-act="close" aria-label="关闭">✕</button>'
     + '<div class="flp-icon">' + svgIcon('lock', 26) + '</div>'
     + '<h3 class="flp-title">' + t('admin.firstLoginTitle') + '</h3>'
     + '<p class="flp-desc">' + t('admin.firstLoginDesc') + '</p>'
@@ -1698,7 +1719,6 @@ function showFirstLoginPwd(defaultPassword) {
       : '')
     + '<p class="flp-warn">' + t('admin.firstLoginWarn') + '</p>'
     + '<div class="flp-actions">'
-    + '<button class="flp-btn ghost" data-act="later">' + t('admin.firstLoginLater') + '</button>'
     + '<button class="flp-btn primary" data-act="change">' + t('admin.firstLoginChange') + '</button>'
     + '</div></div>';
   document.body.appendChild(mask);
@@ -1725,14 +1745,13 @@ function showFirstLoginPwd(defaultPassword) {
     setTimeout(function () { if (mask.parentNode) mask.parentNode.removeChild(mask); }, 200);
   }
 
-  // 点击遮罩空白处、关闭按钮、暂不修改 → 关闭（保持登录态，进入后台）
+  // 不能从遮罩或关闭按钮绕过；只有「前往修改密码」一个出口。
   function goAdmin() {
     if (typeof navigate === 'function') navigate('/admin'); else { try { location.href = href('/admin'); } catch (e) {} }
   }
   mask.addEventListener('click', function (e) {
     var act = e.target && e.target.getAttribute && e.target.getAttribute('data-act');
-    if (e.target === mask || act === 'close' || act === 'later') { close(); goAdmin(); }
-    else if (act === 'change') { close(); goAdmin(); ensureAdminBundle().then(function () { setTimeout(function () { if (window.QingyuAdmin && window.QingyuAdmin.openPwdModal) window.QingyuAdmin.openPwdModal(); }, 350); }); }
+    if (act === 'change') { close(); goAdmin(); }
   });
 }
 

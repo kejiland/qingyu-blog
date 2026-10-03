@@ -1,7 +1,7 @@
 /* Cloudflare Pages Functions · POST /api/ai/summary
  * 文章 AI 摘要（公开、限流 + 缓存；加密/受保护文章不做）。
  *  body: { slug, lang?, force? }   force 需作者会话（防止刷掉缓存） */
-import { json, corsPreflight, isWriteAuthed } from '../../_lib/api-core.js';
+import { json, corsPreflight, isWriteAuthed, unauthorized } from '../../_lib/api-core.js';
 import {
   aiEnabled, aiChat, aiRate, aiCacheGet, aiCachePut, aiPublicGenerate,
   buildSummaryMessages, normalizeLang, clientIp
@@ -43,7 +43,7 @@ export async function onRequest(context) {
   // 匿名生成闸门：BLOG_AI_PUBLIC=0 时，未登录访客不能触发模型调用
   //（仍可读取上方已缓存摘要，前端照样显示结果）。防止任意站点脚本刷走额度。
   if (!aiPublicGenerate(env) && !(await isWriteAuthed(request, env))) {
-    return json({ error: 'AI 生成仅限作者使用' }, 401, request, env);
+    return unauthorized(request, env);
   }
 
   const post = await env.DB.prepare('SELECT * FROM posts WHERE id = ?').bind(slug).first().catch(() => null);
@@ -52,7 +52,7 @@ export async function onRequest(context) {
   if (post.enc || Number(post.protected || 0) === 1) return json({ error: '该文章不支持 AI 摘要' }, 400, request, env);
 
   // 强制重生成需要作者会话（防止他人反复触发刷新缓存）
-  if (force && !(await isWriteAuthed(request, env))) return json({ error: '未授权：请先登录' }, 401, request, env);
+  if (force && !(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
   const ip = clientIp(request);
   // 每 IP 频控：fail-open（KV 抖动不应挡住正常访客）

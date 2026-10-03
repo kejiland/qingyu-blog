@@ -604,9 +604,9 @@ window.BLOG_CONFIG = {
 | Layer | Mechanism |
 | --- | --- |
 | Password storage | PBKDF2-SHA256 salted hash (100,000 iterations, 16-byte random salt), never plaintext |
-| First deploy | With `BLOG_ADMIN_SETUP_KEY` set, initialization requires the `X-Setup-Key` header and login before init returns 403 (anti-squatting). Unset: the first login auto-generates a random default password (`xxxx-xxxx`, `must_change=1`) with a first-come race. **Cloud passwords are at least 8 characters** |
+| First deploy | With `BLOG_ADMIN_SETUP_KEY` set, initialization requires the `X-Setup-Key` header and login before init returns 403 (anti-squatting). Unset: the first login auto-generates a random default password (`xxxx-xxxx`, `must_change=1`) with a first-come race. **Cloud passwords are at least 8 characters**; until it is changed, every admin API except password change/logout returns 403 `PASSWORD_CHANGE_REQUIRED` |
 | Static mode | Passwords stored with a `sha256:` prefix (legacy plaintext auto-upgrades), minimum 4 characters (deterrent only) |
-| Sessions | 32-byte random token (64 hex characters), valid 7 days, stored in D1 `admin_sessions`; destroyed on logout, and all sessions are cleared when the password changes |
+| Sessions | 32-byte random token (64 hex characters), valid 7 days, stored in D1 `admin_sessions`; destroyed on logout, and all sessions are cleared when the password changes; a `must_change` session may call only the password-change endpoint |
 | Login throttling | **Three tiers, and deliberately no long global lock**: 5 failures per IP → 15 minutes; 15 failures per subnet (IPv4 /24, IPv6 /64) → 60-second cooldown; 30 failures site-wide → **only a 10-second cooldown plus an alert log**. Counters age out after 1 hour, and requests during a lock/cooldown return early **without reading or writing the database** (which also blocks "brute-force yourself out of the free D1 write quota") |
 | Break-glass path | A login request carrying the correct `X-Setup-Key` (`BLOG_ADMIN_SETUP_KEY`) **skips every throttle** (but never the password check); the login page reveals that field automatically when throttled. An attacker can delay you by 10 seconds, never lock you out |
 | Edge rate limiting (optional) | Setting `BLOG_RATE_LIMIT_BINDING` enables the Workers Rate Limiting binding (`env.LOGIN_LIMITER`) to throttle logins by IP at the Worker entry with no database traffic. You can also put `/api/admin/login` behind Cloudflare Access or a WAF rate limiting rule — see *Hardening the admin login* below |
@@ -667,9 +667,7 @@ node scripts/minify.mjs     # requires npx terser / clean-css-cli
 | No category / encryption UI | The D1 schema and API keep `category` / `protected` / `enc` (so externally encrypted posts can be imported), but the editor exposes only title / tags / cover / pinned / body |
 | Editing a post rewrites its date | Saving always writes today's date, so editing an old post changes its position in lists and RSS |
 | Tag rename is O(n) | Renaming or deleting a tag issues one PUT per affected post, sequentially |
-| Password modal vs backend | The change-password modal hints at 6 characters while the backend requires **8** — just use 8+ |
 | A throttled login means a short wait | Once throttled, even the correct password has to wait 10 seconds (global cooldown) / 60 seconds (same subnet) / 15 minutes (your own IP) — unless you use the setup-key break-glass path. This is deliberate: still running PBKDF2 while locked would turn a login DoS into a CPU/quota DoS |
-| `must_change` is not enforced | The backend returns the flag, but the UI only shows a tip and never blocks |
 | Admin search filters client-side | List search filters rows already fetched (10-24 per page); with very large datasets the first load still takes longer |
 | Unknown paths return HTTP 200 | The frontend 404 page still answers with status 200 (a common SPA trade-off) |
 

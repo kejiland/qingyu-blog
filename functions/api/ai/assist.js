@@ -1,7 +1,7 @@
 /* Cloudflare Pages Functions · POST /api/ai/assist
  * 后台写作助手（仅作者）：title 标题建议 / tags 标签 / polish 润色 / translate 翻译
  *  body: { action, text, lang? } */
-import { json, corsPreflight, isWriteAuthed } from '../../_lib/api-core.js';
+import { json, corsPreflight, isWriteAuthed, unauthorized } from '../../_lib/api-core.js';
 import {
   aiEnabled, aiChat, aiRate, buildAssistMessages, normalizeLang, clientIp
 } from '../../_lib/ai.js';
@@ -13,7 +13,7 @@ export async function onRequest(context) {
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
   if (!aiEnabled(env)) return json({ ok: false, error: 'AI 未启用' }, 404, request, env);
-  if (!(await isWriteAuthed(request, env))) return json({ error: '未授权：请先登录' }, 401, request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
   const body = await request.json().catch(() => null);
   const action = body && body.action;

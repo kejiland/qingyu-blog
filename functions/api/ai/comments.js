@@ -2,7 +2,7 @@
  * 后台评论 AI 工具（仅作者）：
  *   { action:'summarize' } 汇总最近评论要点（结果 KV 缓存 1h）
  *   { action:'screen', text } 单条评论垃圾判定 → { ok, spam, reason } */
-import { json, corsPreflight, isWriteAuthed } from '../../_lib/api-core.js';
+import { json, corsPreflight, isWriteAuthed, unauthorized } from '../../_lib/api-core.js';
 import {
   aiEnabled, aiChat, aiRate, aiCacheGet, aiCachePut,
   buildCommentSummaryMessages, buildCommentScreenMessages, extractJson, clientIp
@@ -16,7 +16,7 @@ export async function onRequest(context) {
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
   if (!aiEnabled(env)) return json({ ok: false, error: 'AI 未启用' }, 404, request, env);
-  if (!(await isWriteAuthed(request, env))) return json({ error: '未授权：请先登录' }, 401, request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
   const body = await request.json().catch(() => null);
   if (!body || !body.action) return json({ error: '缺少 action' }, 400, request, env);

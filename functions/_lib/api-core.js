@@ -135,8 +135,18 @@ export function corsPreflight(request, env) {
   return new Response(null, { status: 204, headers: getCorsHeaders(request, env) });
 }
 
-/** 401 统一响应（缺少/无效凭证） */
-export function unauthorized(request, env) {
+/** 统一鉴权失败响应。
+ *  有效会话仍处于 must_change 状态时返回 403 + 明确错误码，前端据此强制进入改密页，
+ *  而不会误判为 token 过期并把唯一可用于改密的会话清掉。 */
+export async function unauthorized(request, env) {
+  const state = await adminAuthState(request, env).catch(() => null);
+  if (state && state.authed && state.mustChange) {
+    return json({
+      error: '必须先修改初始密码，才能继续使用后台',
+      code: 'PASSWORD_CHANGE_REQUIRED',
+      mustChange: true
+    }, 403, request, env);
+  }
   return json({ error: '未授权：请先登录获取会话 token，并在请求头携带 Authorization: Bearer <token>' }, 401, request, env);
 }
 
@@ -1172,6 +1182,28 @@ async function validSession(env, token) {
   return !!(s && s.exp && s.exp > nowMs());
 }
 
+function bearerToken(request) {
+  const auth = String(request.headers.get('Authorization') || '').trim();
+  const m = /^Bearer\s+(.+)$/i.exec(auth);
+  return m ? m[1].trim() : '';
+}
+
+/** 返回当前请求的鉴权状态；mustChange 表示会话有效但仍需修改初始密码。 */
+async function adminAuthState(request, env) {
+  if (!env || !env.DB) return { authed: false, mustChange: false, legacy: false, token: '' };
+  const header = String(request.headers.get('Authorization') || '').trim();
+  const token = bearerToken(request);
+  if (token && await validSession(env, token)) {
+    const auth = await getAdminAuth(env);
+    return { authed: true, mustChange: !!(auth && auth.mustChange), legacy: false, token };
+  }
+  const legacy = env.BLOG_WRITE_TOKEN;
+  if (legacy && await safeEqual(header, 'Bearer ' + legacy)) {
+    return { authed: true, mustChange: false, legacy: true, token: '' };
+  }
+  return { authed: false, mustChange: false, legacy: false, token: '' };
+}
+
 /* ---------- 鉴权入口（写操作复用） ---------- */
 
 /**
@@ -1180,15 +1212,14 @@ async function validSession(env, token) {
  * 未配置任何认证（无 auth、无 token）→ 拒绝（安全默认）。
  */
 export async function isWriteAuthed(request, env) {
-  if (!env || !env.DB) return false;
-  const auth = String(request.headers.get('Authorization') || '').trim();
-  const m = /^Bearer\s+(.+)$/i.exec(auth);
-  const token = m ? m[1].trim() : '';
-  if (token && await validSession(env, token)) return true;
-  // 兼容旧配置：BLOG_WRITE_TOKEN 环境变量
-  const legacy = env.BLOG_WRITE_TOKEN;
-  if (legacy && await safeEqual(auth, 'Bearer ' + legacy)) return true;
-  return false;
+  const state = await adminAuthState(request, env);
+  return state.authed && !state.mustChange;
+}
+
+/** 改密接口专用：允许 must_change 会话调用，否则用户无法完成强制改密。 */
+async function isPasswordChangeAuthed(request, env) {
+  const state = await adminAuthState(request, env);
+  return state.authed;
 }
 
 /* ---------- 接口实现 ---------- */
@@ -1534,7 +1565,7 @@ export async function handleAdminPassword(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
   if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
-  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (!(await isPasswordChangeAuthed(request, env))) return unauthorized(request, env);
   const body = await request.json().catch(() => null);
   const cur = String((body && body.current) || '');
   const pwd = String((body && body.password) || '');

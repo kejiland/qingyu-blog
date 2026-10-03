@@ -120,8 +120,10 @@
     try {
       return await window.apiFetch(url, opts || {});
     } catch (e) {
-      // 401 = 会话过期/无效，清除 token 并跳转登录页
-      if ((e && e.status) === 401 || String(e.message || e).indexOf('HTTP 401') >= 0) {
+      // 401 = 会话过期/无效，清除 token 并跳转登录页。
+      // 改密接口的 401 只代表当前密码错误，不能退出仍有效的会话。
+      if (((e && e.status) === 401 || String(e.message || e).indexOf('HTTP 401') >= 0)
+        && !/api\/admin\/password/.test(String(url))) {
         sessionExpired();
       }
       throw e;
@@ -133,10 +135,29 @@
     if (window.cloudLogout) window.cloudLogout(); else if (window.adminLogout) window.adminLogout();
     setTimeout(function () { if (window.navigate) window.navigate('/admin'); }, 800);
   }
+  function mustChangeRequired() {
+    return typeof window._mustChangeRequired === 'function' && window._mustChangeRequired();
+  }
   /* 全局会话失效事件（前台 apiFetch 在任意 401 时派发，后台监听后自动退出登录状态） */
   if (!window.__qySessionExpiredBound) {
     window.__qySessionExpiredBound = true;
     window.addEventListener('qy:session-expired', function () { sessionExpired(); });
+  }
+  /* 服务端拦截未改密会话时切换为不可跳过的改密页。 */
+  if (!window.__qyPasswordChangeBound) {
+    window.__qyPasswordChangeBound = true;
+    var _mustChangeTimer = null;
+    window.addEventListener('qy:password-change-required', function () {
+      if (!mustChangeRequired() || _mustChangeTimer) return;
+      _mustChangeTimer = setTimeout(function () {
+        _mustChangeTimer = null;
+        if (!mustChangeRequired() || !isAdmin()) return;
+        var root = document.querySelector('#app');
+        if (!root) return;
+        var path = (typeof window.currentRoute === 'function') ? window.currentRoute().path : '/admin';
+        mount(root, path);
+      }, 0);
+    });
   }
   function toast(msg, type) {
     var wrap = document.querySelector('.ab-toast-wrap');
@@ -826,8 +847,58 @@
   /* ----------------------- 装载入口 ----------------------- */
   var siderCollapsed = false;
 
+  function renderMustChangeGate(root) {
+    root.innerHTML =
+      '<div class="ab-gate"><div class="ab-gate-card">' +
+      '<div class="ab-gate-logo">' + icon('lock', 24) + '</div>' +
+      '<h2>' + t('admin.firstLoginTitle') + '</h2>' +
+      '<p class="ab-hint">' + t('admin.firstLoginWarn') + '</p>' +
+      '<div class="ab-field" style="margin:16px 0 12px"><label class="ab-label">' + t('admin.pwdModal.confirmPwd') + '</label>' +
+      '<input class="ab-input" id="abForceCurPwd" type="password" autocomplete="current-password"></div>' +
+      '<div class="ab-field" style="margin-bottom:16px"><label class="ab-label">' + t('admin.pwdModal.newPwd') + '</label>' +
+      '<input class="ab-input" id="abForceNewPwd" type="password" autocomplete="new-password"></div>' +
+      '<button class="ab-btn primary" id="abForcePwdBtn" style="width:100%">' + t('admin.pwdModal.change') + '</button>' +
+      '<button type="button" class="ab-gate-link" id="abForceLogout">' + t('admin.sidebar.logout') + '</button>' +
+      '</div></div>';
+    var cur = root.querySelector('#abForceCurPwd');
+    var pwd = root.querySelector('#abForceNewPwd');
+    var btn = root.querySelector('#abForcePwdBtn');
+    var logoutBtn = root.querySelector('#abForceLogout');
+    if (typeof window._initialAdminPwd === 'function') {
+      try { cur.value = window._initialAdminPwd() || ''; } catch (e) {}
+    }
+    async function submit() {
+      var current = cur.value || '';
+      var next = pwd.value || '';
+      if (!current || !next) { toast(t('admin.pwdRequired'), 'err'); return; }
+      if (next.length < 8) { toast(t('admin.pwdModal.tooShort'), 'err'); return; }
+      btn.disabled = true;
+      try {
+        await api('api/admin/password', { method: 'POST', body: JSON.stringify({ current: current, password: next }) });
+        toast(t('admin.pwdModal.success'), 'ok');
+        if (window._setMustChange) window._setMustChange(false);
+        if (cloudOn() && window.cloudLogout) await window.cloudLogout();
+        else if (window.adminLogout) window.adminLogout();
+        setTimeout(function () { go('/admin'); }, 300);
+      } catch (e) {
+        toast(t('admin.pwdModal.fail') + (e.message || e), 'err');
+        btn.disabled = false;
+      }
+    }
+    btn.addEventListener('click', submit);
+    if (logoutBtn) logoutBtn.addEventListener('click', function () {
+      if (cloudOn() && window.cloudLogout) window.cloudLogout(); else if (window.adminLogout) window.adminLogout();
+      go('/admin');
+    });
+    [cur, pwd].forEach(function (el) {
+      el.addEventListener('keydown', function (e) { if (e.key === 'Enter') submit(); });
+    });
+    cur.focus();
+  }
+
   function mount(root, path) {
     if (!isAdmin()) { renderGate(root); return; }
+    if (mustChangeRequired()) { renderMustChangeGate(root); return; }
     // 确保 i18n 已加载
     var route = parseRoute(path);
     // 异步拉取待审核数量用于角标
