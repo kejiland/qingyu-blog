@@ -261,7 +261,10 @@ export default {
     // 静态资源（index.html / style.css / app.js / …）
     if (env.ASSETS) {
       let res = await env.ASSETS.fetch(request);
-      let spaNotFound = false;
+      // _redirects 会把未知路径也映射成 index.html(200)，因此这里按「HTML 外壳 + 无扩展名 + 非已知路由」判定为 404
+      const reqHasExt = /\.[a-zA-Z0-9]+$/.test(url.pathname);
+      const isHtmlShell = /text\/html/i.test(res.headers.get('content-type') || '');
+      let spaNotFound = isHtmlShell && !reqHasExt && !isKnownSpaRoute(url.pathname);
       // SPA 回退：干净路径 / 首页 / 归档 / 关于 / 标签 / /posts/<别名>/ /admin / /write，
       // 以及 /api 以外的任何无扩展名路径，都返回 index.html（由前端 app.js 依据 pathname 渲染）。
       // 仅对 GET/HEAD 回退：POST 等非幂等方法拿到 HTML 会误导调用方。
