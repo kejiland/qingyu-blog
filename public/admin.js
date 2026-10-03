@@ -3308,25 +3308,56 @@
 
 
   /* ====================== 操作审计日志 ====================== */
-  var auditState = { logs: [], action: 'all' };
+  var auditState = { logs: [], action: 'all', from: '', to: '', page: 1, per: 20 };
   var AUDIT_ACTIONS = ['post.delete', 'media.delete', 'settings.update', 'backup.create', 'backup.restore', 'backup.delete', 'audit.clear'];
   function auditActionLabel(a) {
     var key = 'admin.audit.a.' + String(a || '').replace(/[^a-z.]/g, '');
     var label = t(key);
     return (label && label !== key) ? label : String(a || '—');
   }
+  /** 按日期范围过滤（端点为当天 00:00 / 23:59:59） */
+  function auditFiltered() {
+    var list = auditState.logs;
+    if (auditState.from) {
+      var f = new Date(auditState.from + 'T00:00:00').getTime();
+      if (!isNaN(f)) list = list.filter(function (r) { return Number(r.created_at) >= f; });
+    }
+    if (auditState.to) {
+      var e2 = new Date(auditState.to + 'T23:59:59').getTime();
+      if (!isNaN(e2)) list = list.filter(function (r) { return Number(r.created_at) <= e2; });
+    }
+    return list;
+  }
   function pageAudit(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.audit.title') + '</h1><p class="ab-page-sub">' + t('admin.audit.desc') + '</p></div>' +
-      '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abAuditRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button>' +
+      '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abAuditExport">' + icon('download', 14) + ' ' + t('admin.audit.export') + '</button>' +
+      '<button class="ab-btn" id="abAuditRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button>' +
       '<button class="ab-btn danger" id="abAuditClear">' + icon('trash', 14) + ' ' + t('admin.audit.clear') + '</button></div></div>' +
-      '<div class="ab-toolbar"><select class="ab-select" id="abAuditFilter" style="max-width:220px"><option value="all">' + t('admin.audit.allTypes') + '</option>' +
-        AUDIT_ACTIONS.map(function (a) { return '<option value="' + a + '">' + esc(auditActionLabel(a)) + '</option>'; }).join('') + '</select>' +
+      '<div class="ab-toolbar" style="flex-wrap:wrap;gap:10px">' +
+        '<select class="ab-select" id="abAuditFilter" style="max-width:200px"><option value="all">' + t('admin.audit.allTypes') + '</option>' +
+          AUDIT_ACTIONS.map(function (a) { return '<option value="' + a + '">' + esc(auditActionLabel(a)) + '</option>'; }).join('') + '</select>' +
+        '<input class="ab-input" type="date" id="abAuditFrom" style="max-width:160px" aria-label="' + t('admin.audit.from') + '">' +
+        '<span class="ab-muted">—</span>' +
+        '<input class="ab-input" type="date" id="abAuditTo" style="max-width:160px" aria-label="' + t('admin.audit.to') + '">' +
+        '<button class="ab-btn sm" id="abAuditReset">' + t('admin.audit.reset') + '</button>' +
         '<span class="ab-muted" id="abAuditInfo"></span></div>' +
-      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.audit.colAction') + '</th><th>' + t('admin.audit.colTarget') + '</th><th>' + t('admin.audit.colIp') + '</th></tr></thead><tbody id="abAuditBody"></tbody></table></div></div>';
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.audit.colAction') + '</th><th>' + t('admin.audit.colTarget') + '</th><th>' + t('admin.audit.colIp') + '</th></tr></thead><tbody id="abAuditBody"></tbody></table></div><div class="ab-pagination" id="abAuditPage" style="padding:0 4px 6px"></div></div>';
     content.querySelector('#abAuditRefresh').addEventListener('click', function () { loadAudit(content); });
+    content.querySelector('#abAuditExport').addEventListener('click', function () { exportAudit(content); });
     var f = content.querySelector('#abAuditFilter');
     f.value = auditState.action;
-    f.addEventListener('change', function () { auditState.action = f.value; loadAudit(content); });
+    f.addEventListener('change', function () { auditState.action = f.value; auditState.page = 1; renderAudit(content); });
+    var from = content.querySelector('#abAuditFrom');
+    var to = content.querySelector('#abAuditTo');
+    from.value = auditState.from;
+    to.value = auditState.to;
+    from.addEventListener('change', function () { auditState.from = from.value; auditState.page = 1; renderAudit(content); });
+    to.addEventListener('change', function () { auditState.to = to.value; auditState.page = 1; renderAudit(content); });
+    content.querySelector('#abAuditReset').addEventListener('click', function () {
+      auditState.action = 'all'; auditState.from = ''; auditState.to = ''; auditState.page = 1;
+      f.value = 'all'; from.value = ''; to.value = '';
+      renderAudit(content);
+    });
     content.querySelector('#abAuditClear').addEventListener('click', function () {
       confirmModal(t('admin.audit.clear'), '<p class="ab-muted">' + t('admin.audit.clearConfirm') + '</p>', async function () {
         try { await api('api/admin/audit', { method: 'DELETE' }); toast(t('admin.audit.cleared'), 'ok'); loadAudit(content); }
@@ -3337,22 +3368,62 @@
   }
   async function loadAudit(content) {
     var body = content.querySelector('#abAuditBody');
-    var info = content.querySelector('#abAuditInfo');
     if (!body) return;
     body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
     try {
-      var url = 'api/admin/audit?limit=300' + (auditState.action !== 'all' ? '&action=' + enc(auditState.action) : '');
+      var url = 'api/admin/audit?limit=500' + (auditState.action !== 'all' ? '&action=' + enc(auditState.action) : '');
       var d = await api(url);
       auditState.logs = (d && d.logs) || [];
-      if (info) info.textContent = t('admin.audit.total', { n: auditState.logs.length });
-      if (!auditState.logs.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.audit.empty') + '</td></tr>'; return; }
-      body.innerHTML = auditState.logs.map(function (r) {
+      renderAudit(content);
+    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+  }
+  /** 列表渲染：日期过滤 + 分页（每页 20） */
+  function renderAudit(content) {
+    var body = content.querySelector('#abAuditBody');
+    var pg = content.querySelector('#abAuditPage');
+    var info = content.querySelector('#abAuditInfo');
+    if (!body) return;
+    var list = auditFiltered();
+    if (info) info.textContent = t('admin.audit.total', { n: list.length });
+    var per = auditState.per;
+    var totalPages = Math.max(1, Math.ceil(list.length / per));
+    if (auditState.page > totalPages) auditState.page = totalPages;
+    var page = auditState.page;
+    var view = list.slice((page - 1) * per, page * per);
+    if (!view.length) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.audit.empty') + '</td></tr>';
+    } else {
+      body.innerHTML = view.map(function (r) {
         return '<tr><td class="ab-td-date">' + esc(fmtTimestamp(r.created_at)) + '</td>' +
           '<td><span class="ab-chip">' + esc(auditActionLabel(r.action)) + '</span></td>' +
           '<td style="max-width:340px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(((r.target || '') + (r.detail ? ' · ' + r.detail : '')) || '—') + '</div></td>' +
           '<td class="ab-muted">' + esc(r.ip || '—') + '</td></tr>';
       }).join('');
-    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+    }
+    if (pg) {
+      pg.innerHTML = list.length > per
+        ? (page > 1 ? '<button class="ab-page-btn" data-p="' + (page - 1) + '">' + t('pagination.prev') + '</button>' : '') +
+          '<button class="ab-page-btn active">' + page + ' / ' + totalPages + '</button>' +
+          (page < totalPages ? '<button class="ab-page-btn" data-p="' + (page + 1) + '">' + t('pagination.next') + '</button>' : '')
+        : '';
+      pg.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { auditState.page = parseInt(b.getAttribute('data-p'), 10) || 1; renderAudit(content); }); });
+    }
+  }
+  /** 导出当前筛选结果为 CSV */
+  function exportAudit(content) {
+    try {
+      var list = auditFiltered();
+      var rows = [['time', 'action', 'target', 'detail', 'ip']];
+      list.forEach(function (r) {
+        rows.push([
+          r.created_at ? new Date(Number(r.created_at)).toISOString() : '',
+          r.action || '', r.target || '', r.detail || '', r.ip || ''
+        ]);
+      });
+      var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
+      transferDownloadText('audit-' + transferStamp() + '.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');
+      toast(t('admin.audit.exported'), 'ok');
+    } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
   }
 
   /* ====================== 博客设置 ====================== */

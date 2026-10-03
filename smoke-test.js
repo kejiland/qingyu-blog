@@ -1978,7 +1978,7 @@ tests.push(['后台仪表盘：存储与订阅概览卡片 已接入', async () 
   assert.ok(src.includes("api('api/admin/subscribers')") && src.includes("api('api/admin/backups')"), '数据来源');
 }]);
 
-tests.push(['后台：操作审计日志 记录 / 过滤 / 清空', async () => {
+tests.push(['后台：操作审计日志 记录 / 过滤 / 清空（含分页与导出）', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
   env.BLOG_WRITE_TOKEN = 'tok-audit';
