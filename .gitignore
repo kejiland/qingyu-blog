@@ -25,8 +25,7 @@ wrangler.workers.ci.toml
 # 本地工具脚本：push.ps1（Windows PowerShell 5.1 的 git push 包装，仅本机使用，不入库）
 push.ps1
 
-# 字体：源 TTF 不入库；fonts/dreamserif/ 分片必须随仓库部署（Pages 静态托管）
+# 字体：项目不加载任何 webfont；源 TTF 与历史分片均不入库
 public/fonts/*
-!public/fonts/dreamserif/
 # 本地 Lighthouse 产物
 lh-report*.json

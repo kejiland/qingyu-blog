@@ -333,7 +333,6 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 │   ├── locales/                       # Language packs (zh-CN / en / ja / ko / hi, 816 keys each)
 │   ├── flags/                         # SVG flags for the language switcher (cn / gb / jp / kr / in)
 │   ├── libs/smoji/                    # Smoji emoji picker (lazy-loaded)
-│   ├── fonts/dreamserif/              # ⚠️ Legacy local serif shards (no longer loaded; see Known Limitations)
 │   ├── robots.txt                     # Crawler rules (blocks admin, declares the sitemap)
 │   ├── llms.txt                       # Site description for LLMs / agents
 │   ├── ads.txt                        # Ads declaration (optional, pairs with config.js ads)
@@ -671,7 +670,6 @@ node scripts/minify.mjs     # requires npx terser / clean-css-cli
 | Password modal vs backend | The change-password modal hints at 6 characters while the backend requires **8** — just use 8+ |
 | A throttled login means a short wait | Once throttled, even the correct password has to wait 10 seconds (global cooldown) / 60 seconds (same subnet) / 15 minutes (your own IP) — unless you use the setup-key break-glass path. This is deliberate: still running PBKDF2 while locked would turn a login DoS into a CPU/quota DoS |
 | `must_change` is not enforced | The backend returns the flag, but the UI only shows a tip and never blocks |
-| `public/fonts/dreamserif/` is dead weight | The current version loads **no webfonts**; this directory (~10.3 MB, 265 shards) is unreferenced and kept only because of a `.gitignore` whitelist. Deleting it changes nothing functionally |
 | Admin search filters client-side | List search filters rows already fetched (10-24 per page); with very large datasets the first load still takes longer |
 | Unknown paths return HTTP 200 | The frontend 404 page still answers with status 200 (a common SPA trade-off) |
 

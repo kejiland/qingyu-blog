@@ -317,7 +317,6 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 816 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
-│   ├── fonts/dreamserif/              # ⚠️ 历史遗留的本地衬线字体分片（当前版本不再加载，见「已知限制」）
 │   ├── robots.txt                     # 爬虫规则（禁止抓取后台，声明 Sitemap）
 │   ├── llms.txt                       # 面向 LLM / 代理的站点说明
 │   ├── ads.txt                        # 广告声明（可选，配合 config.js ads）
@@ -654,7 +653,6 @@ node scripts/minify.mjs     # 需要 npx terser / clean-css-cli
 | 改密弹窗与后端校验不一致 | 前端提示「至少 6 位」，后端实际要求 **8 位**；请直接按 8 位以上填写 |
 | 被限流时要等一小会儿 | 触发登录限流后，即使密码正确也要等 10 秒（全局冷却）/ 60 秒（同一子网）/ 15 分钟（你自己的 IP）才能登录，除非带上安装密钥走应急通道。这是有意取舍：锁定期间照常跑 PBKDF2 会把「登录 DoS」变成「CPU / 额度 DoS」 |
 | `must_change` 未强制拦截 | 后端会返回该标记，但前端只做提示，不会强制跳转改密 |
-| `public/fonts/dreamserif/` 是历史遗留 | 当前版本**不加载任何 webfont**，这个目录（约 10.3MB、265 个分片）已无引用，仅因 `.gitignore` 白名单保留在仓库中；删掉不影响任何功能 |
 | 后台搜索为前端过滤 | 列表搜索在已拉取的数据上过滤（每页 10–24 条），数据量极大时首屏仍会偏慢 |
 | 未知路径返回 200 | 前端的 404 页面 HTTP 状态码仍是 200（SPA 的常见取舍） |
 
