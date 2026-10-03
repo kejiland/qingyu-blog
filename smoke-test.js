@@ -1874,6 +1874,18 @@ tests.push(['阅读体验：正文字号调节 + 移动端浮动目录', async (
   d.ctx.setReadingScale(1);
 }]);
 
+tests.push(['后台媒体库：搜索 / 分页 / 批量删除 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abMediaKw'), '搜索框');
+  assert.ok(src.includes('abMediaBatchDel'), '批量删除按钮');
+  assert.ok(src.includes('abMediaPage'), '分页容器');
+  assert.ok(src.includes('renderMediaGrid'), '网格渲染函数');
+  assert.ok(src.includes('batchDeleteMedia'), '批量删除逻辑');
+  assert.ok(src.includes('ab-media-check'), '单项勾选框');
+  const acss = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(acss.includes('.ab-media-check'), '选择框样式');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

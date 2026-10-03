@@ -536,6 +536,10 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-media-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ab-media-size { font-size: 11px; color: var(--ab-muted); margin-top: 2px; }
 .ab-media-actions { display: flex; flex-wrap: wrap; gap: 6px; padding: 0 12px 12px; }
+.ab-media-card { position: relative; }
+.ab-media-card.selected { border-color: var(--ab-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ab-primary) 38%, transparent); }
+.ab-media-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(255,255,255,.88); box-shadow: 0 2px 6px rgba(0,0,0,.18); cursor: pointer; }
+.ab-media-check input { margin: 0; cursor: pointer; }
 
 /* ---------- 音乐管理：行内迷你播放器 + 空封面占位 ---------- */
 .ab-cover-ph {

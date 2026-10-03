@@ -2702,38 +2702,118 @@
   }
 
   /* ====================== 媒体库 ====================== */
+  var mediaState = { list: [], kw: '', page: 1, per: 24, selected: {} };
   function pageMedia(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.media.title') + '</h1><p class="ab-page-sub">' + t('admin.media.desc') + '</p><p class="ab-hint" style="margin:6px 0 0">' + t('admin.media.compressHint') + '</p></div>' +
       (cloudOn() ? '<label class="ab-btn primary">' + icon('upload', 15) + ' ' + t('admin.media.upload') + '<input type="file" id="abUpload" accept="image/*" multiple hidden></label>' : '<span class="ab-chip" style="background:var(--ab-primary-weak);color:var(--ab-primary)">' + t('admin.categories.staticHint') + '</span>') + '</div>' +
       (cloudOn() ? '' : '<div class="ab-card"><div class="ab-empty"><div class="ab-empty-ico">🖼</div><p>' + t('admin.media.cloudOnly') + '</p></div></div>');
     if (!cloudOn()) return;
-    content.innerHTML += '<div class="ab-media-grid" id="abMediaGrid"><span class="ab-spin"></span></div>';
+    content.innerHTML += '<div class="ab-toolbar"><div class="ab-search"><input class="ab-input" id="abMediaKw" placeholder="' + t('admin.media.search') + '"></div>' +
+      '<div class="ab-row" style="gap:10px;align-items:center;flex-wrap:wrap"><label class="ab-hint" style="display:flex;align-items:center;gap:6px;cursor:pointer;margin:0"><input type="checkbox" id="abMediaAll"> ' + t('admin.media.selectAll') + '</label>' +
+      '<span class="ab-muted" id="abMediaSelInfo"></span>' +
+      '<button class="ab-btn danger" id="abMediaBatchDel" disabled>' + icon('trash', 14) + ' ' + t('admin.media.batchDelete') + '</button></div></div>' +
+      '<div class="ab-media-grid" id="abMediaGrid"><span class="ab-spin"></span></div><div class="ab-pagination" id="abMediaPage"></div>';
     var up = content.querySelector('#abUpload');
     up.addEventListener('change', function () { uploadFiles(content, up.files); });
+    var kw = content.querySelector('#abMediaKw');
+    kw.value = mediaState.kw;
+    kw.addEventListener('input', debounce(function () { mediaState.kw = (kw.value || '').trim().toLowerCase(); mediaState.page = 1; renderMediaGrid(content); }, 200));
+    content.querySelector('#abMediaAll').addEventListener('change', function () { toggleSelectAll(content, this.checked); });
+    content.querySelector('#abMediaBatchDel').addEventListener('click', function () { batchDeleteMedia(content); });
+    mediaState.selected = {};
     loadMedia(content);
   }
   async function loadMedia(content) {
     var grid = content.querySelector('#abMediaGrid');
+    if (!grid) return;
     grid.innerHTML = '<span class="ab-spin"></span> ' + t('admin.postList.loading');
     try {
       var d = await api('api/media');
-      var list = (d && d.media) || [];
-      grid.innerHTML = list.length ? list.map(function (m) {
-        return '<div class="ab-media-card">' +
-          '<div class="ab-media-thumb"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
-          '<div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div><div class="ab-media-size">' + fmtSize(m.size) + '</div></div>' +
-          '<div class="ab-media-actions"><button class="ab-btn sm" data-copy="' + enc(m.url) + '">' + t('admin.media.copy') + '</button><button class="ab-btn sm danger" data-delmedia="' + enc(m.id) + '">' + t('admin.media.delete') + '</button></div>' +
-        '</div>';
-      }).join('') : '<div class="ab-card ab-empty"><div class="ab-empty-ico">🖼</div><p>' + t('admin.media.empty') + '</p></div>';
-      grid.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { copyText(dec(b.getAttribute('data-copy'))); toast(t('admin.media.copied'), 'ok'); }); });
-      grid.querySelectorAll('[data-delmedia]').forEach(function (b) { b.addEventListener('click', function () {
-        var mid = dec(b.getAttribute('data-delmedia'));
-        confirmModal(t('admin.media.delete'), '<p class="ab-muted">' + t('admin.media.deleteConfirm') + '</p>', async function () {
-          try { await api('api/media/' + enc(mid), { method: 'DELETE' }); toast(t('admin.media.deleted'), 'ok'); loadMedia(content); } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
-        }, t('admin.comments.delete'));
-      }); });
+      mediaState.list = ((d && d.media) || []).slice();
+      mediaState.selected = {};
+      renderMediaGrid(content);
     } catch (e) { grid.innerHTML = '<div class="ab-empty"><p>' + t('admin.postList.loadFail') + esc(e.message || e) + '</p></div>'; }
   }
+  function mediaFiltered() {
+    var kw = mediaState.kw;
+    if (!kw) return mediaState.list;
+    return mediaState.list.filter(function (m) { return String(m.name || '').toLowerCase().indexOf(kw) >= 0; });
+  }
+  function renderMediaGrid(content) {
+    var grid = content.querySelector('#abMediaGrid');
+    var pg = content.querySelector('#abMediaPage');
+    if (!grid) return;
+    var list = mediaFiltered();
+    var per = mediaState.per;
+    var totalPages = Math.max(1, Math.ceil(list.length / per));
+    if (mediaState.page > totalPages) mediaState.page = totalPages;
+    var page = mediaState.page;
+    var view = list.slice((page - 1) * per, page * per);
+    grid.innerHTML = view.length ? view.map(function (m) {
+      var sel = !!mediaState.selected[m.id];
+      return '<div class="ab-media-card' + (sel ? ' selected' : '') + '">' +
+        '<label class="ab-media-check"><input type="checkbox" data-pick="' + enc(m.id) + '"' + (sel ? ' checked' : '') + '></label>' +
+        '<div class="ab-media-thumb"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
+        '<div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div><div class="ab-media-size">' + fmtSize(m.size) + '</div></div>' +
+        '<div class="ab-media-actions"><button class="ab-btn sm" data-copy="' + enc(m.url) + '">' + t('admin.media.copy') + '</button><button class="ab-btn sm danger" data-delmedia="' + enc(m.id) + '">' + t('admin.media.delete') + '</button></div>' +
+      '</div>';
+    }).join('') : '<div class="ab-card ab-empty" style="grid-column:1/-1"><div class="ab-empty-ico">🖼</div><p>' + (mediaState.kw ? t('admin.media.noMatch') : t('admin.media.empty')) + '</p></div>';
+    if (pg) {
+      pg.innerHTML = list.length > per
+        ? (page > 1 ? '<button class="ab-page-btn" data-p="' + (page - 1) + '">' + t('pagination.prev') + '</button>' : '') +
+          '<button class="ab-page-btn active">' + page + ' / ' + totalPages + '</button>' +
+          (page < totalPages ? '<button class="ab-page-btn" data-p="' + (page + 1) + '">' + t('pagination.next') + '</button>' : '')
+        : '';
+      pg.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { mediaState.page = parseInt(b.getAttribute('data-p'), 10) || 1; renderMediaGrid(content); }); });
+    }
+    grid.querySelectorAll('[data-pick]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = dec(cb.getAttribute('data-pick'));
+        if (cb.checked) mediaState.selected[id] = true; else delete mediaState.selected[id];
+        var card = cb.closest('.ab-media-card');
+        if (card) card.classList.toggle('selected', cb.checked);
+        syncMediaSelection(content);
+      });
+    });
+    grid.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { copyText(dec(b.getAttribute('data-copy'))); toast(t('admin.media.copied'), 'ok'); }); });
+    grid.querySelectorAll('[data-delmedia]').forEach(function (b) { b.addEventListener('click', function () {
+      var mid = dec(b.getAttribute('data-delmedia'));
+      confirmModal(t('admin.media.delete'), '<p class="ab-muted">' + t('admin.media.deleteConfirm') + '</p>', async function () {
+        try { await api('api/media/' + enc(mid), { method: 'DELETE' }); toast(t('admin.media.deleted'), 'ok'); loadMedia(content); } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
+      }, t('admin.comments.delete'));
+    }); });
+    syncMediaSelection(content);
+  }
+  function syncMediaSelection(content) {
+    var ids = Object.keys(mediaState.selected);
+    var info = content.querySelector('#abMediaSelInfo');
+    var btn = content.querySelector('#abMediaBatchDel');
+    var all = content.querySelector('#abMediaAll');
+    if (info) info.textContent = ids.length ? t('admin.media.selectedItems', { n: ids.length }) : '';
+    if (btn) btn.disabled = ids.length === 0;
+    if (all) {
+      var list = mediaFiltered();
+      all.checked = list.length > 0 && list.every(function (m) { return !!mediaState.selected[m.id]; });
+    }
+  }
+  function toggleSelectAll(content, on) {
+    mediaFiltered().forEach(function (m) { if (on) mediaState.selected[m.id] = true; else delete mediaState.selected[m.id]; });
+    renderMediaGrid(content);
+  }
+  async function batchDeleteMedia(content) {
+    var ids = Object.keys(mediaState.selected);
+    if (!ids.length) return;
+    confirmModal(t('admin.media.batchDelete'), '<p class="ab-muted">' + t('admin.media.batchConfirm', { n: ids.length }) + '</p>', async function () {
+      var ok = 0;
+      for (var i = 0; i < ids.length; i++) {
+        try { await api('api/media/' + enc(ids[i]), { method: 'DELETE' }); ok++; } catch (e) {}
+      }
+      toast(ok ? t('admin.media.batchDeleted', { n: ok }) : t('admin.postList.opFail'), ok ? 'ok' : 'err');
+      mediaState.selected = {};
+      loadMedia(content);
+    }, t('admin.comments.delete'));
+  }
+
   function copyText(t) {
     try { if (navigator.clipboard) navigator.clipboard.writeText(t); else { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); } } catch (e) {}
   }
