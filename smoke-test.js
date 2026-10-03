@@ -2141,6 +2141,13 @@ tests.push(['后台文章列表：服务端搜索与分页', async () => {
   assert.strictEqual(r.status, 401, '未登录分页查询 401');
 }]);
 
+tests.push(['路由：未知路径返回 404、已知路由仍 200', async () => {
+  const src = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
+  assert.ok(src.includes('isKnownSpaRoute'), '存在已知路由判定');
+  assert.ok(src.includes('spaNotFound ? 404 : res.status'), '未知路径改用 404 状态');
+  assert.ok(src.includes('archive|tags|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');

@@ -21,6 +21,16 @@ import { handleSubscribe, handleSubscribeConfirm, handleUnsubscribe, handleSubsc
 import { handleOgUploadUrl } from './functions/_lib/og.js';
 import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.js';
 
+/** 已知的前端路由：只有这些路径才用 200 返回 SPA 外壳，其余无扩展名路径按 404 返回 */
+function isKnownSpaRoute(pathname) {
+  return pathname === '/' ||
+    /^\/(archive|tags|about|guestbook|popular|subscribe|series|write)\/?$/.test(pathname) ||
+    /^\/posts\/[^/]+\/?$/.test(pathname) ||
+    /^\/posts\/[^/]+\/edit\/?$/.test(pathname) ||
+    /^\/series\/[^/]+\/?$/.test(pathname) ||
+    pathname.indexOf('/admin') === 0;
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -251,11 +261,13 @@ export default {
     // 静态资源（index.html / style.css / app.js / …）
     if (env.ASSETS) {
       let res = await env.ASSETS.fetch(request);
+      let spaNotFound = false;
       // SPA 回退：干净路径 / 首页 / 归档 / 关于 / 标签 / /posts/<别名>/ /admin / /write，
       // 以及 /api 以外的任何无扩展名路径，都返回 index.html（由前端 app.js 依据 pathname 渲染）。
       // 仅对 GET/HEAD 回退：POST 等非幂等方法拿到 HTML 会误导调用方。
       if (res.status === 404 && (request.method === 'GET' || request.method === 'HEAD') && !/\.[a-zA-Z0-9]+$/.test(url.pathname)) {
         res = await env.ASSETS.fetch(new Request(url.origin + '/', request));
+        if (!isKnownSpaRoute(url.pathname)) spaNotFound = true;
       }
       // 性能：给静态资源加缓存头，避免每次刷新全量重下大文件（app.js 184KB / style.css 94KB）。
       //  · 带扩展名的静态文件：1 小时强缓存 + 1 天 SWR（部署后 CF_ZONE_ID purge 立即生效，无陈旧感）
@@ -282,7 +294,7 @@ export default {
         } else if (request.method === 'GET') {
           headers.set('Cache-Control', 'no-cache');
         }
-        return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+        return new Response(res.body, { status: spaNotFound ? 404 : res.status, statusText: spaNotFound ? 'Not Found' : res.statusText, headers });
       } catch (e) {
         return res;
       }
