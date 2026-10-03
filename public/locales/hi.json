@@ -710,6 +710,8 @@
   "admin.editor.hr": "विभाजक",
   "admin.editor.codeBlock": "कोड ब्लॉक",
   "admin.editor.langPlain": "सादा टेक्स्ट",
+  "admin.editor.stats": "{chars} अक्षर · {words} शब्द · ~{minutes} मिनट",
+  "admin.editor.shortcutHint": "शॉर्टकट: Ctrl/⌘ + B बोल्ड · I इटैलिक · K लिंक · S ड्राफ़्ट सहेजें",
   "admin.editor.tableCol": "स्तंभ",
   "admin.editor.tableCell": "सामग्री",
   "admin.editor.savedOffline": "ऑफ़लाइन सहेजा गया, ऑनलाइन होने पर स्वतः सिंक होगा",

@@ -2311,6 +2311,7 @@
             '<button class="ab-tool" id="abSmoji" title="' + t('admin.editor.emoji') + '" aria-label="' + t('admin.editor.emoji') + '">😊</button>' +
           '</div>' +
           '<textarea class="ab-editor-area" id="abBody" placeholder="' + t('admin.editor.writeHint') + '"></textarea>' +
+          '<div class="ab-editor-stats" id="abEditorStats"></div>' +
         '</div>' +
         '<div class="ab-editor-pane"><div class="ab-editor-preview" id="abPreviewPane"></div></div>' +
       '</div>' +
@@ -2334,7 +2335,7 @@
 
   function bindEditor(content, route) {
     var area = content.querySelector('#abBody');
-    area.addEventListener('input', function () { autosizeArea(area); });
+    area.addEventListener('input', function () { autosizeArea(area); updateEditorStats(content); });
     area.addEventListener('input', debounce(function () { updatePreview(content); }, 200));
     area.addEventListener('paste', function (e) {
       var items = e.clipboardData && e.clipboardData.items ? Array.prototype.slice.call(e.clipboardData.items) : [];
@@ -2345,11 +2346,25 @@
       e.preventDefault();
       insertPastedImage(content, area, file);
     });
+    // 常用快捷键：Ctrl/⌘ + B / I / K / S
+    area.addEventListener('keydown', function (e) {
+      if (!(e.ctrlKey || e.metaKey)) return;
+      var k = String(e.key || '').toLowerCase();
+      if (k === 'b' || k === 'i' || k === 'k') {
+        e.preventDefault();
+        var langSel = content.querySelector('#abMdLang');
+        insertMd(area, k === 'b' ? 'bold' : (k === 'i' ? 'italic' : 'link'), { lang: langSel ? langSel.value : '' });
+        updatePreview(content); updateEditorStats(content);
+      } else if (k === 's') {
+        e.preventDefault();
+        saveEditor(content, route, 'draft');
+      }
+    });
     content.querySelector('#abToolbar').querySelectorAll('[data-md]').forEach(function (b) {
       b.addEventListener('click', function () {
         var langSel = content.querySelector('#abMdLang');
         insertMd(area, b.getAttribute('data-md'), { lang: langSel ? langSel.value : '' });
-        updatePreview(content); area.focus();
+        updatePreview(content); updateEditorStats(content); area.focus();
       });
     });
     var dateInput = content.querySelector('#abDate');
@@ -2414,6 +2429,23 @@
     area.style.height = 'auto';
     area.style.height = Math.max(area.scrollHeight, 420) + 'px';
   }
+  /** 正文字数与预计阅读时长（中日韩按字计，拉丁按词计） */
+  function editorCounts(text) {
+    var str = String(text || '');
+    var cjkRe = /[\u4e00-\u9fa5\u3040-\u30ff\uac00-\ud7af]/g;
+    var cjk = (str.match(cjkRe) || []).length;
+    var words = (str.replace(cjkRe, ' ').match(/[A-Za-z0-9_'-]+/g) || []).length;
+    var total = cjk + words;
+    return { chars: str.length, total: total, minutes: Math.max(1, Math.ceil(total / 400)) };
+  }
+  function updateEditorStats(content) {
+    var box = content.querySelector('#abEditorStats');
+    if (!box) return;
+    var area = content.querySelector('#abBody');
+    var c = editorCounts(area ? area.value : '');
+    box.innerHTML = '<span>' + t('admin.editor.stats', { chars: c.chars, words: c.total, minutes: c.minutes }) + '</span>' +
+      '<span class="ab-hint">' + t('admin.editor.shortcutHint') + '</span>';
+  }
   function insertMd(area, type, opts) {
     opts = opts || {};
     var s = area.selectionStart, e = area.selectionEnd, v = area.value;
@@ -2459,6 +2491,7 @@
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
     updatePreview(content);
+    updateEditorStats(content);
   }
   async function saveEditor(content, route, status) {
     var title = content.querySelector('#abTitle').value.trim();

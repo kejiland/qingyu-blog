@@ -710,6 +710,8 @@
   "admin.editor.hr": "Divider",
   "admin.editor.codeBlock": "Code block",
   "admin.editor.langPlain": "Plain text",
+  "admin.editor.stats": "{chars} chars · {words} words · ~{minutes} min read",
+  "admin.editor.shortcutHint": "Shortcuts: Ctrl/⌘ + B bold · I italic · K link · S save draft",
   "admin.editor.tableCol": "Column",
   "admin.editor.tableCell": "Content",
   "admin.editor.savedOffline": "Saved offline. It will sync automatically when online.",

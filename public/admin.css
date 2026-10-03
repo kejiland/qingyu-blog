@@ -588,6 +588,8 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-tool { width: 33px; height: 31px; border: none; background: transparent; border-radius: var(--ab-radius-xs); cursor: pointer; color: var(--ab-text); display: inline-flex; align-items: center; justify-content: center; font-size: 14px; transition: background .12s, color .12s; }
 .ab-tool:hover { background: var(--ab-card-solid); color: var(--ab-primary); }
 .ab-tool-select { height: 31px; border: 1px solid var(--ab-border-strong); border-radius: var(--ab-radius-xs); background: var(--ab-card-solid); color: var(--ab-text); font-size: 12px; padding: 0 6px; font-family: inherit; cursor: pointer; }
+.ab-editor-stats { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 10px; font-size: 12px; color: var(--ab-muted); border-top: 1px solid var(--ab-border); }
+.ab-editor-stats .ab-hint { margin: 0; }
 .ab-editor-area { min-height: 420px; border: none; outline: none; padding: 16px; font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 14px; line-height: 1.7; resize: none; overflow: hidden; background: var(--ab-card-solid); color: var(--ab-text); width: 100%; box-sizing: border-box; height: auto; }
 /* 编辑器底部操作条：右对齐、统一上间距与按钮间隙 */
 .ab-editor-actions { margin-top: 18px; justify-content: flex-end; gap: 10px; }

@@ -385,6 +385,8 @@
     "admin.editor.hr": "分割线",
     "admin.editor.codeBlock": "代码块",
     "admin.editor.langPlain": "纯文本",
+    "admin.editor.stats": "{chars} 字符 · {words} 字 · 约 {minutes} 分钟",
+    "admin.editor.shortcutHint": "快捷键：Ctrl/⌘ + B 加粗 · I 斜体 · K 链接 · S 存草稿",
     "admin.editor.tableCol": "列",
     "admin.editor.tableCell": "内容",
     "admin.editor.savedOffline": "已离线保存，联网后会自动同步",

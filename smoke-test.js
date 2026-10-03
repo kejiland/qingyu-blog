@@ -1920,6 +1920,16 @@ tests.push(['编辑器工具栏：表格 / 任务列表 / 分割线 / 代码块�
   assert.ok(acss.includes('.ab-tool-select'), '语言选择器样式');
 }]);
 
+tests.push(['编辑器：字数统计 / 阅读时长 / 快捷键 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abEditorStats'), '统计条 DOM');
+  assert.ok(src.includes('editorCounts') && src.includes('updateEditorStats'), '字数统计逻辑');
+  assert.ok(src.includes("k === 's'"), 'Ctrl+S 存草稿');
+  assert.ok(src.includes("k === 'k'"), 'Ctrl+K 链接');
+  const acss = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(acss.includes('.ab-editor-stats'), '统计条样式');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
