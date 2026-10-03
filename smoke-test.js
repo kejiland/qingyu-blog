@@ -2109,6 +2109,18 @@ tests.push(['编辑器：分类选择 已接入', async () => {
   assert.ok(src.includes('fillCategoryOptions'), '分类候选填充');
 }]);
 
+tests.push(['编辑文章：未传日期时保留原日期（不刷新为今天）', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-date';
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer tok-date' };
+  await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'dp1', title: '旧文', date: '2020-01-02', content: 'x' }) }), env);
+  await core.handlePostId(new Request('http://t/api/posts/dp1', { method: 'PUT', headers: auth, body: JSON.stringify({ title: '旧文改', content: 'y' }) }), env, 'dp1');
+  const row = env._d1.posts.get('dp1');
+  assert.strictEqual(row.date, '2020-01-02', '未传日期时保留原日期');
+  assert.strictEqual(row.title, '旧文改', '标题已更新');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');

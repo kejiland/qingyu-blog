@@ -424,6 +424,8 @@ export async function handlePostId(request, env, id) {
     const body = await request.json().catch(() => null);
     const p = normalizePost(body);
     p.id = id;
+    // 编辑旧文时若未显式带日期，沿用数据库中的原日期，避免被“今天”覆盖导致排序跳到最新
+    if (!p.date && exist && exist.date) p.date = String(exist.date);
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
     if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,

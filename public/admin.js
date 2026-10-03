@@ -2624,7 +2624,8 @@
 
     var wantPinned = !!content.querySelector('#abPinned').checked;
     var dateInput = content.querySelector('#abDate');
-    var dateValue = normalizeEditorDate(dateInput ? dateInput.value : '');
+    var rawDate = dateInput ? String(dateInput.value || '').trim().replace('T', ' ') : '';
+    var dateValue = rawDate || ((content.__editingPost && content.__editingPost.date) ? String(content.__editingPost.date) : normalizeEditorDate(''));
     var publishAt = null;
     if (status === 'scheduled') {
       var scheduleInput = content.querySelector('#abSchedule');
