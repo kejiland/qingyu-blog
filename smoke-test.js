@@ -572,8 +572,8 @@ function makeD1() {
     }
     if (s === 'DELETE FROM backups WHERE id = ?') { t.backups.delete(params[0]); return { success: true }; }
     /* comments */
-    if (/^SELECT \* FROM comments WHERE post_id = \?/.test(s) && /ORDER BY (rowid|COALESCE)/.test(s)) {
-      let rows = [...t.comments.values()].filter((r) => r.post_id === params[0]);
+    if (/^SELECT \*(, rowid AS rid)? FROM comments WHERE post_id = \?/.test(s) && /ORDER BY (rowid|COALESCE)/.test(s)) {
+      let rows = [...t.comments.values()].filter((r) => r.post_id === params[0]).map((r) => Object.assign({ rid: r.__rowid }, r));
       if (s.includes('status')) rows = rows.filter((r) => r.status === 'approved' || r.status == null);
       if (s.includes('COALESCE(pinned')) {
         rows.sort((a, b) => (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
@@ -1841,6 +1841,24 @@ tests.push(['评论（前端）：点赞按钮 / 置顶精选徽章 / commentSor
   const sorted = list.slice().sort(ctx.commentSort).map((x) => x.id).join(',');
   assert.strictEqual(sorted, 'c2,c3,c4,c1', 'commentSort 排序正确');
   assert.ok(typeof ctx.handleCommentLikeClick !== 'undefined' || html.includes('comment-like'), '点赞交互已接入');
+}]);
+
+tests.push(['评论（前端）：最新/最热排序、顶层分页与加载更多', async () => {
+  const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  const list = [];
+  for (let i = 1; i <= 20; i++) list.push({ id: 'c' + i, author: 'u' + i, content: 'x' + i, date: '2026-01-01', likes: i, rid: i });
+  assert.strictEqual(ctx.commentRootCount(list), 20, '顶层评论计数');
+  assert.strictEqual(list.slice().sort(ctx.commentSort)[0].id, 'c20', '最热按点赞排序');
+  const fresh = list.slice().sort(ctx.commentSortNew).map((c) => c.id);
+  assert.strictEqual(fresh[0], 'c20', '最新按写入顺序倒序');
+  assert.strictEqual(fresh[19], 'c1', '最新末尾是最早');
+  const html = ctx.renderCommentTree(list, false, { sorter: ctx.commentSort, limit: 8 });
+  assert.strictEqual((html.match(/class="comment"/g) || []).length, 8, '只渲染前 8 条顶层评论');
+  const withReply = list.slice(0, 3).concat([{ id: 'r1', author: 'r', content: 'reply', parent_id: 'c3', rid: 99 }]);
+  assert.strictEqual(ctx.commentRootCount(withReply), 3, '回复不计入顶层数量');
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
+  assert.ok(d.html.includes('id="commentSort"') && d.html.includes('data-sort="new"'), '排序切换入口');
+  assert.ok(d.html.includes('id="commentMore"'), '加载更多容器');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

@@ -1651,6 +1651,14 @@ kbd {
 .comments h3 { font-size: 18px; margin: 0 0 4px; font-family: var(--font-heading); letter-spacing: .01em; }
 .comment-count { color: var(--muted); font-weight: 400; font-size: 13.5px; }
 .comment-hint { color: var(--muted); font-size: 12.5px; margin: 0 0 14px; }
+.comments-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.comments-head h3 { margin: 0; }
+.comment-sort { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.cs-btn { border: 0; background: none; color: var(--muted); font-size: 12.5px; padding: 5px 14px; cursor: pointer; font-family: inherit; transition: background .15s, color .15s; }
+.cs-btn:hover { color: var(--accent); }
+.cs-btn.active { background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); font-weight: 600; }
+.comment-more { text-align: center; margin-top: 16px; }
+.comment-more .btn { min-width: 160px; }
 .comment-form {
   display: flex; flex-direction: column; gap: 8px;
   border: 1px solid var(--border); border-radius: 14px; padding: 16px;

@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.4';
+var BLOG_VERSION = '2.10.5';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2304,11 +2304,30 @@ function unmarkCommentLiked(id) {
   try { localStorage.setItem('qingyu.commentLikedIds', JSON.stringify(likedCommentIds().filter(function (x) { return String(x) !== String(id); }))); } catch (e) {}
 }
 function commentSort(a, b) {
+  // 最热：置顶 > 精选 > 点赞 > 写入顺序
   return (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
     || (Number(b.featured) || 0) - (Number(a.featured) || 0)
-    || (Number(b.likes) || 0) - (Number(a.likes) || 0);
+    || (Number(b.likes) || 0) - (Number(a.likes) || 0)
+    || (Number(a.rid) || 0) - (Number(b.rid) || 0);
 }
-function renderCommentTree(list, canDel) {
+function commentSortNew(a, b) {
+  // 最新：置顶仍然优先，其余按写入顺序倒序
+  return (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
+    || (Number(b.rid) || 0) - (Number(a.rid) || 0);
+}
+/** 顶层评论数量：分页以顶层为准，回复跟随其父评论一起渲染 */
+function commentRootCount(list) {
+  if (!Array.isArray(list) || !list.length) return 0;
+  var byId = {};
+  list.forEach(function (c) { byId[c.id] = 1; });
+  var n = 0;
+  list.forEach(function (c) { if (!(c.parent_id && byId[c.parent_id])) n++; });
+  return n;
+}
+function renderCommentTree(list, canDel, opts) {
+  opts = opts || {};
+  var sorter = typeof opts.sorter === 'function' ? opts.sorter : commentSort;
+  var limit = Number(opts.limit) > 0 ? Number(opts.limit) : 0;
   if (!Array.isArray(list) || !list.length) return '<li class="comment-empty">' + t('comment.noComments') + '</li>';
   var roots = [];
   var childMap = {};
@@ -2318,7 +2337,8 @@ function renderCommentTree(list, canDel) {
     if (c.parent_id && byId[c.parent_id]) childMap[c.parent_id].push(c);
     else roots.push(c);
   });
-  roots.sort(commentSort);
+  roots.sort(sorter);
+  if (limit && roots.length > limit) roots = roots.slice(0, limit);
 
   function renderOne(c, depth) {
     var replies = childMap[c.id] || [];
@@ -2632,11 +2652,12 @@ async function renderPost(id) {
   html += '</div>';
 
   // comments
-  html += '<div class="comments"><h3>' + t('comment.title') + ' <span class="comment-count" id="commentCount">' + '0' + '</span></h3>';
+  html += '<div class="comments"><div class="comments-head"><h3>' + t('comment.title') + ' <span class="comment-count" id="commentCount">0</span></h3>' +
+    '<div class="comment-sort" id="commentSort" role="tablist"><button type="button" class="cs-btn active" data-sort="hot" role="tab" aria-selected="true">' + t('comment.sortHot') + '</button><button type="button" class="cs-btn" data-sort="new" role="tab" aria-selected="false">' + t('comment.sortNew') + '</button></div></div>';
   html += '<p class="comment-hint">' + t('comment.hint') + '</p>';
   html += '<div class="reply-indicator" id="replyIndicator" style="display:none"><span id="replyTo"></span><button class="reply-cancel" id="replyCancel">✕</button></div>';
   html += '<div class="comment-form"><input type="text" id="commentAuthor" maxlength="30" placeholder="' + t('comment.authorPlaceholder') + '"><div class="comment-editor-row"><textarea id="commentContent" rows="2" maxlength="1000" placeholder="' + t('comment.contentPlaceholder') + '"></textarea><button type="button" class="comment-emoji-btn" id="commentEmoji" title="' + t('comment.emoji') + '" aria-label="' + t('comment.emoji') + '">😊</button></div><div class="comment-submit-row"><button class="btn btn-primary" id="commentSubmit">' + t('comment.submit') + '</button><span class="c-status" id="commentStatus"></span></div></div>';
-  html += '<ul class="comment-list" id="commentList"></ul></div>';
+  html += '<ul class="comment-list" id="commentList"></ul><div class="comment-more" id="commentMore" style="display:none"><button type="button" class="btn" id="commentMoreBtn">' + t('comment.loadMore') + '</button></div></div>';
 
   // 精选文章（评论区下方）
   html += renderFeaturedHtml(post.id);
@@ -2717,15 +2738,33 @@ async function renderPost(id) {
     });
   })();
 
-  // load comments（构建评论树：顶层 + 嵌套回复统一渲染）
+  // load comments（顶层 + 嵌套回复统一渲染；支持「最热 / 最新」排序与分页）
+  var CMT_PAGE = 8;
+  var _cmtState = { sort: 'hot', shown: CMT_PAGE, list: [] };
   function refreshComments(list) {
+    _cmtState.list = Array.isArray(list) ? list : [];
+    _cmtState.shown = CMT_PAGE;
+    renderCommentView();
+  }
+  function renderCommentView() {
     var ul = document.querySelector('#commentList');
     var cnt = document.querySelector('#commentCount');
+    var moreWrap = document.querySelector('#commentMore');
     if (!ul) return;
-    if (cnt) cnt.textContent = String(list ? list.length : 0);
+    var list = _cmtState.list;
+    if (cnt) cnt.textContent = String(list.length);
+    if (!list.length) {
+      ul.innerHTML = '<li class="comment-empty">' + t('comment.noComments') + '</li>';
+      if (moreWrap) moreWrap.style.display = 'none';
+      return;
+    }
     var canDel = !_cloudOn() || adminOk();
-    if (!list || !list.length) { ul.innerHTML = '<li class="comment-empty">' + t('comment.noComments') + '</li>'; return; }
-    ul.innerHTML = renderCommentTree(list, canDel);
+    var sorter = _cmtState.sort === 'new' ? commentSortNew : commentSort;
+    ul.innerHTML = renderCommentTree(list, canDel, { sorter: sorter, limit: _cmtState.shown });
+    if (moreWrap) moreWrap.style.display = commentRootCount(list) > _cmtState.shown ? 'block' : 'none';
+    bindCommentActions(ul);
+  }
+  function bindCommentActions(ul) {
     // 删除按钮
     ul.querySelectorAll('.comment-del').forEach(function (b) {
       b.addEventListener('click', function () {
@@ -2776,6 +2815,28 @@ async function renderPost(id) {
       });
     });
   }
+  var sortWrap = document.querySelector('#commentSort');
+  if (sortWrap) {
+    sortWrap.querySelectorAll('[data-sort]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var v = b.getAttribute('data-sort');
+        if (v === _cmtState.sort) return;
+        _cmtState.sort = v;
+        _cmtState.shown = CMT_PAGE;
+        sortWrap.querySelectorAll('[data-sort]').forEach(function (x) {
+          var on = x === b;
+          x.classList.toggle('active', on);
+          x.setAttribute('aria-selected', on ? 'true' : 'false');
+        });
+        renderCommentView();
+      });
+    });
+  }
+  var moreBtn = document.querySelector('#commentMoreBtn');
+  if (moreBtn) moreBtn.addEventListener('click', function () {
+    _cmtState.shown += CMT_PAGE;
+    renderCommentView();
+  });
   loadComments(post.id).then(refreshComments);
 
   // 取消回复
