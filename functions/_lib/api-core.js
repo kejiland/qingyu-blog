@@ -358,6 +358,11 @@ export async function handlePosts(request, env) {
     const full = url.searchParams.get('full') === '1';
     const includeDrafts = full || url.searchParams.get('all') === '1';
 
+    const q = String(url.searchParams.get('q') || '').trim().toLowerCase();
+    const stFilter = String(url.searchParams.get('status') || '');
+    const pageNum = Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 0));
+    const perNum = Math.min(100, Math.floor(Number(url.searchParams.get('per')) || 0));
+    const paged = pageNum > 0 && perNum > 0;
     // all=1 / full=1 是后台接口：必须登录，可返回草稿（full=1 还返回正文）。
     // 公开的 GET /api/posts 仍只返回已发布摘要，且响应不区分管理员身份。
     if (includeDrafts && !(await isWriteAuthed(request, env))) return unauthorized(request, env);
@@ -367,6 +372,18 @@ export async function handlePosts(request, env) {
 
     // 完整备份：正文/密文原样返回，禁止写进共享缓存。
     if (full) return json({ ok: true, posts: all }, 200, request, env, { 'Cache-Control': NO_CACHE });
+    // 后台列表：服务端过滤 + 分页（不下发全量文章）
+    if (paged) {
+      if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+      let list = all;
+      if (stFilter && stFilter !== 'all') list = list.filter((p) => (p.status || 'published') === stFilter);
+      if (q) list = list.filter((p) => ((p.title || '') + ' ' + (Array.isArray(p.tags) ? p.tags.join(' ') : String(p.tags || ''))).toLowerCase().indexOf(q) >= 0);
+      const total = list.length;
+      const pages = Math.max(1, Math.ceil(total / perNum));
+      const start = (pageNum - 1) * perNum;
+      const rows = list.slice(start, start + perNum).map((p) => { const c = Object.assign({}, p); if (!c.protected && c.content) c.search = String(c.content).slice(0, 800); delete c.content; delete c.enc; return c; });
+      return json({ ok: true, posts: rows, total: total, page: pageNum, per: perNum, pages: pages }, 200, request, env, { 'Cache-Control': NO_CACHE });
+    }
 
     const summary = all.map((p) => {
       if (!p.protected) {

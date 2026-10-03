@@ -2121,6 +2121,26 @@ tests.push(['编辑文章：未传日期时保留原日期（不刷新为今天�
   assert.strictEqual(row.title, '旧文改', '标题已更新');
 }]);
 
+tests.push(['后台文章列表：服务端搜索与分页', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-sp';
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer tok-sp' };
+  for (let i = 0; i < 25; i++) {
+    await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'sp' + i, title: '文章' + i, date: '2026-01-01', content: 'body', tags: i % 2 ? ['技术'] : ['随笔'] }) }), env);
+  }
+  let r = await core.handlePosts(new Request('http://t/api/posts?page=2&per=10&status=all', { headers: auth }), env);
+  let d = await r.json();
+  assert.strictEqual(d.total, 25, '服务端返回总数');
+  assert.strictEqual(d.posts.length, 10, '第二页 10 条');
+  assert.strictEqual(d.pages, 3, '共 3 页');
+  r = await core.handlePosts(new Request('http://t/api/posts?page=1&per=10&q=' + encodeURIComponent('技术'), { headers: auth }), env);
+  d = await r.json();
+  assert.strictEqual(d.total, 12, '按标签搜索命中 12 篇');
+  r = await core.handlePosts(new Request('http://t/api/posts?page=1&per=10', {}), env);
+  assert.strictEqual(r.status, 401, '未登录分页查询 401');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');

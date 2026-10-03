@@ -1053,6 +1053,7 @@
 
   async function loadDashboard(content) {
     var posts = [];
+    var serverTotal = 0;
     try { posts = await listPosts(); } catch (e) {}
     var total = posts.length;
     var published = posts.filter(function (p) { return (p.status || 'published') === 'published'; }).length;
@@ -1472,9 +1473,19 @@
     var posts = [];
     try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
 
-    var kw = content.querySelector('#abPostKw').value.trim().toLowerCase();
+    var kwRaw = content.querySelector('#abPostKw').value.trim();
+    var kw = kwRaw.toLowerCase();
     var st = content.querySelector('#abPostStatus').value;
-
+    if (cloudOn()) {
+      try {
+        var sd = await api('api/posts?q=' + encodeURIComponent(kwRaw) + '&status=' + encodeURIComponent(st) + '&page=' + page + '&per=10');
+        posts = (sd && sd.posts) || [];
+        serverTotal = Number(sd && sd.total) || 0;
+      } catch (e) {
+        body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
+        return;
+      }
+    }
     var filtered = posts.filter(function (p) {
       if (st !== 'all' && (p.status || 'published') !== st) return false;
       if (kw) {
@@ -1490,7 +1501,7 @@
       content.querySelector('#abPostPage').innerHTML = '';
       return;
     }
-    var per = 10, totalPages = Math.max(1, Math.ceil(filtered.length / per));
+    var per = 10, totalPages = serverTotal ? Math.max(1, Math.ceil(serverTotal / per)) : Math.max(1, Math.ceil(filtered.length / per));
     page = Math.min(page, totalPages);
     var slice = filtered.slice((page - 1) * per, page * per);
     body.innerHTML = slice.map(function (p) {
