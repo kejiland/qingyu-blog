@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.12';
+var BLOG_VERSION = '2.10.13';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -695,6 +695,13 @@ function updateReadingProgress() {
   var progress = height <= viewport ? (scrollY >= top ? 1 : 0) : (scrollY - top) / (end - top);
   progress = Math.max(0, Math.min(1, progress));
   bar.style.transform = 'scaleX(' + progress + ')';
+  // 侧边目录的阅读进度环
+  var ring = document.querySelector('#tocRingFg');
+  if (ring && ring.style) {
+    var CIRC = 2 * Math.PI * 8;
+    ring.style.strokeDasharray = String(CIRC);
+    ring.style.strokeDashoffset = String(CIRC * (1 - progress));
+  }
 }
 
 function updateTocActive() {
@@ -707,10 +714,20 @@ function updateTocActive() {
     if (!heading || !heading.getBoundingClientRect) return;
     if (heading.getBoundingClientRect().top <= 150) active = link;
   });
+  var activeHref = active ? (active.getAttribute('href') || '') : '';
+  var order = [];
+  links.forEach(function (l) {
+    var href = l.getAttribute('href') || '';
+    if (href && order.indexOf(href) < 0) order.push(href);
+  });
+  var activeIdx = activeHref ? order.indexOf(activeHref) : -1;
   links.forEach(function (link) {
     if (!link.classList) return;
-    if (link === active) link.classList.add('active');
-    else link.classList.remove('active');
+    var href = link.getAttribute('href') || '';
+    var idx = order.indexOf(href);
+    var isActive = !!activeHref && href === activeHref;
+    link.classList.toggle('active', isActive);
+    link.classList.toggle('read', !isActive && activeIdx >= 0 && idx >= 0 && idx < activeIdx);
   });
 }
 
@@ -2626,7 +2643,9 @@ async function renderPost(id) {
   // 桌面端侧边目录（≥1400px 显示，固定在正文右侧，滚动时始终可见）
   if (toc) {
     html += '<aside class="post-toc-aside" id="postTocAside" aria-label="' + t('toc.title') + '">' +
-      '<div class="pta-title">' + svgIcon('list', 14) + ' ' + t('toc.title') + '</div>' +
+      '<div class="pta-head"><div class="pta-title">' + svgIcon('list', 14) + ' ' + t('toc.title') + '</div>' +
+      '<div class="pta-tools"><svg class="pta-ring" viewBox="0 0 20 20" aria-hidden="true"><circle class="pta-ring-bg" cx="10" cy="10" r="8"></circle><circle class="pta-ring-fg" id="tocRingFg" cx="10" cy="10" r="8"></circle></svg>' +
+      '<button type="button" class="pta-toggle" id="tocToggle" aria-label="' + t('toc.collapse') + '" title="' + t('toc.collapse') + '">−</button></div></div>' +
       '<div class="pta-list">' + tocHeadings.map(function (h) {
         return '<a href="#' + esc(h.id) + '" data-toc="' + esc(h.id) + '" style="padding-left:' + (8 + (h.lvl - 1) * 12) + 'px"><span class="toc-num">' + esc(h.num) + '</span>' + esc(h.text) + '</a>';
       }).join('') + '</div></aside>';
@@ -2793,6 +2812,20 @@ async function renderPost(id) {
     });
   }
   // 移动端浮动目录：抽屉展开 / 关闭
+  // 侧边目录折叠（本地记忆）
+  var tocAside = document.querySelector('#postTocAside');
+  var tocToggle = document.querySelector('#tocToggle');
+  if (tocAside && tocToggle) {
+    var tocCollapsed = false;
+    try { tocCollapsed = localStorage.getItem('qingyu.tocCollapsed') === '1'; } catch (e) {}
+    if (tocCollapsed) { tocAside.classList.add('collapsed'); tocToggle.textContent = '+'; }
+    tocToggle.addEventListener('click', function () {
+      var next = !tocAside.classList.contains('collapsed');
+      tocAside.classList.toggle('collapsed', next);
+      tocToggle.textContent = next ? '+' : '−';
+      try { localStorage.setItem('qingyu.tocCollapsed', next ? '1' : '0'); } catch (e) {}
+    });
+  }
   var tocFab = document.querySelector('#tocFab');
   var tocSheet = document.querySelector('#tocSheet');
   function closeTocSheet() { if (tocSheet) tocSheet.hidden = true; }

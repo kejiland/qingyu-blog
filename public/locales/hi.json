@@ -458,6 +458,8 @@
   "confirm.cancel": "रद्द करें",
   "i18n.langLabel": "भाषा",
   "toc.title": "विषय सूची",
+  "toc.collapse": "विषय-सूची संकुचित करें",
+  "toc.expand": "विषय-सूची विस्तृत करें",
   "post.untitled": "(शीर्षक नहीं)",
   "post.defaultTitle": "बिना शीर्षक लेख",
   "post.thumbnailAlt": "लेख थंबनेल",

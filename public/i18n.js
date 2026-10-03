@@ -572,6 +572,8 @@
     "confirm.cancel": "取消",
     "i18n.langLabel": "语言",
     "toc.title": "目录",
+    "toc.collapse": "收起目录",
+    "toc.expand": "展开目录",
     "ad.label": "广告",
     "search.noMatch": "没有匹配的文章",
     "search.results": "找到 {count} 条结果",

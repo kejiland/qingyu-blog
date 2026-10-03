@@ -458,6 +458,8 @@
   "confirm.cancel": "取消",
   "i18n.langLabel": "语言",
   "toc.title": "目录",
+  "toc.collapse": "收起目录",
+  "toc.expand": "展开目录",
   "post.untitled": "(无标题)",
   "post.defaultTitle": "未命名文章",
   "post.thumbnailAlt": "文章缩略图",
