@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.20';
+var BLOG_VERSION = '2.10.21';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -695,6 +695,57 @@ function updateReadingProgress() {
   var progress = height <= viewport ? (scrollY >= top ? 1 : 0) : (scrollY - top) / (end - top);
   progress = Math.max(0, Math.min(1, progress));
   bar.style.transform = 'scaleX(' + progress + ')';
+}
+
+/* ---------- 阅读位置记忆（每篇文章各自记忆，最多保留 50 篇 / 30 天） ---------- */
+var READ_POS_KEY = 'qingyu.readPos';
+var _readPosCurrent = null;
+var _readPosTimer = null;
+function readPositions() {
+  try { return JSON.parse(localStorage.getItem(READ_POS_KEY) || '{}') || {}; } catch (e) { return {}; }
+}
+function saveReadPos(id, y) {
+  if (!id) return;
+  try {
+    var all = readPositions();
+    all[id] = { y: Math.max(0, Math.round(Number(y) || 0)), at: Date.now() };
+    var keys = Object.keys(all);
+    if (keys.length > 50) {
+      keys.sort(function (a, b) { return (all[a].at || 0) - (all[b].at || 0); });
+      keys.slice(0, keys.length - 50).forEach(function (k) { delete all[k]; });
+    }
+    localStorage.setItem(READ_POS_KEY, JSON.stringify(all));
+  } catch (e) {}
+}
+function getReadPos(id) {
+  var v = readPositions()[id];
+  if (!v) return 0;
+  if (Date.now() - (Number(v.at) || 0) > 30 * 86400000) return 0;
+  return Number(v.y) || 0;
+}
+function clearReadPos(id) {
+  try { var all = readPositions(); delete all[id]; localStorage.setItem(READ_POS_KEY, JSON.stringify(all)); } catch (e) {}
+}
+/** 滚动节流保存；滚过正文底部视为「已读完」并清除记录 */
+function readPosTick() {
+  var id = _readPosCurrent;
+  if (!id) return;
+  var y = (typeof window !== 'undefined' && typeof window.scrollY === 'number') ? window.scrollY : 0;
+  var article = document.querySelector('.article');
+  if (article && article.getBoundingClientRect) {
+    var rect = article.getBoundingClientRect();
+    if (rect.bottom && rect.bottom < 80) { clearReadPos(id); return; }
+  }
+  saveReadPos(id, y);
+}
+function bindReadPos() {
+  if (typeof window === 'undefined' || window.__readPosBound) return;
+  window.__readPosBound = true;
+  window.addEventListener('scroll', function () {
+    if (_readPosTimer) return;
+    _readPosTimer = setTimeout(function () { _readPosTimer = null; readPosTick(); }, 500);
+  }, { passive: true });
+  window.addEventListener('beforeunload', readPosTick);
 }
 
 function updateTocActive() {
@@ -2794,6 +2845,19 @@ async function renderPost(id) {
     if (tocClose) tocClose.addEventListener('click', closeTocSheet);
     tocSheet.querySelectorAll('a[data-toc]').forEach(function (a) { a.addEventListener('click', closeTocSheet); });
   }
+
+  // 阅读位置记忆：先恢复上次位置，滚动过程中持续记录
+  _readPosCurrent = post.id;
+  bindReadPos();
+  (function restoreReadPos() {
+    var y = getReadPos(post.id);
+    if (y > 300 && window.scrollTo) {
+      setTimeout(function () {
+        try { window.scrollTo({ top: y, behavior: 'smooth' }); } catch (e) { window.scrollTo(0, y); }
+        toast(t('post.readRestored'), 'ok');
+      }, 150);
+    }
+  })();
 
   // load comments（顶层 + 嵌套回复统一渲染；支持「最热 / 最新」排序与分页）
   var CMT_PAGE = 8;

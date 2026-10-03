@@ -75,6 +75,7 @@
   "post.edit": "編集",
   "post.delete": "削除",
   "post.copyLink": "リンクをコピー",
+  "post.readRestored": "前回の読書位置に戻りました",
   "post.fontSize": "文字サイズ",
   "post.fontSmaller": "文字を小さく",
   "post.fontReset": "標準に戻す",

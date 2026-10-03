@@ -75,6 +75,7 @@
   "post.edit": "편집",
   "post.delete": "삭제",
   "post.copyLink": "링크 복사",
+  "post.readRestored": "이전 읽던 위치로 이동했습니다",
   "post.fontSize": "글자 크기",
   "post.fontSmaller": "글자 작게",
   "post.fontReset": "기본 크기로",

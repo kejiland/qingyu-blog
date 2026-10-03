@@ -75,6 +75,7 @@
   "post.edit": "Edit",
   "post.delete": "Delete",
   "post.copyLink": "Copy link",
+  "post.readRestored": "Jumped back to where you left off",
   "post.fontSize": "Reading size",
   "post.fontSmaller": "Decrease font size",
   "post.fontReset": "Reset font size",

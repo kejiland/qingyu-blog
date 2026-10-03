@@ -2001,6 +2001,16 @@ tests.push(['后台：操作审计日志 记录 / 过滤 / 清空（含分页与
   assert.strictEqual(d.logs.length, 1, '清空后仅保留清空动作本身');
 }]);
 
+tests.push(['阅读位置记忆：保存 / 读取 / 清理', async () => {
+  const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  ctx.saveReadPos('p1', 1234);
+  assert.strictEqual(ctx.getReadPos('p1'), 1234, '保存后可读回');
+  ctx.clearReadPos('p1');
+  assert.strictEqual(ctx.getReadPos('p1'), 0, '清理后为 0');
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/markdown-cheatsheet/');
+  assert.ok(d.ctx.getReadPos('markdown-cheatsheet') >= 0, '文章页已接入位置记忆');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
