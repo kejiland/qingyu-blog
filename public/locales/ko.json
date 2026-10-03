@@ -697,5 +697,13 @@
   "admin.analytics.empty": "글 데이터가 없습니다",
   "admin.analytics.colTrend": "추이",
   "admin.analytics.exportCsv": "CSV 내보내기",
-  "admin.analytics.exported": "CSV를 내보냈습니다"
+  "admin.analytics.exported": "CSV를 내보냈습니다",
+  "comment.like": "좋아요",
+  "comment.pinned": "고정 댓글",
+  "comment.featured": "추천 댓글",
+  "comment.pinComment": "고정",
+  "comment.unpinComment": "고정 해제",
+  "comment.feature": "추천 설정",
+  "comment.unfeature": "추천 해제",
+  "comment.likeFail": "좋아요에 실패했습니다. 나중에 다시 시도해 주세요"
 }

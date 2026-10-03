@@ -10,7 +10,7 @@ import { handleSearch } from './functions/_lib/search.js';
 import { handlePostRelations } from './functions/_lib/relations.js';
 import { handlePopular } from './functions/_lib/popular.js';
 import { handlePostAnalytics } from './functions/_lib/analytics.js';
-import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
+import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleCommentLike, handleMedia, handleMediaId, handleSettings, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
@@ -134,6 +134,10 @@ export default {
     }
     if (url.pathname === '/api/stats/trend') {
       return handleStatsTrend(request, env);
+    }
+    let cl = url.pathname.match(/^\/api\/comments\/([^/]+)\/like$/);
+    if (cl) {
+      return handleCommentLike(request, env, decodeURIComponent(cl[1]));
     }
     let cm = url.pathname.match(/^\/api\/comments\/([^/]+)$/);
     if (cm) {

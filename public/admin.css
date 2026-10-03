@@ -511,6 +511,12 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-status.approved { color: var(--ab-ok); background: color-mix(in srgb, var(--ab-ok) 12%, transparent); }
 .ab-status.pending { color: var(--ab-warn); background: color-mix(in srgb, var(--ab-warn) 14%, transparent); }
 
+/* ---------- 评论置顶 / 精选徽章 ---------- */
+.ab-cmt-badge { display: inline-flex; align-items: center; gap: 3px; margin: 2px 0 0 6px; padding: 1px 8px; border-radius: 999px; font-size: 11px; line-height: 1.7; vertical-align: middle; white-space: nowrap; }
+.ab-cmt-badge.pinned { color: var(--ab-primary); background: var(--ab-primary-weak); }
+.ab-cmt-badge.featured { color: #9a6a14; background: color-mix(in srgb, #d7a33d 20%, transparent); }
+.ab-table tbody tr.ab-cmt-pinned > td:first-child { box-shadow: inset 3px 0 0 var(--ab-primary); }
+
 /* ---------- 空状态 ---------- */
 .ab-empty { text-align: center; padding: 54px 20px; color: var(--ab-muted); }
 .ab-empty .ab-empty-ico { font-size: 36px; opacity: .45; margin-bottom: 12px; display: block; }

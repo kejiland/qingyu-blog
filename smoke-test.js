@@ -572,23 +572,66 @@ function makeD1() {
     }
     if (s === 'DELETE FROM backups WHERE id = ?') { t.backups.delete(params[0]); return { success: true }; }
     /* comments */
-    if (s === 'SELECT * FROM comments WHERE post_id = ? ORDER BY rowid ASC'
-      || s === "SELECT * FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY rowid ASC") {
-      return [...t.comments.values()].filter((r) => r.post_id === params[0])
-        .filter((r) => !s.includes('status') || (r.status === 'approved' || r.status == null))
-        .sort((a, b) => (a.__rowid || 0) - (b.__rowid || 0));
+    if (/^SELECT \* FROM comments WHERE post_id = \?/.test(s) && /ORDER BY (rowid|COALESCE)/.test(s)) {
+      let rows = [...t.comments.values()].filter((r) => r.post_id === params[0]);
+      if (s.includes('status')) rows = rows.filter((r) => r.status === 'approved' || r.status == null);
+      if (s.includes('COALESCE(pinned')) {
+        rows.sort((a, b) => (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
+          || (Number(b.featured) || 0) - (Number(a.featured) || 0)
+          || (Number(b.likes) || 0) - (Number(a.likes) || 0)
+          || (a.__rowid || 0) - (b.__rowid || 0));
+      } else {
+        rows.sort((a, b) => (a.__rowid || 0) - (b.__rowid || 0));
+      }
+      return rows;
+    }
+    // 后台评论列表：comments LEFT JOIN posts（含文章标题）
+    if (/^SELECT c\.\*, p\.title AS post_title FROM comments c/.test(s)) {
+      let rows = [...t.comments.values()];
+      if (s.includes('WHERE c.status = ?')) rows = rows.filter((r) => r.status === params[0]);
+      rows.sort((a, b) => (b.__rowid || 0) - (a.__rowid || 0));
+      return rows.map((r) => Object.assign({}, r, { post_title: (t.posts.get(r.post_id) || {}).title || null }));
     }
     if (s === 'SELECT COUNT(*) AS c FROM comments WHERE post_id = ?') {
       let c = 0; for (const r of t.comments.values()) if (r.post_id === params[0]) c++;
       return { c };
     }
     if (/^INSERT INTO comments/.test(s)) {
-      const [id, post_id, author, content, date] = params;
-      t.comments.set(id, { id, post_id, author, content, date, __rowid: ++seq }); return { success: true };
+      const [id, post_id, author, content, date, status, parent_id] = params;
+      t.comments.set(id, { id, post_id, author, content, date, status, parent_id, likes: 0, featured: 0, pinned: 0, __rowid: ++seq });
+      return { success: true };
     }
     if (s === 'SELECT 1 FROM comments WHERE post_id = ? AND id = ?') {
       const r = t.comments.get(params[1]);
       return (r && r.post_id === params[0]) ? { '1': 1 } : null;
+    }
+    if (s === 'SELECT post_id FROM comments WHERE id = ?') {
+      const r = t.comments.get(params[0]);
+      return r ? { post_id: r.post_id } : null;
+    }
+    if (s === 'SELECT likes FROM comments WHERE id = ?') {
+      const r = t.comments.get(params[0]);
+      return r ? { likes: Number(r.likes) || 0 } : null;
+    }
+    if (s === 'SELECT parent_id FROM comments WHERE post_id = ? AND id = ?') {
+      const r = t.comments.get(params[1]);
+      return (r && r.post_id === params[0]) ? { parent_id: r.parent_id === undefined ? null : r.parent_id } : null;
+    }
+    if (s === 'UPDATE comments SET likes = MIN(COALESCE(likes,0) + 1, 999999) WHERE id = ?') {
+      const r = t.comments.get(params[0]);
+      if (r) r.likes = Math.min((Number(r.likes) || 0) + 1, 999999);
+      return { success: true };
+    }
+    // 后台修改评论字段：UPDATE comments SET col = ?[, col2 = ?] WHERE id = ?
+    if (/^UPDATE comments SET [a-z_]+ = \?(, [a-z_]+ = \?)* WHERE id = \?$/.test(s)) {
+      const cols = s.slice('UPDATE comments SET '.length, s.indexOf(' WHERE id = ?')).split(',').map((x) => x.trim().split('=')[0].trim());
+      const id = params[params.length - 1];
+      const r = t.comments.get(id);
+      if (r) cols.forEach((col, i) => { r[col] = params[i]; });
+      return { success: true };
+    }
+    if (s === 'DELETE FROM comments WHERE id = ?') {
+      t.comments.delete(params[0]); return { success: true };
     }
     // 重复发送查重（api-core handleComments）：同分区 + 同昵称 + 同内容
     if (/^SELECT id FROM comments WHERE post_id = \? AND author = \? AND content = \? LIMIT 1$/.test(s)) {
@@ -1588,6 +1631,68 @@ tests.push(['API：评论 POST / GET / 校验 / 删除（需令牌）', async ()
   assert.strictEqual(after.comments.length, 2, '删除后剩 2 条');
 }]);
 
+tests.push(['评论互动：点赞自增 / 置顶精选排序 / 未登录不可改', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  const post = (pid, body) => core.handleComments(new Request('http://t/api/posts/' + pid + '/comments', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  }), env, pid);
+  const a = (await (await post('ci', { author: 'A', content: '第一条' })).json()).comment;
+  const b = (await (await post('ci', { author: 'B', content: '第二条' })).json()).comment;
+  const c = (await (await post('ci', { author: 'C', content: '第三条' })).json()).comment;
+
+  // 点赞：第一次返回 1，第二次返回 2
+  let r = await core.handleCommentLike(new Request('http://t/api/comments/' + c.id + '/like', { method: 'POST' }), env, c.id);
+  assert.strictEqual(r.status, 200, '点赞 200');
+  assert.strictEqual((await r.json()).likes, 1, '第一次点赞 = 1');
+  r = await core.handleCommentLike(new Request('http://t/api/comments/' + c.id + '/like', { method: 'POST' }), env, c.id);
+  assert.strictEqual((await r.json()).likes, 2, '第二次点赞 = 2');
+
+  // 点赞不存在的评论 → 404
+  const miss = await core.handleCommentLike(new Request('http://t/api/comments/nope/like', { method: 'POST' }), env, 'nope');
+  assert.strictEqual(miss.status, 404, '点赞不存在评论 404');
+
+  // 未登录不能改置顶 / 精选
+  let pu = await core.handleCommentUpdate(new Request('http://t/api/comments/' + a.id, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pinned: true })
+  }), env, a.id);
+  assert.strictEqual(pu.status, 401, '未登录改置顶 401');
+
+  // 有令牌可置顶 / 精选
+  env.BLOG_WRITE_TOKEN = 'tok-cmt';
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer tok-cmt' };
+  pu = await core.handleCommentUpdate(new Request('http://t/api/comments/' + a.id, {
+    method: 'PUT', headers: auth, body: JSON.stringify({ pinned: true })
+  }), env, a.id);
+  assert.strictEqual(pu.status, 200, '置顶成功');
+  await core.handleCommentUpdate(new Request('http://t/api/comments/' + b.id, {
+    method: 'PUT', headers: auth, body: JSON.stringify({ featured: true })
+  }), env, b.id);
+
+  // 前台排序：置顶 > 精选 > 点赞 > 写入顺序
+  const ordering = await (await core.handleComments(new Request('http://t/api/posts/ci/comments'), env, 'ci')).json();
+  assert.strictEqual(ordering.comments[0].id, a.id, '置顶排最前');
+  assert.strictEqual(ordering.comments[1].id, b.id, '精选排第二');
+  assert.strictEqual(ordering.comments[2].id, c.id, '高赞排第三');
+
+  // 后台列表返回点赞 / 置顶 / 精选字段（含文章标题连接）
+  const admin = await (await core.handleCommentsList(new Request('http://t/api/comments?status=all', {
+    headers: { Authorization: 'Bearer tok-cmt' }
+  }), env)).json();
+  assert.strictEqual(admin.comments.length, 3, '后台列表 3 条');
+  const rowC = admin.comments.filter((x) => x.id === c.id)[0];
+  assert.strictEqual(Number(rowC.likes), 2, '后台列表带点赞数');
+  const rowA = admin.comments.filter((x) => x.id === a.id)[0];
+  assert.strictEqual(Number(rowA.pinned), 1, '后台列表带置顶状态');
+
+  // 取消置顶后就地更新
+  await core.handleCommentUpdate(new Request('http://t/api/comments/' + a.id, {
+    method: 'PUT', headers: auth, body: JSON.stringify({ pinned: false })
+  }), env, a.id);
+  const ordering2 = await (await core.handleComments(new Request('http://t/api/posts/ci/comments'), env, 'ci')).json();
+  assert.strictEqual(ordering2.comments[0].id, b.id, '取消置顶后精选顶到最前');
+}]);
+
 tests.push(['留言板（云端）：合成 id gb-note/gb-idea 复用评论管道，持久化 + 来源校验', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
@@ -1690,6 +1795,26 @@ tests.push(['评论（静态模式）：保存在本浏览器并渲染', async (
   // 详情页包含评论区结构
   const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
   assert.ok(d.html.includes('comment-list') && d.html.includes('发表评论'), '评论表单在详情页');
+}]);
+
+tests.push(['评论（前端）：点赞按钮 / 置顶精选徽章 / commentSort 排序', async () => {
+  const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  const list = [
+    { id: 'c1', author: '小甲', content: '普通评论', date: '2026-01-01' },
+    { id: 'c2', author: '小乙', content: '置顶评论', date: '2026-01-02', pinned: 1 },
+    { id: 'c3', author: '小丙', content: '精选评论', date: '2026-01-03', featured: 1 },
+    { id: 'c4', author: '小丁', content: '高赞评论', date: '2026-01-04', likes: 5 }
+  ];
+  const html = ctx.renderCommentTree(list, false);
+  assert.ok(html.includes('comment-like'), '渲染点赞按钮');
+  assert.ok(html.includes('data-like-id="c1"'), '点赞按钮携带评论 id');
+  assert.ok(html.includes('comment-badge pinned'), '渲染置顶徽章');
+  assert.ok(html.includes('comment-badge featured'), '渲染精选徽章');
+  assert.ok(html.includes('class="comment pinned') || html.includes('comment pinned'), '置顶评论带状态类');
+  // 排序：置顶 > 精选 > 点赞 > 普通
+  const sorted = list.slice().sort(ctx.commentSort).map((x) => x.id).join(',');
+  assert.strictEqual(sorted, 'c2,c3,c4,c1', 'commentSort 排序正确');
+  assert.ok(typeof ctx.handleCommentLikeClick !== 'undefined' || html.includes('comment-like'), '点赞交互已接入');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

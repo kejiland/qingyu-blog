@@ -697,5 +697,13 @@
   "admin.analytics.empty": "No post analytics yet",
   "admin.analytics.colTrend": "Trend",
   "admin.analytics.exportCsv": "Export CSV",
-  "admin.analytics.exported": "CSV exported"
+  "admin.analytics.exported": "CSV exported",
+  "comment.like": "Like",
+  "comment.pinned": "Pinned comment",
+  "comment.featured": "Featured comment",
+  "comment.pinComment": "Pin",
+  "comment.unpinComment": "Unpin",
+  "comment.feature": "Feature",
+  "comment.unfeature": "Unfeature",
+  "comment.likeFail": "Like failed, please try again later"
 }

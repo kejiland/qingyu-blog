@@ -34,6 +34,7 @@ const KNOWN_ROUTES = [
   /^\/api\/posts\/[^/]+\/stats$/,
   /^\/api\/posts\/[^/]+\/relations$/,
   /^\/api\/comments$/,
+  /^\/api\/comments\/[^/]+\/like$/,
   /^\/api\/comments\/[^/]+$/,
   /^\/api\/media$/,
   /^\/api\/media\/upload-url$/,

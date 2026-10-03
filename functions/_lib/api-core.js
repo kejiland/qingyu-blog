@@ -450,7 +450,7 @@ export async function handlePostId(request, env, id) {
  * 评论（D1 表 comments；GET 列表 / POST 发表 / DELETE 单条）
  * ============================================================ */
 
-const COMMENT_CAPS = { author: 30, content: 1000, perPost: 300, perMin: 5 };
+const COMMENT_CAPS = { author: 30, content: 1000, perPost: 300, perMin: 5, likePerMin: 30 };
 
 /** 清除字符串中的 ASCII 控制字符（保留 \n \t）：防注入 / 干扰渲染的隐形字符 */
 function sanitizeText(s) {
@@ -479,7 +479,7 @@ export async function handleComments(request, env, postId) {
   if (method === 'GET') {
     // 按写入顺序返回（rowid 单调递增），与旧版 KV 行为一致；
     // 仅返回已通过审核的评论（status 缺失视为已通过，兼容旧数据）。
-    const list = await dbAll(env.DB, "SELECT * FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY rowid ASC", postId);
+    const list = await dbAll(env.DB, "SELECT * FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY COALESCE(pinned,0) DESC, COALESCE(featured,0) DESC, COALESCE(likes,0) DESC, rowid ASC", postId);
     // 评论是用户实时互动内容、变化频繁，不进边缘缓存（no-store），
     // 保证发表/删除后立即可见；否则命中 60s 缓存会导致删除"不刷新"。
     return json({ ok: true, postId, comments: list }, 200, request, env, { 'Cache-Control': NO_CACHE });
@@ -568,6 +568,26 @@ export async function handleComments(request, env, postId) {
   return json({ error: 'Method not allowed' }, 405, request, env);
 }
 
+/** POST /api/comments/:id/like（公开点赞，按 IP 频控） */
+export async function handleCommentLike(request, env, cid) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  const exist = await dbFirst(env.DB, 'SELECT likes FROM comments WHERE id = ?', cid).catch(() => null);
+  if (!exist) return json({ error: '评论不存在' }, 404, request, env);
+  const ip = clientIp(request);
+  const win = Math.floor(Date.now() / 60000);
+  const key = 'rate:cmtlike:' + ip + ':' + win;
+  if (env.BLOG) {
+    let n = 0;
+    try { n = Number((await env.BLOG.get(key)) || 0); } catch (e) {}
+    if (n >= COMMENT_CAPS.likePerMin) return json({ error: '点赞太频繁，请稍后再试' }, 429, request, env);
+    try { await env.BLOG.put(key, String(n + 1), { expirationTtl: 120 }); } catch (e) {}
+  }
+  await dbRun(env.DB, 'UPDATE comments SET likes = MIN(COALESCE(likes,0) + 1, 999999) WHERE id = ?', cid);
+  const row = await dbFirst(env.DB, 'SELECT likes FROM comments WHERE id = ?', cid);
+  return json({ ok: true, likes: Number(row && row.likes) || 0 }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
 /** DELETE /api/posts/:id/comments/:cid（需写入令牌，用于管理/删除不当评论） */
 export async function handleCommentId(request, env, postId, cid) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
@@ -1369,12 +1389,24 @@ export async function handleCommentUpdate(request, env, cid) {
   if (request.method === 'OPTIONS') return corsPreflight(request, env);
   if (request.method !== 'PUT' && request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
   if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
-  const body = await request.json().catch(() => null);
-  const status = (body && body.status) || 'approved';
-  if (status !== 'approved' && status !== 'pending') return json({ error: 'status 只能是 approved 或 pending' }, 400, request, env);
+  const body = (await request.json().catch(() => null)) || {};
+  const fields = [];
+  const params = [];
+  if (Object.prototype.hasOwnProperty.call(body, 'status')) {
+    if (body.status !== 'approved' && body.status !== 'pending') return json({ error: 'status 只能是 approved 或 pending' }, 400, request, env);
+    fields.push('status = ?'); params.push(body.status);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'featured')) {
+    fields.push('featured = ?'); params.push(body.featured ? 1 : 0);
+  }
+  if (Object.prototype.hasOwnProperty.call(body, 'pinned')) {
+    fields.push('pinned = ?'); params.push(body.pinned ? 1 : 0);
+  }
+  if (!fields.length) return json({ error: '缺少要更新的字段' }, 400, request, env);
   const exist = await dbFirst(env.DB, 'SELECT post_id FROM comments WHERE id = ?', cid);
   if (!exist) return json({ error: '评论不存在' }, 404, request, env);
-  await dbRun(env.DB, 'UPDATE comments SET status = ? WHERE id = ?', status, cid);
+  params.push(cid);
+  await dbRun(env.DB, 'UPDATE comments SET ' + fields.join(', ') + ' WHERE id = ?', ...params);
   return json({ ok: true }, 200, request, env);
 }
 

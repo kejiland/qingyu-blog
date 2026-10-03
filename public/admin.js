@@ -2571,7 +2571,7 @@
     content.innerHTML += '<div class="ab-toolbar">' +
       '<div class="ab-search"><input class="ab-input" id="abCmtKw" placeholder="' + t('admin.comments.search') + '"></div>' +
       '<select class="ab-select" id="abCmtFilter" style="max-width:160px"><option value="all">' + t('admin.comments.all') + '</option><option value="pending"' + (filter === 'pending' ? ' selected' : '') + '>' + t('admin.comments.pendingStatus') + '</option><option value="approved">' + t('admin.comments.approved') + '</option></select>' +
-      '</div><div id="abAiComments" class="ab-ai-comments"></div><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.comments.colAuthor') + '</th><th>' + t('admin.comments.colContent') + '</th><th>' + t('admin.comments.colPost') + '</th><th>' + t('admin.comments.colDate') + '</th><th>' + t('admin.comments.colStatus') + '</th><th class="col-actions">' + t('admin.comments.colActions') + '</th></tr></thead><tbody id="abCmtBody"></tbody></table></div>';
+      '</div><div id="abAiComments" class="ab-ai-comments"></div><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.comments.colAuthor') + '</th><th>' + t('admin.comments.colContent') + '</th><th>' + t('admin.comments.colPost') + '</th><th>' + t('admin.comments.colDate') + '</th><th>' + t('comment.like') + '</th><th>' + t('admin.comments.colStatus') + '</th><th class="col-actions">' + t('admin.comments.colActions') + '</th></tr></thead><tbody id="abCmtBody"></tbody></table></div>';
     bindComments(content);
     loadComments(content, filter);
     initAbAiComments(content);
@@ -2585,18 +2585,19 @@
   async function loadComments(content, filter) {
     var body = content.querySelector('#abCmtBody');
     if (!body) return;
-    body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
     var d;
-    try { d = await api('api/comments?status=' + (filter === 'pending' ? 'pending' : 'all')); } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
+    try { d = await api('api/comments?status=' + (filter === 'pending' ? 'pending' : 'all')); } catch (e) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
     var list = (d && d.comments) || [];
     var kw = (content.querySelector('#abCmtKw').value || '').trim().toLowerCase();
     if (kw) list = list.filter(function (c) { return ((c.author || '') + ' ' + (c.content || '')).toLowerCase().indexOf(kw) >= 0; });
-    if (!list.length) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.dashboard.noComments') + '</td></tr>'; return; }
+    if (!list.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.dashboard.noComments') + '</td></tr>'; return; }
     // 建立 id → 评论 映射，以便展示“回复了某人”的父子关系
     var cmtById = {};
     list.forEach(function (c) { cmtById[c.id] = c; });
     body.innerHTML = list.map(function (c) {
       var st = c.status || 'approved';
+      var pinned = !!c.pinned, featured = !!c.featured;
       // 二级及以上回复：标注其父评论，便于后台追踪回复链
       var replyTag = '';
       if (c.parent_id) {
@@ -2604,37 +2605,86 @@
         if (parent) replyTag = ' <span class="ab-cmt-replyto">' + esc(t('comment.replyTo', { author: parent.author || t('admin.comments.anonymous') })) + '</span>';
         else replyTag = ' <span class="ab-cmt-replyto">#' + esc(c.parent_id) + '</span>';
       }
+      var badges = '';
+      if (pinned) badges += ' <span class="ab-cmt-badge pinned">' + icon('pin', 11) + t('comment.pinned') + '</span>';
+      if (featured) badges += ' <span class="ab-cmt-badge featured">' + icon('star', 11) + t('comment.featured') + '</span>';
       var actions = '';
       if (st === 'pending') actions += '<button class="ab-btn sm primary" data-approve="' + enc(c.id) + '">' + icon('check', 13) + ' ' + t('admin.comments.approve') + '</button> ';
+      actions += '<button class="ab-btn sm' + (pinned ? ' primary' : '') + '" data-pin="' + enc(c.id) + '" data-on="' + (pinned ? '1' : '0') + '">' + icon('pin', 13) + ' ' + (pinned ? t('comment.unpinComment') : t('comment.pinComment')) + '</button> ';
+      actions += '<button class="ab-btn sm' + (featured ? ' primary' : '') + '" data-feat="' + enc(c.id) + '" data-on="' + (featured ? '1' : '0') + '">' + icon('star', 13) + ' ' + (featured ? t('comment.unfeature') : t('comment.feature')) + '</button> ';
       actions += '<button class="ab-btn sm danger" data-delcmt="' + enc(c.id) + '">' + icon('trash', 13) + ' ' + t('admin.comments.delete') + '</button>';
-      return '<tr>' +
+      return '<tr' + (pinned ? ' class="ab-cmt-pinned"' : '') + '>' +
         '<td>' + esc(c.author || t('admin.comments.anonymous')) + '</td>' +
-        '<td style="max-width:320px">' + esc((c.content || '').slice(0, 120)) + replyTag + '</td>' +
+        '<td style="max-width:320px">' + esc((c.content || '').slice(0, 120)) + replyTag + badges + '</td>' +
         '<td>' + esc(c.post_title || c.post_id || '—') + '</td>' +
         '<td>' + esc(fmtDate(c.date)) + '</td>' +
+        '<td style="text-align:center;white-space:nowrap">' + icon('heart', 12) + ' ' + esc(String(Number(c.likes) || 0)) + '</td>' +
         '<td><span class="ab-status ' + st + '">' + (st === 'pending' ? t('admin.comments.pendingStatus') : t('admin.comments.approved')) + '</span></td>' +
         '<td class="col-actions">' + actions + '</td>' +
       '</tr>';
     }).join('');
     body.querySelectorAll('[data-approve]').forEach(function (b) { b.addEventListener('click', function () { approveComment(content, dec(b.getAttribute('data-approve')), filter, b.closest('tr')); }); });
-    body.querySelectorAll('[data-delcmt]').forEach(function (b) { b.addEventListener('click', function () {
-      var cid = dec(b.getAttribute('data-delcmt'));
-      var tr = b.closest('tr');
-      confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.comments.deleteConfirm') + '</p>', async function () {
-        // 无感刷新：请求期间先半透明即时反馈，成功后行淡出移除，不整表重拉
-        if (tr) { tr.style.opacity = '0.45'; tr.style.pointerEvents = 'none'; }
-        try {
-          await api('api/comments/' + enc(cid), { method: 'DELETE' });
-          toast(t('admin.comments.deleted'), 'ok');
-          seamlessRemoveRow(body, tr, t('admin.dashboard.noComments'));
-        } catch (e) {
-          if (tr) { tr.style.opacity = ''; tr.style.pointerEvents = ''; }
-          toast(t('admin.postList.opFail') + (e.message || e), 'err');
-        }
-      }, t('admin.comments.delete'));
-    }); });
+    body.querySelectorAll('[data-pin]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'pinned'); }); });
+    body.querySelectorAll('[data-feat]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'featured'); }); });
+    body.querySelectorAll('[data-delcmt]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var cid = dec(b.getAttribute('data-delcmt'));
+        var tr = b.closest('tr');
+        confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.comments.deleteConfirm') + '</p>', async function () {
+          // 无感刷新：请求期间先半透明即时反馈，成功后行淡出移除，不整表重拉
+          if (tr) { tr.style.opacity = '0.45'; tr.style.pointerEvents = 'none'; }
+          try {
+            await api('api/comments/' + enc(cid), { method: 'DELETE' });
+            toast(t('admin.comments.deleted'), 'ok');
+            seamlessRemoveRow(body, tr, t('admin.dashboard.noComments'));
+          } catch (e) {
+            if (tr) { tr.style.opacity = ''; tr.style.pointerEvents = ''; }
+            toast(t('admin.postList.opFail') + (e.message || e), 'err');
+          }
+        }, t('admin.comments.delete'));
+      });
+    });
   }
-  async function approveComment(content, cid, filter, tr) {
+  // 切换评论置顶 / 精选（就地更新按钮与徽章，不重拉整表）
+  async function toggleCommentFlag(content, btn, key) {
+    var attr = key === 'pinned' ? 'data-pin' : 'data-feat';
+    var cid = dec(btn.getAttribute(attr));
+    var on = btn.getAttribute('data-on') === '1';
+    var target = !on;
+    btn.disabled = true;
+    try {
+      var payload = {};
+      payload[key] = target;
+      await api('api/comments/' + enc(cid), { method: 'PUT', body: JSON.stringify(payload) });
+      btn.setAttribute('data-on', target ? '1' : '0');
+      btn.classList.toggle('primary', target);
+      if (key === 'pinned') {
+        btn.innerHTML = icon('pin', 13) + ' ' + (target ? t('comment.unpinComment') : t('comment.pinComment'));
+      } else {
+        btn.innerHTML = icon('star', 13) + ' ' + (target ? t('comment.unfeature') : t('comment.feature'));
+      }
+      var tr = btn.closest('tr');
+      if (tr) {
+        if (key === 'pinned') tr.classList.toggle('ab-cmt-pinned', target);
+        var cell = tr.cells && tr.cells[1];
+        if (cell) {
+          var badge = cell.querySelector('.ab-cmt-badge.' + key);
+          if (target && !badge) {
+            var span = document.createElement('span');
+            span.className = 'ab-cmt-badge ' + key;
+            span.innerHTML = (key === 'pinned' ? icon('pin', 11) + t('comment.pinned') : icon('star', 11) + t('comment.featured'));
+            cell.appendChild(span);
+          } else if (!target && badge) {
+            badge.remove();
+          }
+        }
+      }
+    } catch (e) {
+      toast(t('admin.postList.opFail') + (e.message || e), 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }  async function approveComment(content, cid, filter, tr) {
     // 无感刷新：审核通过后原行状态徽章就地更新为「已通过」，其余行与滚动位置不动
     try {
       await api('api/comments/' + enc(cid), { method: 'PUT', body: JSON.stringify({ status: 'approved' }) });

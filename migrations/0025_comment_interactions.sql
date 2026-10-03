@@ -1,0 +1,4 @@
+-- 评论互动：点赞、精选、置顶
+ALTER TABLE comments ADD COLUMN likes INTEGER DEFAULT 0;
+ALTER TABLE comments ADD COLUMN featured INTEGER DEFAULT 0;
+ALTER TABLE comments ADD COLUMN pinned INTEGER DEFAULT 0;

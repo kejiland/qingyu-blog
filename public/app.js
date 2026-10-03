@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.1';
+var BLOG_VERSION = '2.10.2';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -182,6 +182,7 @@ function svgIcon(name, size) {
     palette: '<svg ' + s + ' ' + c + '><path d="M12 3a9 9 0 1 0 5.4 16.2A2.4 2.4 0 0 0 15.6 17h-.9a2.6 2.6 0 0 1-2.6-2.6c0-1.4 1.1-2.6 2.6-2.6h1.4A3.9 3.9 0 0 0 20.2 8 9 9 0 0 0 12 3z"/><circle cx="7.4" cy="11.3" r="1"/><circle cx="10.6" cy="7.2" r="1"/><circle cx="15.4" cy="8.6" r="1"/></svg>',
     globe: '<svg ' + s + ' ' + c + '><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a15.5 15.5 0 0 1 0 18M12 3a15.5 15.5 0 0 0 0 18"/></svg>',
     spark: '<svg ' + s + ' ' + c + '><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 16l.8 2.2L22 19l-2.2.8L19 22l-.8-2.2L16 19l2.2-.8z"/></svg>',
+    star: '<svg ' + s + ' ' + c + '><path d="M12 3.4l2.6 5.3 5.8.9-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.6 9.6l5.8-.9z"/></svg>',
     copy: '<svg ' + s + ' ' + c + '><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>',
     music: '<svg ' + s + ' ' + c + '><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>',
     play: '<svg ' + s + ' ' + c + '><path d="M7 4.5v15l13-7.5z"/></svg>',
@@ -2248,6 +2249,28 @@ function clearPostCache(id) {
  * 统一供首次加载与发表/删除后的刷新使用，保证嵌套结构、缩进与“回复”按钮一致。
  * 注意：若父评论被删除或不在列表内，其子孙评论会归并到顶层，避免丢失。
  */
+function likedCommentIds() {
+  try {
+    var list = JSON.parse(localStorage.getItem('qingyu.commentLikedIds') || '[]');
+    return Array.isArray(list) ? list : [];
+  } catch (e) { return []; }
+}
+function hasLikedComment(id) { return likedCommentIds().indexOf(String(id)) >= 0; }
+function markCommentLiked(id) {
+  try {
+    var list = likedCommentIds();
+    if (list.indexOf(String(id)) < 0) list.push(String(id));
+    localStorage.setItem('qingyu.commentLikedIds', JSON.stringify(list.slice(-1000)));
+  } catch (e) {}
+}
+function unmarkCommentLiked(id) {
+  try { localStorage.setItem('qingyu.commentLikedIds', JSON.stringify(likedCommentIds().filter(function (x) { return String(x) !== String(id); }))); } catch (e) {}
+}
+function commentSort(a, b) {
+  return (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
+    || (Number(b.featured) || 0) - (Number(a.featured) || 0)
+    || (Number(b.likes) || 0) - (Number(a.likes) || 0);
+}
 function renderCommentTree(list, canDel) {
   if (!Array.isArray(list) || !list.length) return '<li class="comment-empty">' + t('comment.noComments') + '</li>';
   var roots = [];
@@ -2255,24 +2278,23 @@ function renderCommentTree(list, canDel) {
   var byId = {};
   list.forEach(function (c) { byId[c.id] = c; childMap[c.id] = []; });
   list.forEach(function (c) {
-    // 只有父评论存在且在同一列表内才作为子评论挂靠，否则归到顶层
     if (c.parent_id && byId[c.parent_id]) childMap[c.parent_id].push(c);
     else roots.push(c);
   });
+  roots.sort(commentSort);
 
-  // 递归渲染单个评论及其子评论
   function renderOne(c, depth) {
     var replies = childMap[c.id] || [];
+    var liked = hasLikedComment(c.id);
+    var likeBtn = '<button class="comment-like' + (liked ? ' liked' : '') + '" data-like-id="' + esc(c.id) + '" aria-label="' + esc(t('comment.like')) + '">' + svgIcon('heart', 12) + ' <span>' + (Number(c.likes) || 0) + '</span></button>';
     var replyBtn = (depth < 3)
       ? '<button class="comment-reply-btn" data-reply-id="' + esc(c.id) + '" data-reply-author="' + esc(c.author) + '">' + t('comment.reply') + '</button>'
       : '';
     var delBtn = canDel
       ? '<button class="comment-del" data-cid="' + esc(c.id) + '">' + t('comment.delete') + '</button>'
       : '';
-    // 在内容下方标注“回复了某人”（若该评论是回复）
-    // 安全：t() 的插值不做转义，作者名可能含 HTML（服务端只清控制字符），
-    // 必须对整个结果 esc 再进 innerHTML（同 admin.js 的 comment.replyTo 用法），
-    // 否则父评论作者名可构造存储型 XSS（他人回复时对所有访客触发）。
+    var badges = (Number(c.pinned) ? '<span class="comment-badge pinned">' + t('comment.pinned') + '</span>' : '')
+      + (Number(c.featured) ? '<span class="comment-badge featured">' + t('comment.featured') + '</span>' : '');
     var replyToLabel = '';
     if (c.parent_id && byId[c.parent_id]) {
       replyToLabel = '<div class="comment-reply-to">' + esc(t('comment.replyTo', { author: byId[c.parent_id].author })) + '</div>';
@@ -2281,11 +2303,11 @@ function renderCommentTree(list, canDel) {
       ? '<ul class="comment-children">' + replies.map(function (r) { return renderOne(r, depth + 1); }).join('') + '</ul>'
       : '';
     var initial = String(c.author || '?').trim().slice(0, 1) || '?';
-    return '<li class="comment" data-id="' + esc(c.id) + '"><div class="comment-head">'
+    return '<li class="comment' + (Number(c.pinned) ? ' pinned' : '') + (Number(c.featured) ? ' featured' : '') + '" data-id="' + esc(c.id) + '"><div class="comment-head">'
       + '<span class="comment-avatar" aria-hidden="true">' + esc(initial) + '</span>'
-      + '<span class="comment-author">' + esc(c.author) + '</span>'
+      + '<span class="comment-author">' + esc(c.author) + '</span>' + badges
       + '<span class="comment-date">' + esc(c.date || '') + '</span>'
-      + '<span class="comment-actions">' + replyBtn + delBtn + '</span>'
+      + '<span class="comment-actions">' + likeBtn + replyBtn + delBtn + '</span>'
       + '</div>'
       + '<div class="comment-main">'
       + replyToLabel
@@ -2619,6 +2641,35 @@ async function renderPost(id) {
     ul.querySelectorAll('.comment-del').forEach(function (b) {
       b.addEventListener('click', function () {
         deleteComment(post.id, b.getAttribute('data-cid')).then(refreshComments);
+      });
+    });
+    // 评论点赞（每浏览器一次，云端调用点赞接口）
+    ul.querySelectorAll('.comment-like').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var cid = b.getAttribute('data-like-id');
+        if (!cid || b.classList.contains('liked') || b.disabled) return;
+        b.disabled = true;
+        markCommentLiked(cid);
+        b.classList.add('liked');
+        var countEl = b.querySelector('span');
+        var oldCount = countEl ? Number(countEl.textContent) || 0 : 0;
+        if (countEl) countEl.textContent = String(oldCount + 1);
+        try {
+          if (_cloudOn()) {
+            var result = await apiFetch('api/comments/' + encodeURIComponent(cid) + '/like', { method: 'POST', body: '{}' });
+            if (countEl && result && result.likes !== undefined) countEl.textContent = String(Number(result.likes) || 0);
+          } else {
+            var localList = await loadComments(post.id);
+            var target = localList.find(function (item) { return String(item.id) === String(cid); });
+            if (target) target.likes = oldCount + 1;
+            try { localStorage.setItem(commentKey(post.id), JSON.stringify(localList)); } catch (e) {}
+          }
+        } catch (e) {
+          unmarkCommentLiked(cid);
+          b.classList.remove('liked');
+          if (countEl) countEl.textContent = String(oldCount);
+          toast(t('comment.likeFail'), 'err');
+        } finally { b.disabled = false; }
       });
     });
     // 回复按钮（含二级/三级回复，均可继续回复）

@@ -1695,6 +1695,14 @@ kbd {
   padding: 10px 10px 10px 14px; background: transparent;
 }
 .comment-children .comment:hover { border-left-color: var(--accent); background: color-mix(in srgb, var(--bg-soft) 40%, transparent); }
+.comment-like, .comment-reply-btn { background: none; border: none; color: var(--muted, #999); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
+.comment-like { display: inline-flex; align-items: center; gap: 3px; }
+.comment-like:hover, .comment-like.liked { color: var(--accent); background: var(--accent-soft); }
+.comment-like:disabled { cursor: default; opacity: .8; }
+.comment-badge { display: inline-flex; align-items: center; padding: 1px 6px; border-radius: 999px; font-size: 10.5px; line-height: 1.5; }
+.comment-badge.pinned { color: var(--accent); background: var(--accent-soft); }
+.comment-badge.featured { color: #9a6a14; background: color-mix(in srgb, #d7a33d 18%, var(--bg-soft)); }
+.comment.pinned { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); }
 .comment-reply-btn { background: none; border: none; color: var(--muted, #999); cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 4px; }
 .comment-reply-btn:hover { background: var(--bg-soft); color: var(--accent); }
 @media (max-width: 560px) {

@@ -697,5 +697,13 @@
   "admin.analytics.empty": "कोई लेख डेटा नहीं",
   "admin.analytics.colTrend": "रुझान",
   "admin.analytics.exportCsv": "CSV निर्यात करें",
-  "admin.analytics.exported": "CSV निर्यात हो गया"
+  "admin.analytics.exported": "CSV निर्यात हो गया",
+  "comment.like": "लाइक",
+  "comment.pinned": "पिन किया गया",
+  "comment.featured": "चयनित टिप्पणी",
+  "comment.pinComment": "पिन",
+  "comment.unpinComment": "अनपिन",
+  "comment.feature": "चयनित करें",
+  "comment.unfeature": "चयन हटाएँ",
+  "comment.likeFail": "लाइक नहीं हो सका, बाद में फिर प्रयास करें"
 }

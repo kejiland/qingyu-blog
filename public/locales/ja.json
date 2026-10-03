@@ -697,5 +697,13 @@
   "admin.analytics.empty": "記事データがありません",
   "admin.analytics.colTrend": "推移",
   "admin.analytics.exportCsv": "CSVを出力",
-  "admin.analytics.exported": "CSVを出力しました"
+  "admin.analytics.exported": "CSVを出力しました",
+  "comment.like": "いいね",
+  "comment.pinned": "固定コメント",
+  "comment.featured": "注目コメント",
+  "comment.pinComment": "固定",
+  "comment.unpinComment": "固定解除",
+  "comment.feature": "注目に設定",
+  "comment.unfeature": "注目を解除",
+  "comment.likeFail": "いいねに失敗しました。後でもう一度お試しください"
 }
