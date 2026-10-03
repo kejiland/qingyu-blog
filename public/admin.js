@@ -1280,11 +1280,19 @@
         '<div class="ab-search"><input class="ab-input" id="abPostKw" placeholder="' + t('admin.postList.search') + '"></div>' +
         '<select class="ab-select" id="abPostStatus" style="max-width:160px"><option value="all">' + t('admin.postList.allStatus') + '</option><option value="published">' + t('admin.dashboard.published') + '</option><option value="scheduled">' + t('admin.dashboard.scheduled') + '</option><option value="draft">' + t('admin.dashboard.drafts') + '</option></select>' +
       '</div>' +
+      '<div class="ab-bulk" id="abPostBulk" style="display:none"><span class="ab-muted" id="abPostSelInfo"></span>' +
+        '<button class="ab-btn sm" id="abPostPinOn">' + icon('pin', 13) + ' ' + t('admin.postList.bulkPinOn') + '</button>' +
+        '<button class="ab-btn sm" id="abPostPinOff">' + icon('pin', 13) + ' ' + t('admin.postList.bulkPinOff') + '</button>' +
+        '<button class="ab-btn sm danger" id="abPostDel">' + icon('trash', 13) + ' ' + t('admin.postList.bulkDelete') + '</button></div>' +
       '<div class="ab-table-wrap"><table class="ab-table"><thead><tr>' +
+        '<th class="col-check"><input type="checkbox" id="abPostAll" aria-label="' + t('admin.postList.selectPage') + '"></th>' +
         '<th>' + t('admin.postList.colTitle') + '</th><th>' + t('admin.postList.colTags') + '</th><th>' + t('admin.postList.colDate') + '</th><th>' + t('admin.postList.colStatus') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th>' +
       '</tr></thead><tbody id="abPostBody"></tbody></table></div>' +
       '<div class="ab-pagination" id="abPostPage"></div>';
 
+    content.querySelector('#abPostPinOn').addEventListener('click', function () { bulkPinPosts(content, true); });
+    content.querySelector('#abPostPinOff').addEventListener('click', function () { bulkPinPosts(content, false); });
+    content.querySelector('#abPostDel').addEventListener('click', function () { bulkDeletePosts(content); });
     bindPosts(content);
     loadPosts(content, 1);
     // 绑定内容区内的导航链接（如「写新文章」按钮），bindShell 仅绑定挂载时已有的元素
@@ -1299,6 +1307,57 @@
     function refilter() { loadPosts(content, 1); }
     kw.addEventListener('input', debounce(refilter, 250));
     st.addEventListener('change', refilter);
+    var all = content.querySelector('#abPostAll');
+    if (all) all.addEventListener('change', function () {
+      var on = all.checked;
+      content.querySelectorAll('#abPostBody [data-pick]').forEach(function (cb) {
+        var id = dec(cb.getAttribute('data-pick'));
+        if (on) postSel[id] = true; else delete postSel[id];
+        cb.checked = on;
+      });
+      syncPostSelection(content);
+    });
+  }
+  /** 文章列表多选状态（跨页保留，按 id 记录） */
+  var postSel = {};
+  function syncPostSelection(content) {
+    var ids = Object.keys(postSel);
+    var bar = content.querySelector('#abPostBulk');
+    var info = content.querySelector('#abPostSelInfo');
+    if (bar) bar.style.display = ids.length ? 'flex' : 'none';
+    if (info) info.textContent = t('admin.postList.bulkSelected', { n: ids.length });
+  }
+  async function bulkPinPosts(content, pinned) {
+    var ids = Object.keys(postSel);
+    if (!ids.length) return;
+    var ok = 0;
+    for (var i = 0; i < ids.length; i++) {
+      try {
+        var post = await getPost(ids[i]);
+        if (!post) continue;
+        post.pinned = pinned;
+        if (cloudOn()) await api('api/posts/' + enc(ids[i]), { method: 'PUT', body: JSON.stringify(post) });
+        else saveStaticPost(post);
+        ok++;
+      } catch (e) {}
+    }
+    if (!cloudOn() && ok) downloadPostsJs();
+    toast(pinned ? t('admin.postList.bulkPinned', { n: ok }) : t('admin.postList.bulkUnpinned', { n: ok }), ok ? 'ok' : 'err');
+    postSel = {};
+    loadPosts(content, 1);
+  }
+  async function bulkDeletePosts(content) {
+    var ids = Object.keys(postSel);
+    if (!ids.length) return;
+    confirmModal(t('admin.postList.bulkDelete'), '<p class="ab-muted">' + t('admin.postList.bulkDeleteConfirm', { n: ids.length }) + '</p>', async function () {
+      var ok = 0;
+      for (var i = 0; i < ids.length; i++) {
+        try { await deletePost(ids[i]); if (window.syncDeletedPost) window.syncDeletedPost(ids[i]); ok++; } catch (e) {}
+      }
+      toast(t('admin.postList.bulkDeleted', { n: ok }), ok ? 'ok' : 'err');
+      postSel = {};
+      loadPosts(content, 1);
+    }, t('admin.comments.delete'));
   }
   function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
@@ -1323,7 +1382,7 @@
     filtered.sort(function (a, b) { return (b.date || '').localeCompare(a.date || ''); });
 
     if (!filtered.length) {
-      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.postList.noMatch') + '</td></tr>';
+      body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.postList.noMatch') + '</td></tr>';
       content.querySelector('#abPostPage').innerHTML = '';
       return;
     }
@@ -1337,7 +1396,8 @@
       if (postStatus === 'scheduled') statusBadge = '<span class="ab-status scheduled">' + icon('clock', 11) + ' ' + t('admin.dashboard.scheduled') + (p.publishAt ? ' · ' + esc(fmtTimestamp(p.publishAt)) : '') + '</span>';
       else if (p.pinned) statusBadge = '<span class="ab-status published">' + icon('pin', 11) + ' ' + t('admin.postList.pin') + '</span>';
       else statusBadge = '<span class="ab-status ' + (postStatus === 'draft' ? 'draft' : 'published') + '">' + (postStatus === 'draft' ? t('admin.dashboard.drafts') : t('admin.dashboard.published')) + '</span>';
-      return '<tr>' +
+      return '<tr' + (postSel[id] ? ' class="selected"' : '') + '>' +
+        '<td class="col-check"><input type="checkbox" data-pick="' + enc(id) + '"' + (postSel[id] ? ' checked' : '') + ' aria-label="' + t('admin.postList.selectPage') + '"></td>' +
         '<td><a class="ab-post-title" data-link="/admin/posts/' + enc(id) + '/edit">' + esc(p.title || t('admin.dashboard.noTitle')) + '</a>' + (p.series ? ' <span class="ab-chip">' + icon('list', 11) + ' ' + esc(p.series) + (p.seriesOrder ? ' #' + esc(String(p.seriesOrder)) : '') + '</span>' : '') + '</td>' +
         '<td class="ab-td-tags">' + (p.tags && p.tags.length ? '<div class="ab-tag-row">' + p.tags.map(function (t) { return '<span class="ab-chip">' + esc(t) + '</span>'; }).join('') + '</div>' : '<span class="ab-muted">—</span>') + '</td>' +
         '<td class="ab-td-date">' + esc(fmtPostDate(p.date)) + '</td>' +
@@ -1394,6 +1454,22 @@
         }
       }, t('admin.comments.delete'));
     }); });
+
+    body.querySelectorAll('[data-pick]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = dec(cb.getAttribute('data-pick'));
+        if (cb.checked) postSel[id] = true; else delete postSel[id];
+        var card = cb.closest('tr');
+        if (card) card.classList.toggle('selected', cb.checked);
+        var allBox = content.querySelector('#abPostAll');
+        var boxes = body.querySelectorAll('[data-pick]');
+        if (allBox) allBox.checked = boxes.length > 0 && Array.prototype.every.call(boxes, function (x) { return x.checked; });
+        syncPostSelection(content);
+      });
+    });
+    var allBox0 = content.querySelector('#abPostAll');
+    if (allBox0) allBox0.checked = false;
+    syncPostSelection(content);
 
     var pg = content.querySelector('#abPostPage');
     var html = '';

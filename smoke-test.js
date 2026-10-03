@@ -1896,6 +1896,18 @@ tests.push(['后台订阅者：搜索 / 状态筛选 / 分页 / 导出 已接入
   assert.ok(src.includes('subState'), '分页状态');
 }]);
 
+tests.push(['后台文章列表：批量置顶 / 取消置顶 / 删除 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abPostBulk'), '批量操作条');
+  assert.ok(src.includes('abPostAll'), '本页全选');
+  assert.ok(src.includes('bulkPinPosts'), '批量置顶逻辑');
+  assert.ok(src.includes('bulkDeletePosts'), '批量删除逻辑');
+  assert.ok(src.includes('data-pick'), '行内勾选框');
+  assert.ok(src.includes('syncPostSelection'), '选中态同步');
+  const acss = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(acss.includes('.ab-bulk'), '批量条样式');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

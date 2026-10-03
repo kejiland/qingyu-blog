@@ -522,6 +522,11 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-empty .ab-empty-ico { font-size: 36px; opacity: .45; margin-bottom: 12px; display: block; }
 .ab-empty p { margin: 4px 0; }
 
+/* ---------- 批量操作条 ---------- */
+.ab-bulk { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px; padding: 10px 14px; border-radius: var(--ab-radius-sm); background: var(--ab-primary-weak); }
+.ab-table .col-check { width: 36px; text-align: center; }
+.ab-table tbody tr.selected { background: var(--ab-primary-weak); }
+
 /* ---------- 媒体库 ---------- */
 .ab-media-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
 .ab-media-card {
