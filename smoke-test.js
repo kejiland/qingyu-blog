@@ -510,6 +510,11 @@ function makeD1() {
       return { success: true };
     }
     if (s === 'DELETE FROM posts WHERE id = ?') { t.posts.delete(params[0]); return { success: true }; }
+    if (s === 'UPDATE posts SET tags = ? WHERE id = ?') {
+      const row = t.posts.get(params[1]);
+      if (row) row.tags = params[0];
+      return { success: true };
+    }
     /* subscribers / mail outbox */
     if (s === 'SELECT * FROM subscribers WHERE email = ?') {
       return [...t.subscribers.values()].find((r) => r.email === params[0]) || null;
@@ -2037,6 +2042,24 @@ tests.push(['编辑器：分类选择 已接入', async () => {
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
+tests.push(['标签：批量重命名 / 删除接口', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-tag';
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer tok-tag' };
+  env._d1.posts.set('tp1', { id: 'tp1', tags: JSON.stringify(['旧标签', '保留']) });
+  env._d1.posts.set('tp2', { id: 'tp2', tags: JSON.stringify(['旧标签']) });
+  env._d1.posts.set('tp3', { id: 'tp3', tags: JSON.stringify(['其他']) });
+  let r = await core.handleTags(new Request('http://t/api/admin/tags', { method: 'POST', headers: auth, body: JSON.stringify({ op: 'rename', from: '旧标签', to: '新标签' }) }), env);
+  assert.strictEqual(r.status, 200, '批量重命名 200');
+  assert.strictEqual((await r.json()).updated, 2, '命中 2 篇');
+  assert.ok(JSON.parse(env._d1.posts.get('tp1').tags).indexOf('新标签') >= 0, '标签已重命名');
+  r = await core.handleTags(new Request('http://t/api/admin/tags', { method: 'POST', headers: auth, body: JSON.stringify({ op: 'delete', from: '新标签' }) }), env);
+  assert.strictEqual((await r.json()).updated, 2, '批量删除命中 2 篇');
+  r = await core.handleTags(new Request('http://t/api/admin/tags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), env);
+  assert.strictEqual(r.status, 401, '未登录 401');
+}]);
+
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
   env.BLOG_ADMIN_SETUP_KEY = 'setup-key-123';

@@ -2725,6 +2725,11 @@
     try { await applyTermChange(old, nv); toast(t('admin.tags.renameOk'), 'ok'); loadTerms(content, sel); } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
   }
   async function applyTermChange(old, neo) {
+    // 云端：一次请求批量处理，避免逐篇 PUT（N+1）
+    if (cloudOn()) {
+      await api('api/admin/tags', { method: 'POST', body: JSON.stringify({ op: neo ? 'rename' : 'delete', from: old, to: neo || '' }) });
+      return;
+    }
     var summary = await listPosts();
     var ids = [];
     summary.forEach(function (p) {

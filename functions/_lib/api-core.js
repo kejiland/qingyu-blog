@@ -1633,3 +1633,32 @@ export async function handleAuditLog(request, env) {
 
   return json({ error: 'Method not allowed' }, 405, request, env);
 }
+
+/** POST /api/admin/tags（批量重命名 / 删除标签，一次请求完成） */
+export async function handleTags(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  const body = (await request.json().catch(() => null)) || {};
+  const op = String(body.op || '');
+  const from = String(body.from || '').trim();
+  const to = String(body.to || '').trim();
+  if (!from || (op !== 'rename' && op !== 'delete')) return json({ error: '参数不完整' }, 400, request, env);
+  const rows = await dbAll(env.DB, 'SELECT id,tags FROM posts').catch(() => []);
+  const stmts = [];
+  (rows || []).forEach(function (r) {
+    let tags = [];
+    try { tags = Array.isArray(r.tags) ? r.tags : JSON.parse(r.tags || '[]'); } catch (e) { tags = []; }
+    if (!Array.isArray(tags) || tags.indexOf(from) < 0) return;
+    const next = [];
+    tags.forEach(function (x) {
+      if (x !== from) { if (next.indexOf(x) < 0) next.push(x); return; }
+      if (op === 'rename' && to && next.indexOf(to) < 0) next.push(to);
+    });
+    stmts.push({ sql: 'UPDATE posts SET tags = ? WHERE id = ?', params: [JSON.stringify(next), r.id] });
+  });
+  if (stmts.length) await dbBatch(env.DB, stmts);
+  await recordAudit(env, request, op === 'rename' ? 'tag.rename' : 'tag.delete', from, to);
+  return json({ ok: true, updated: stmts.length }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
