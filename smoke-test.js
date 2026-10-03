@@ -1940,6 +1940,14 @@ tests.push(['后台媒体库：大图预览与复制 Markdown 已接入', async 
   assert.ok(acss.includes('.ab-lightbox') && acss.includes('.ab-lb-nav'), '灯箱样式');
 }]);
 
+tests.push(['后台音乐管理：搜索与分页 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abMusicKw'), '搜索框');
+  assert.ok(src.includes('abMusicPage'), '分页容器');
+  assert.ok(src.includes('musicFiltered') && src.includes('renderMusicList'), '过滤与分页渲染');
+  assert.ok(src.includes('musicState'), '分页状态');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

@@ -389,6 +389,8 @@
   "admin.music.deleteConfirm": "Delete this track?",
   "admin.music.deleted": "Deleted",
   "admin.music.empty": "No music yet — upload a track to start playing",
+  "admin.music.search": "Search title or artist",
+  "admin.music.noMatch": "No matching tracks",
   "admin.settings.title": "Blog Settings",
   "admin.settings.desc": "Site info, profile, and navigation menu",
   "admin.settings.cloudOnly": "Site settings require cloud mode (Cloudflare)",

@@ -389,6 +389,8 @@
   "admin.music.deleteConfirm": "この曲を削除しますか？",
   "admin.music.deleted": "削除しました",
   "admin.music.empty": "音楽がまだありません — 曲をアップロードして再生を始めましょう",
+  "admin.music.search": "曲名・アーティストを検索",
+  "admin.music.noMatch": "一致する曲がありません",
   "admin.settings.title": "ブログ設定",
   "admin.settings.desc": "サイト情報、プロフィール、ナビゲーションメニュー",
   "admin.settings.cloudOnly": "ブログ設定にはクラウドモード（Cloudflare）が必要です",

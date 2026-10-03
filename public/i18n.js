@@ -730,6 +730,8 @@
     "admin.music.deleteConfirm": "确定删除该曲目？",
     "admin.music.deleted": "已删除",
     "admin.music.empty": "暂无音乐，上传一首开始播放吧",
+    "admin.music.search": "搜索歌名或歌手",
+    "admin.music.noMatch": "没有匹配的曲目",
     "admin.settings.cloudOnly": "站点设置需在云端模式（Cloudflare）下使用",
     "admin.settings.navMenu": "导航菜单",
     "admin.settings.footerNav": "底部导航",

@@ -389,6 +389,8 @@
   "admin.music.deleteConfirm": "이 곡을 삭제할까요?",
   "admin.music.deleted": "삭제됨",
   "admin.music.empty": "음악이 아직 없습니다 — 곡을 업로드하고 재생을 시작하세요",
+  "admin.music.search": "곡명 또는 아티스트 검색",
+  "admin.music.noMatch": "일치하는 곡이 없습니다",
   "admin.settings.title": "블로그 설정",
   "admin.settings.desc": "사이트 정보, 프로필, 네비게이션 메뉴",
   "admin.settings.cloudOnly": "블로그 설정은 클라우드 모드(Cloudflare)가 필요합니다",

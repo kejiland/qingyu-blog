@@ -389,6 +389,8 @@
   "admin.music.deleteConfirm": "इस ट्रैक को हटाएँ?",
   "admin.music.deleted": "हटा दिया गया",
   "admin.music.empty": "अभी कोई संगीत नहीं — प्ले करना शुरू करने के लिए एक ट्रैक अपलोड करें",
+  "admin.music.search": "गाना या कलाकार खोजें",
+  "admin.music.noMatch": "कोई मेल खाता ट्रैक नहीं",
   "admin.settings.title": "ब्लॉग सेटिंग्स",
   "admin.settings.desc": "साइट जानकारी, प्रोफ़ाइल और नेविगेशन मेन्यू",
   "admin.settings.cloudOnly": "ब्लॉग सेटिंग्स के लिए क्लाउड मोड (Cloudflare) आवश्यक है",

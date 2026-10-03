@@ -3238,6 +3238,7 @@
 
   /* ====================== 博客设置 ====================== */
   /* ====================== 音乐管理（R2 直传 + D1 列表） ====================== */
+  var musicState = { list: [], kw: '', page: 1, per: 15 };
   function pageMusic(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.music.title') + '</h1>' +
       '<p class="ab-page-sub">' + t('admin.music.desc') + '</p></div></div>';
@@ -3259,9 +3260,13 @@
         '<div class="ab-progress" id="abMusicBar" style="display:none;height:6px;border-radius:999px;background:var(--ab-border);margin-top:10px;overflow:hidden">' +
           '<div id="abMusicBarFill" style="width:0%;height:100%;background:var(--ab-primary);transition:width .2s"></div></div>' +
       '</div></div>' +
+      '<div class="ab-toolbar"><div class="ab-search"><input class="ab-input" id="abMusicKw" placeholder="' + t('admin.music.search') + '"></div></div>' +
       '<div class="ab-card"><div class="ab-table-wrap ab-music-list"><table class="ab-table"><thead><tr>' +
         '<th>' + t('admin.music.colTitle') + '</th><th>' + t('admin.music.colSize') + '</th><th class="col-actions">' + t('admin.music.colActions') + '</th>' +
-      '</tr></thead><tbody id="abMusicBody"></tbody></table></div></div>');
+      '</tr></thead><tbody id="abMusicBody"></tbody></table></div><div class="ab-pagination" id="abMusicPage" style="padding:0 4px 6px"></div></div>');
+    var mKw = content.querySelector('#abMusicKw');
+    mKw.value = musicState.kw;
+    mKw.addEventListener('input', debounce(function () { musicState.kw = (mKw.value || '').trim().toLowerCase(); musicState.page = 1; renderMusicList(content); }, 200));
     bindMusic(content);
     loadMusic(content);
   }
@@ -3318,28 +3323,48 @@
       body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>';
       return;
     }
-    var list = (d && d.music) || [];
-    if (!list.length) {
-      body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.music.empty') + '</td></tr>';
-      return;
-    }
-    body.innerHTML = list.map(function (s) {
-      return '<tr data-mid="' + enc(s.id) + '">' +
-        '<td><div style="display:flex;align-items:center;gap:11px;min-width:0">' +
-          (s.cover ? '<img src="' + esc(s.cover) + '" alt="" style="width:38px;height:38px;border-radius:10px;object-fit:cover;flex:0 0 auto">'
-            : '<span class="ab-cover-ph">' + icon('music', 17) + '</span>') +
-          '<div style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:15px;color:var(--ab-text)">' + esc(s.title) + '</div>' +
-          '<div class="ab-muted" style="font-size:12.5px;margin-top:2px">' + esc(s.artist || '—') + '</div></div></div></td>' +
-        '<td class="ab-muted">' + fmtSize(s.size) + '</td>' +
-        '<td class="col-actions"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">' +
-          '<button type="button" class="ab-play" data-src="' + enc(s.url) + '" title="' + t('player.play') + '">' + icon('play', 14) + '</button>' +
-          '<span class="ab-player-bar" title="' + t('player.seek') + '"><span class="ab-player-fill"></span></span>' +
-          '<span class="ab-player-time ab-muted">0:00</span>' +
-          '<button type="button" class="ab-btn sm" data-act="edit" title="' + t('admin.music.edit') + '">' + icon('pen', 13) + '</button>' +
-          '<button type="button" class="ab-btn sm danger" data-act="del" title="' + t('admin.music.delete') + '">' + icon('trash', 13) + '</button>' +
-        '</div></td>' +
-      '</tr>';
-    }).join('');
+    musicState.list = (d && d.music) || [];
+    renderMusicList(content);
+  }
+  /** 关键字过滤（歌名 + 歌手） */
+  function musicFiltered() {
+    var kw = musicState.kw;
+    if (!kw) return musicState.list;
+    return musicState.list.filter(function (s) {
+      return (String(s.title || '') + ' ' + String(s.artist || '')).toLowerCase().indexOf(kw) >= 0;
+    });
+  }
+  /** 音乐列表：过滤 + 分页（每页 15） */
+  function renderMusicList(content) {
+    var body = content.querySelector('#abMusicBody');
+    var pg = content.querySelector('#abMusicPage');
+    if (!body) return;
+    var list = musicFiltered();
+    var per = musicState.per;
+    var totalPages = Math.max(1, Math.ceil(list.length / per));
+    if (musicState.page > totalPages) musicState.page = totalPages;
+    var page = musicState.page;
+    var view = list.slice((page - 1) * per, page * per);
+    if (!view.length) {
+      body.innerHTML = '<tr><td colspan="3" style="text-align:center;padding:34px" class="ab-muted">' + (musicState.kw ? t('admin.music.noMatch') : t('admin.music.empty')) + '</td></tr>';
+    } else {
+      body.innerHTML = view.map(function (s) {
+        return '<tr data-mid="' + enc(s.id) + '">' +
+          '<td><div style="display:flex;align-items:center;gap:11px;min-width:0">' +
+            (s.cover ? '<img src="' + esc(s.cover) + '" alt="" style="width:38px;height:38px;border-radius:10px;object-fit:cover;flex:0 0 auto">'
+              : '<span class="ab-cover-ph">' + icon('music', 17) + '</span>') +
+            '<div style="min-width:0"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;font-size:15px;color:var(--ab-text)">' + esc(s.title) + '</div>' +
+            '<div class="ab-muted" style="font-size:12.5px;margin-top:2px">' + esc(s.artist || '—') + '</div></div></div></td>' +
+          '<td class="ab-muted">' + fmtSize(s.size) + '</td>' +
+          '<td class="col-actions"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">' +
+            '<button type="button" class="ab-play" data-src="' + enc(s.url) + '" title="' + t('player.play') + '">' + icon('play', 14) + '</button>' +
+            '<span class="ab-player-bar" title="' + t('player.seek') + '"><span class="ab-player-fill"></span></span>' +
+            '<span class="ab-player-time ab-muted">0:00</span>' +
+            '<button type="button" class="ab-btn sm" data-act="edit" title="' + t('admin.music.edit') + '">' + icon('pen', 13) + '</button>' +
+            '<button type="button" class="ab-btn sm danger" data-act="del" title="' + t('admin.music.delete') + '">' + icon('trash', 13) + '</button>' +
+          '</div></td>' +
+        '</tr>';
+      }).join('');
     body.querySelectorAll('button[data-act]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var tr = btn.closest('tr');
@@ -3348,7 +3373,7 @@
         if (btn.getAttribute('data-act') === 'del') confirmModal(t('admin.music.delete'), esc(t('admin.music.deleteConfirm')), async function () {
           try {
             await api('api/music/' + id, { method: 'DELETE' });
-            loadMusic(content); // 音乐表仅 3 列，不走 seamlessRemoveRow（其按 6 列判断），直接全量刷新
+            loadMusic(content);
             toast(t('admin.music.deleted'), 'ok');
           } catch (e) { toast(esc(e.message || e), 'err'); }
         }, t('admin.music.delete'));
@@ -3356,6 +3381,15 @@
       });
     });
     bindRowPlayers(body);
+  }
+    if (pg) {
+      pg.innerHTML = list.length > per
+        ? (page > 1 ? '<button class="ab-page-btn" data-p="' + (page - 1) + '">' + t('pagination.prev') + '</button>' : '') +
+          '<button class="ab-page-btn active">' + page + ' / ' + totalPages + '</button>' +
+          (page < totalPages ? '<button class="ab-page-btn" data-p="' + (page + 1) + '">' + t('pagination.next') + '</button>' : '')
+        : '';
+      pg.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { musicState.page = parseInt(b.getAttribute('data-p'), 10) || 1; renderMusicList(content); }); });
+    }
   }
   /* 行内迷你播放器：单个共享 Audio，同一时刻只播一首；进度条可点击跳转 */
   function fmtTime(sec) {
