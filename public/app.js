@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.5';
+var BLOG_VERSION = '2.10.6';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -145,6 +145,27 @@ function applyTheme(t) {
 function setTheme(t) { applyTheme(t); try { localStorage.setItem(themeKey(), t); } catch (e) {} }
 function toggleTheme() { var n = getTheme() === 'dark' ? 'light' : 'dark'; setTheme(n); refreshThemeIcon(); renderAccentSwatches(); renderAccentNativeSelect(); return n; }
 /* 统一 SVG 图标：currentColor 描边，自动继承文字色、hover 变主题色 */
+/* ---------- 正文字号（A- / A / A+）：本地记忆，跨页面生效 ---------- */
+var READING_SCALE_KEY = 'qingyu.readingScale';
+function getReadingScale() {
+  var v = 1;
+  try { v = Number(localStorage.getItem(READING_SCALE_KEY)) || 1; } catch (e) {}
+  if (!(v >= 0.85 && v <= 1.5)) v = 1;
+  return Math.round(v * 100) / 100;
+}
+function applyReadingScale(scale) {
+  var v = (scale === undefined) ? getReadingScale() : scale;
+  v = Math.max(0.85, Math.min(1.5, Number(v) || 1));
+  v = Math.round(v * 100) / 100;
+  try { document.documentElement.style.setProperty('--reading-scale', String(v)); } catch (e) {}
+  return v;
+}
+function setReadingScale(scale) {
+  var v = applyReadingScale(scale);
+  try { localStorage.setItem(READING_SCALE_KEY, String(v)); } catch (e) {}
+  return v;
+}
+
 function svgIcon(name, size) {
   size = size || 18;
   var s = 'width="' + size + '" height="' + size + '"';
@@ -2595,9 +2616,22 @@ async function renderPost(id) {
   var minutes = Math.max(1, Math.ceil((stripMd(content || '').length / 400)));
   var seriesMeta = post.series ? '<a class="pin" href="' + esc(href(seriesUrl(post.series))) + '">' + svgIcon('list', 13) + ' ' + esc(post.series) + '</a>' : '';
   html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span><span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
+  html += '<div class="reading-tools"><span class="rt-label">' + t('post.fontSize') + '</span>' +
+    '<button type="button" class="rt-btn" data-rs="-1" aria-label="' + t('post.fontSmaller') + '" title="' + t('post.fontSmaller') + '">A−</button>' +
+    '<button type="button" class="rt-btn" data-rs="0" aria-label="' + t('post.fontReset') + '" title="' + t('post.fontReset') + '">A</button>' +
+    '<button type="button" class="rt-btn" data-rs="1" aria-label="' + t('post.fontLarger') + '" title="' + t('post.fontLarger') + '">A+</button>' +
+    '</div>';
   html += aiPostSlot(post);
   html += toc;
   html += '<article class="article">' + bodyHtml + '</article>';
+  if (toc) {
+    html += '<button type="button" class="toc-fab" id="tocFab" aria-label="' + t('toc.open') + '">' + svgIcon('list', 18) + '</button>' +
+      '<div class="toc-sheet" id="tocSheet" hidden><div class="toc-sheet-head"><span>' + t('toc.title') + '</span>' +
+      '<button type="button" class="toc-sheet-close" id="tocSheetClose" aria-label="' + t('announce.close') + '">✕</button></div>' +
+      '<div class="toc-sheet-list">' + tocHeadings.map(function (h) {
+        return '<a href="#' + esc(h.id) + '" data-toc="' + esc(h.id) + '" style="padding-left:' + (8 + (h.lvl - 1) * 14) + 'px"><span class="toc-num">' + esc(h.num) + '</span>' + esc(h.text) + '</a>';
+      }).join('') + '</div></div>';
+  }
   // 点赞：正文尾部，水平居中
   html += '<div class="like-bar"><button class="btn like-btn" id="likeBtn">' + svgIcon('heart', 15) + ' <span id="likeCount">0</span></button></div>';
   // 底部：左标签、右复制链接(+编辑)
@@ -2737,6 +2771,29 @@ async function renderPost(id) {
       }
     });
   })();
+
+  // 正文字号：就地调整并记忆
+  var rsWrap = document.querySelector('#readingToolsHost') || document.querySelector('.reading-tools');
+  if (rsWrap) {
+    rsWrap.querySelectorAll('[data-rs]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var step = Number(b.getAttribute('data-rs'));
+        var next = step === 0 ? 1 : (getReadingScale() + step * 0.1);
+        setReadingScale(next);
+        toast(t('post.fontSize') + ' ' + Math.round(getReadingScale() * 100) + '%', 'ok');
+      });
+    });
+  }
+  // 移动端浮动目录：抽屉展开 / 关闭
+  var tocFab = document.querySelector('#tocFab');
+  var tocSheet = document.querySelector('#tocSheet');
+  function closeTocSheet() { if (tocSheet) tocSheet.hidden = true; }
+  if (tocFab && tocSheet) {
+    tocFab.addEventListener('click', function () { tocSheet.hidden = !tocSheet.hidden; });
+    var tocClose = document.querySelector('#tocSheetClose');
+    if (tocClose) tocClose.addEventListener('click', closeTocSheet);
+    tocSheet.querySelectorAll('a[data-toc]').forEach(function (a) { a.addEventListener('click', closeTocSheet); });
+  }
 
   // load comments（顶层 + 嵌套回复统一渲染；支持「最热 / 最新」排序与分页）
   var CMT_PAGE = 8;
@@ -5083,6 +5140,7 @@ window.__bootPromise = (async function () {
   var cfg = getConfig();
   applyTheme(getTheme());
   applyAccent(getAccent());
+  applyReadingScale();
   bindNavClicks();
   // 全局样式非阻塞加载后，首帧渲染前需等它就绪（与 i18n 并行），避免 FOUC
   var _cssReady = _waitGlobalStyle();

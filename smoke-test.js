@@ -1861,6 +1861,19 @@ tests.push(['评论（前端）：最新/最热排序、顶层分页与加载更
   assert.ok(d.html.includes('id="commentMore"'), '加载更多容器');
 }]);
 
+tests.push(['阅读体验：正文字号调节 + 移动端浮动目录', async () => {
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/markdown-cheatsheet/');
+  assert.ok(d.html.includes('class="reading-tools"'), '字号调节控件');
+  assert.ok(d.html.includes('data-rs="1"'), 'A+ 按钮');
+  assert.ok(d.html.includes('id="tocFab"'), '浮动目录按钮');
+  assert.ok(d.html.includes('id="tocSheet"'), '目录抽屉');
+  assert.strictEqual(d.ctx.setReadingScale(1.2), 1.2, '字号 1.2');
+  assert.strictEqual(d.ctx.getReadingScale(), 1.2, '读回字号');
+  assert.strictEqual(d.ctx.setReadingScale(99), 1.5, '字号上限 1.5');
+  assert.strictEqual(d.ctx.setReadingScale(0.1), 0.85, '字号下限 0.85');
+  d.ctx.setReadingScale(1);
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

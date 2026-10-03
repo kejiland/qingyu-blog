@@ -1126,7 +1126,7 @@ html[data-theme="dark"] .post-card .mini-tags span {
 .article {
   word-break: break-word;
   line-height: 1.85;
-  font-size: 16.5px;
+  font-size: calc(16.5px * var(--reading-scale, 1));
   letter-spacing: var(--ls-body);
 }
 .article h1, .article h2, .article h3, .article h4 { line-height: 1.35; margin: 1.7em 0 0.6em; }
@@ -3183,3 +3183,21 @@ html[data-theme="dark"] body.scrolled .topbar {
 .announce-close { flex: none; border: 0; background: rgba(255,255,255,.16); color: #fff; width: 24px; height: 24px; border-radius: 999px; cursor: pointer; font-size: 12px; line-height: 1; }
 .announce-close:hover { background: rgba(255,255,255,.3); }
 @media (max-width: 640px) { .announce-inner { padding: 7px 12px; font-size: 12.5px; } }
+
+/* 正文字号调节（A- / A / A+） */
+.reading-tools { display: flex; align-items: center; gap: 6px; margin: 0 0 16px; }
+.rt-label { font-size: 12px; color: var(--muted); margin-right: 2px; }
+.rt-btn { border: 1px solid var(--border); background: transparent; color: var(--text); border-radius: 7px; font-size: 12px; line-height: 1; padding: 5px 9px; cursor: pointer; font-family: inherit; transition: color .15s, border-color .15s, background .15s; }
+.rt-btn:hover { color: var(--accent); border-color: var(--accent); background: var(--accent-soft, rgba(0,0,0,.04)); }
+
+/* 移动端浮动目录 */
+.toc-fab { display: none; position: fixed; right: 18px; bottom: 92px; z-index: 60; width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface, var(--bg, #fff)); color: var(--text); box-shadow: 0 8px 22px rgba(0,0,0,.16); cursor: pointer; align-items: center; justify-content: center; }
+.toc-fab:hover { color: var(--accent); }
+.toc-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 70; max-height: 62vh; overflow: auto; padding: 14px 16px calc(18px + env(safe-area-inset-bottom, 0px)); background: var(--surface, var(--bg, #fff)); border-top: 1px solid var(--border); border-radius: 16px 16px 0 0; box-shadow: 0 -12px 34px rgba(0,0,0,.18); }
+.toc-sheet[hidden] { display: none; }
+.toc-sheet-head { display: flex; align-items: center; justify-content: space-between; font-weight: 600; margin-bottom: 10px; }
+.toc-sheet-close { border: 0; background: none; color: var(--muted); font-size: 15px; cursor: pointer; padding: 2px 6px; }
+.toc-sheet-list { display: flex; flex-direction: column; gap: 2px; }
+.toc-sheet-list a { display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; color: var(--text); text-decoration: none; font-size: 14px; }
+.toc-sheet-list a:hover, .toc-sheet-list a.active { color: var(--accent); background: var(--accent-soft, rgba(0,0,0,.05)); }
+@media (max-width: 991px) { .toc-fab { display: flex; } }
