@@ -3190,6 +3190,11 @@
       copyright: site.copyright || (cfg().footer && cfg().footer.copyrightName) || '',
       footerText: site.footerText || (cfg().footer && cfg().footer.decl) || '',
       about: site.about || '',
+      announceEnabled: !!site.announceEnabled,
+      announceText: site.announceText || '',
+      announceLink: site.announceLink || '',
+      announceLinkText: site.announceLinkText || '',
+      announceClosable: site.announceClosable !== false,
       moderate: s.moderate_comments === '1'
     };
     settingsDraft.profile = {
@@ -3236,6 +3241,11 @@
         name: val(content, '#abSiteName'), desc: val(content, '#abSiteDesc'), avatar: val(content, '#abSiteAvatar'),
         copyright: val(content, '#abFooterCopyright'), footerText: val(content, '#abFooterText'),
         about: val(content, '#abSiteAbout'),
+        announceEnabled: content.querySelector('#abAnnounceEnabled') ? content.querySelector('#abAnnounceEnabled').checked : settingsDraft.site.announceEnabled,
+        announceText: content.querySelector('#abAnnounceText') ? val(content, '#abAnnounceText') : settingsDraft.site.announceText,
+        announceLink: content.querySelector('#abAnnounceLink') ? val(content, '#abAnnounceLink') : settingsDraft.site.announceLink,
+        announceLinkText: content.querySelector('#abAnnounceLinkText') ? val(content, '#abAnnounceLinkText') : settingsDraft.site.announceLinkText,
+        announceClosable: content.querySelector('#abAnnounceClosable') ? content.querySelector('#abAnnounceClosable').checked : settingsDraft.site.announceClosable,
         moderate: content.querySelector('#abModerate') ? content.querySelector('#abModerate').checked : settingsDraft.site.moderate
       };
     }
@@ -3301,6 +3311,11 @@
     if (content.querySelector('#abFooterText')) content.querySelector('#abFooterText').value = site.footerText || '';
     if (content.querySelector('#abSiteAbout')) content.querySelector('#abSiteAbout').value = site.about || '';
     if (content.querySelector('#abModerate')) content.querySelector('#abModerate').checked = !!site.moderate;
+    if (content.querySelector('#abAnnounceEnabled')) content.querySelector('#abAnnounceEnabled').checked = !!site.announceEnabled;
+    if (content.querySelector('#abAnnounceText')) content.querySelector('#abAnnounceText').value = site.announceText || '';
+    if (content.querySelector('#abAnnounceLink')) content.querySelector('#abAnnounceLink').value = site.announceLink || '';
+    if (content.querySelector('#abAnnounceLinkText')) content.querySelector('#abAnnounceLinkText').value = site.announceLinkText || '';
+    if (content.querySelector('#abAnnounceClosable')) content.querySelector('#abAnnounceClosable').checked = site.announceClosable !== false;
     if (content.querySelector('#abProfileName')) content.querySelector('#abProfileName').value = prof.name || '';
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
@@ -3318,6 +3333,12 @@
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.footerCopyright') + '</label><input class="ab-input" id="abFooterCopyright"></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.footerDecl') + '</label><textarea class="ab-textarea" id="abFooterText" style="min-height:70px"></textarea></div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abModerate"> ' + t('admin.settings.moderateComments') + '</label></div>' +
+        '<div class="ab-section-title" style="margin-top:14px">' + icon('spark', 15) + ' ' + t('admin.settings.announceTitle') + '</div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAnnounceEnabled"> ' + t('admin.settings.announceEnable') + '</label></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.announceText') + '</label><textarea class="ab-textarea" id="abAnnounceText" style="min-height:60px"></textarea></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.announceLink') + '</label><input class="ab-input" id="abAnnounceLink" placeholder="/about"></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.announceLinkText') + '</label><input class="ab-input" id="abAnnounceLinkText"></div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAnnounceClosable"> ' + t('admin.settings.announceClosable') + '</label></div>' +
       '</div>';
     } else if (tab === 'profile') {
       body.innerHTML = '<div class="ab-card" style="max-width:620px">' +
@@ -3396,7 +3417,10 @@
     var payload = {
       site_info: {
         name: site.name || '', desc: site.desc || '', avatar: site.avatar || '',
-        copyright: site.copyright || '', footerText: site.footerText || '', about: site.about || ''
+        copyright: site.copyright || '', footerText: site.footerText || '', about: site.about || '',
+        announceEnabled: !!site.announceEnabled, announceText: site.announceText || '',
+        announceLink: site.announceLink || '', announceLinkText: site.announceLinkText || '',
+        announceClosable: site.announceClosable !== false
       },
       profile: {
         name: prof.name || '', bio: prof.bio || '', avatar: prof.avatar || '', email: prof.email || ''

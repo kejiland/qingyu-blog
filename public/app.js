@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.3';
+var BLOG_VERSION = '2.10.4';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1894,7 +1894,44 @@ function app() { return document.querySelector('#app'); }
     + searchForm
     + '</div>'
     + '<div class="search-panel" id="searchPanel"></div>'
-    + '</header>';
+    + '</header>'
+    + renderAnnounce();
+}
+
+var _announceBound = false;
+/** 站点公告栏：后台「站点信息」开启后在顶栏下方展示，访客可关闭（本地记住） */
+function renderAnnounce() {
+  var site = (getConfig() && getConfig().site) || {};
+  if (!site.announceEnabled) return '';
+  var text = String(site.announceText || '').trim();
+  if (!text) return '';
+  var link = String(site.announceLink || '').trim();
+  var sig = text + '|' + link;
+  try { if (localStorage.getItem('qingyu.announceClosed') === sig) return ''; } catch (e) {}
+  if (!_announceBound) {
+    _announceBound = true;
+    document.addEventListener('click', function (ev) {
+      var node = ev && ev.target;
+      var btn = (node && node.closest) ? node.closest('[data-announce-close]') : null;
+      if (!btn) return;
+      var bar = document.querySelector('#announceBar');
+      if (!bar) return;
+      try { localStorage.setItem('qingyu.announceClosed', bar.getAttribute('data-announce-sig') || ''); } catch (e2) {}
+      bar.style.display = 'none';
+    });
+  }
+  var linkText = String(site.announceLinkText || '').trim() || t('announce.more');
+  var inner = esc(text);
+  if (link) inner += ' <a class="announce-link" href="' + esc(link) + '">' + esc(linkText) + '</a>';
+  var close = site.announceClosable
+    ? '<button class="announce-close" data-announce-close="1" aria-label="' + t('announce.close') + '" title="' + t('announce.close') + '">✕</button>'
+    : '';
+  return '<div class="announce-bar" id="announceBar" data-announce-sig="' + esc(sig) + '" role="status">'
+    + '<div class="container announce-inner">'
+    + '<span class="announce-ico" aria-hidden="true">' + svgIcon('spark', 14) + '</span>'
+    + '<span class="announce-text">' + inner + '</span>'
+    + close
+    + '</div></div>';
 }
 
 function renderFooter() {

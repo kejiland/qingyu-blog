@@ -3164,3 +3164,14 @@ html[data-theme="dark"] body.scrolled .topbar {
   .post-card:hover { transform: none; }
   .post-card:hover::after { transform: translateY(-100%); }
 }
+
+
+/* 站点公告栏：顶栏下方的细条，移动端自动换行 */
+.announce-bar { background: linear-gradient(90deg, var(--accent, #b14e2c), color-mix(in srgb, var(--accent, #b14e2c) 72%, #000)); color: #fff; font-size: 13.5px; }
+.announce-inner { display: flex; align-items: center; gap: 10px; padding: 8px 16px; }
+.announce-ico { display: inline-flex; opacity: .9; flex: none; }
+.announce-text { flex: 1; min-width: 0; line-height: 1.5; }
+.announce-text a.announce-link { color: #fff; text-decoration: underline; text-underline-offset: 2px; font-weight: 600; }
+.announce-close { flex: none; border: 0; background: rgba(255,255,255,.16); color: #fff; width: 24px; height: 24px; border-radius: 999px; cursor: pointer; font-size: 12px; line-height: 1; }
+.announce-close:hover { background: rgba(255,255,255,.3); }
+@media (max-width: 640px) { .announce-inner { padding: 7px 12px; font-size: 12.5px; } }

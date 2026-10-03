@@ -1530,6 +1530,20 @@ tests.push(['详情页：分享菜单（复制链接 / 系统分享 / 社交平�
   assert.ok(d.html.includes('data-share="email"'), '邮件分享项');
 }]);
 
+tests.push(['站点公告：开启后前台渲染，含链接与关闭按钮', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.ctx._siteSettings = { site_info: JSON.stringify({ announceEnabled: true, announceText: '本站已完成升级', announceLink: '/about', announceLinkText: '了解更多', announceClosable: true }) };
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.includes('id="announceBar"'), '渲染公告栏');
+  assert.ok(html.includes('本站已完成升级'), '公告文字');
+  assert.ok(html.includes('data-announce-close'), '关闭按钮');
+  assert.ok(html.includes('class="announce-link"'), '公告链接');
+  b.ctx._siteSettings = { site_info: JSON.stringify({ announceEnabled: false, announceText: 'x' }) };
+  await b.ctx.route();
+  assert.ok(!b.ctx.document.querySelector('#app').innerHTML.includes('announce-bar'), '未开启时不渲染');
+}]);
+
 tests.push(['非法路径不崩溃（decodeURIComponent 防护）', async () => {
   const n = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/%E4%B8%8D%E5%AE%8C%E6%95%B4%/');
   assert.ok(n.html.includes('内容不存在') || n.html.length > 0, '非法编码渲染兜底页');
