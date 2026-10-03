@@ -1930,6 +1930,15 @@ tests.push(['编辑器：字数统计 / 阅读时长 / 快捷键 已接入', asy
   assert.ok(acss.includes('.ab-editor-stats'), '统计条样式');
 }]);
 
+tests.push(['文章目录：宽屏侧边固定目录已接入', async () => {
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/markdown-cheatsheet/');
+  assert.ok(d.html.includes('id="postTocAside"'), '侧边目录容器');
+  assert.ok(d.html.includes('pta-list'), '侧边目录列表');
+  assert.ok(d.html.includes('data-toc="toc-1"'), '侧边目录锚点');
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  assert.ok(css.includes('.post-toc-aside') && css.includes('min-width: 1340px'), '宽屏媒体查询');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

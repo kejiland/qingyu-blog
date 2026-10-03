@@ -207,7 +207,7 @@ Or trigger the `Migrate KV to D1` workflow manually from the Actions tab (`dry-r
 | Markdown renderer | Headings / tables / blockquotes / lists / fenced code (syntax highlighting for js, ts, python, bash, css) / inline code / bold, italic, strikethrough / images / links. Input is escaped first; raw HTML never executes |
 | Table of contents | Auto-numbered (1 / 1.1 / 1.2 …), anchor links, collapsible, smooth scrolling |
 | Reading experience | Reading-time estimate, view count, likes (per-browser dedup), pin badge, **one-tap share** (copy link / native share / Weibo / X / Facebook / Telegram / email), back-to-top |
-| **Reading size & floating TOC** | Article pages offer one-tap body font sizing (A− / A / A+, remembered locally); on mobile a floating button opens the full table of contents as a bottom sheet |
+| **Reading size & side TOC** | One-tap body font sizing (A− / A / A+, remembered locally); **on wide screens (>=1340px) the table of contents is pinned beside the article and highlights as you scroll**; narrow screens keep the inline TOC and mobile gets a floating bottom-sheet button |
 | **Immersive reading** | Article images open in a full-screen lightbox with keyboard navigation; a top reading-progress bar tracks position and the table of contents highlights the current section |
 | **Announcement bar** | Enabled from Settings → Site info; shows a notice with an optional link under the top bar. Visitors can dismiss it and the choice is remembered |
 | **Popular posts** | `/popular` ranks articles by views×1 + likes×3 + comments×5, with all-time, 7-day and 30-day ranges in cloud mode |

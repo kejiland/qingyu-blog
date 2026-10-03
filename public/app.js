@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.11';
+var BLOG_VERSION = '2.10.12';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2623,6 +2623,14 @@ async function renderPost(id) {
     '</div>';
   html += aiPostSlot(post);
   html += toc;
+  // 桌面端侧边目录（≥1400px 显示，固定在正文右侧，滚动时始终可见）
+  if (toc) {
+    html += '<aside class="post-toc-aside" id="postTocAside" aria-label="' + t('toc.title') + '">' +
+      '<div class="pta-title">' + svgIcon('list', 14) + ' ' + t('toc.title') + '</div>' +
+      '<div class="pta-list">' + tocHeadings.map(function (h) {
+        return '<a href="#' + esc(h.id) + '" data-toc="' + esc(h.id) + '" style="padding-left:' + (8 + (h.lvl - 1) * 12) + 'px"><span class="toc-num">' + esc(h.num) + '</span>' + esc(h.text) + '</a>';
+      }).join('') + '</div></aside>';
+  }
   html += '<article class="article">' + bodyHtml + '</article>';
   if (toc) {
     html += '<button type="button" class="toc-fab" id="tocFab" aria-label="' + t('toc.open') + '">' + svgIcon('list', 18) + '</button>' +
