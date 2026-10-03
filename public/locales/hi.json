@@ -438,6 +438,8 @@
   "admin.settings.aboutHint": "Markdown समर्थित, About पेज के ऊपर दिखाया जाता है",
   "admin.settings.aboutPlaceholder": "About पेज की सामग्री लिखें (Markdown समर्थित)…",
   "admin.settings.moderateComments": "डिफ़ॉल्ट रूप से टिप्पणी मॉडरेशन आवश्यक",
+  "admin.settings.blocklist": "टिप्पणी प्रतिबंधित शब्द",
+  "admin.settings.blocklistHint": "प्रति पंक्ति एक (कॉमा भी चलेगा)। शब्द मिलने पर टिप्पणी अस्वीकृत होगी",
   "admin.settings.announceTitle": "घोषणा पट्टी",
   "admin.settings.announceEnable": "घोषणा पट्टी सक्षम करें",
   "admin.settings.announceText": "घोषणा टेक्स्ट",

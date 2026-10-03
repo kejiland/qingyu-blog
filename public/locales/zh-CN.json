@@ -438,6 +438,8 @@
   "admin.settings.aboutHint": "支持 Markdown，显示在关于页面正文之上",
   "admin.settings.aboutPlaceholder": "编写关于页面的内容（支持 Markdown）…",
   "admin.settings.moderateComments": "新评论默认需要审核",
+  "admin.settings.blocklist": "评论敏感词",
+  "admin.settings.blocklistHint": "每行一个（也支持逗号分隔）；评论或昵称命中即拒绝提交",
   "admin.settings.announceTitle": "公告栏",
   "admin.settings.announceEnable": "启用公告栏",
   "admin.settings.announceText": "公告文字",

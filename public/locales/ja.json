@@ -438,6 +438,8 @@
   "admin.settings.aboutHint": "Markdown 対応。About ページの上部に表示されます",
   "admin.settings.aboutPlaceholder": "About ページの内容を記述してください（Markdown 対応）…",
   "admin.settings.moderateComments": "デフォルトでコメントの承認制にする",
+  "admin.settings.blocklist": "コメントNGワード",
+  "admin.settings.blocklistHint": "1行に1つ（カンマ区切りも可）。該当するコメントは拒否されます",
   "admin.settings.announceTitle": "お知らせバー",
   "admin.settings.announceEnable": "お知らせバーを有効にする",
   "admin.settings.announceText": "お知らせのテキスト",

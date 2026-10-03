@@ -462,7 +462,7 @@ function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
-    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map()
+    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
@@ -576,6 +576,11 @@ function makeD1() {
       t.backups.set(id, { id, object_key, size, reason, created_at, counts }); return { success: true };
     }
     if (s === 'DELETE FROM backups WHERE id = ?') { t.backups.delete(params[0]); return { success: true }; }
+    /* site_settings */
+    if (/^SELECT v FROM site_settings WHERE k = \?/.test(s)) {
+      const r = t.site_settings.get(params[0]);
+      return r ? { v: r.v } : null;
+    }
     /* audit_log */
     if (/^INSERT INTO audit_log/.test(s)) {
       const [id, action, target, detail, ip, created_at] = params;
@@ -2174,6 +2179,20 @@ tests.push(['分类：分类页 / 首页筛选 / 路由白名单', async () => {
   assert.ok(!home.includes('随笔文'), '其他分类被过滤');
   const w = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
   assert.ok(w.includes('categories'), 'worker 路由白名单含 /categories');
+}]);
+
+tests.push(['评论敏感词：命中拒绝、正常放行', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  assert.strictEqual(core.commentBlocklistHit('欢迎 广告 内容', ['广告']), '广告', '纯函数命中');
+  assert.strictEqual(core.commentBlocklistHit('正常内容', ['广告']), '', '纯函数不命中');
+  const env = mockEnv();
+  env.COMMENT_BLOCKLIST = '广告\n赌博';
+  const post = (body) => core.handleComments(new Request('http://t/api/posts/k1/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env, 'k1');
+  let r = await post({ author: '路人', content: '这条带 赌博 字样' });
+  assert.strictEqual(r.status, 400, '命中敏感词 400');
+  assert.ok((await r.json()).error.indexOf('敏感词') >= 0, '错误提示含敏感词');
+  r = await post({ author: '路人', content: '正常讨论内容' });
+  assert.strictEqual(r.status, 201, '正常评论放行');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

@@ -566,6 +566,8 @@
     "admin.settings.footerCopyright": "页脚版权署名",
     "admin.settings.footerDecl": "页脚声明",
     "admin.settings.moderateComments": "新评论默认需要审核",
+    "admin.settings.blocklist": "评论敏感词",
+    "admin.settings.blocklistHint": "每行一个（也支持逗号分隔）；评论或昵称命中即拒绝提交",
     "admin.settings.announceTitle": "公告栏",
     "admin.settings.announceEnable": "启用公告栏",
     "admin.settings.announceText": "公告文字",

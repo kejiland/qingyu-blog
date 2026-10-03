@@ -3848,6 +3848,8 @@
       name: prof.name || '', bio: prof.bio || '', avatar: prof.avatar || '', email: prof.email || ''
     };
     settingsDraft.nav = parseArr(s.nav_menu, defaultNavItems());
+    settingsDraft.blocklist = String(s.comment_blocklist || '');
+
     settingsDraft.footerNav = parseArr(s.footer_nav, defaultFooterNav());
     settingsDraft.links = parseArr(s.friend_links, defaultFriendLinks());
   }
@@ -3897,6 +3899,8 @@
       };
     }
     if (content.querySelector('#abProfileName') !== null) {
+    if (content.querySelector('#abBlocklist') !== null) settingsDraft.blocklist = val(content, '#abBlocklist');
+
       settingsDraft.profile = {
         name: val(content, '#abProfileName'), bio: val(content, '#abProfileBio'),
         avatar: val(content, '#abProfileAvatar'), email: val(content, '#abProfileEmail')
@@ -3958,6 +3962,8 @@
     if (content.querySelector('#abFooterText')) content.querySelector('#abFooterText').value = site.footerText || '';
     if (content.querySelector('#abSiteAbout')) content.querySelector('#abSiteAbout').value = site.about || '';
     if (content.querySelector('#abModerate')) content.querySelector('#abModerate').checked = !!site.moderate;
+    if (content.querySelector('#abBlocklist')) content.querySelector('#abBlocklist').value = String(settingsDraft.blocklist || '');
+
     if (content.querySelector('#abAnnounceEnabled')) content.querySelector('#abAnnounceEnabled').checked = !!site.announceEnabled;
     if (content.querySelector('#abAnnounceText')) content.querySelector('#abAnnounceText').value = site.announceText || '';
     if (content.querySelector('#abAnnounceLink')) content.querySelector('#abAnnounceLink').value = site.announceLink || '';
@@ -3980,6 +3986,8 @@
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.footerCopyright') + '</label><input class="ab-input" id="abFooterCopyright"></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.footerDecl') + '</label><textarea class="ab-textarea" id="abFooterText" style="min-height:70px"></textarea></div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abModerate"> ' + t('admin.settings.moderateComments') + '</label></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.blocklist') + '</label><label class="ab-hint" style="font-size:12px">' + t('admin.settings.blocklistHint') + '</label><textarea class="ab-textarea" id="abBlocklist" style="min-height:80px"></textarea></div>' +
+
         '<div class="ab-section-title" style="margin-top:14px">' + icon('spark', 15) + ' ' + t('admin.settings.announceTitle') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAnnounceEnabled"> ' + t('admin.settings.announceEnable') + '</label></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.announceText') + '</label><textarea class="ab-textarea" id="abAnnounceText" style="min-height:60px"></textarea></div>' +
@@ -4075,7 +4083,8 @@
       nav_menu: JSON.stringify(Array.isArray(settingsDraft.nav) ? settingsDraft.nav : []),
       footer_nav: JSON.stringify(Array.isArray(settingsDraft.footerNav) ? settingsDraft.footerNav : []),
       friend_links: JSON.stringify(Array.isArray(settingsDraft.links) ? settingsDraft.links : []),
-      moderate_comments: site.moderate ? '1' : '0'
+      moderate_comments: site.moderate ? '1' : '0',
+      comment_blocklist: String(settingsDraft.blocklist || ''),
     };
     try {
       await api('api/settings', { method: 'PUT', body: JSON.stringify(payload) });

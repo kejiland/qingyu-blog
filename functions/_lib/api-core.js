@@ -480,6 +480,26 @@ export async function handlePostId(request, env, id) {
  * 评论（D1 表 comments；GET 列表 / POST 发表 / DELETE 单条）
  * ============================================================ */
 
+/** 评论敏感词：词库存 site_settings.comment_blocklist（JSON 数组或换行/逗号分隔） */
+export function commentBlocklistHit(text, list) {
+  const hay = String(text || '').toLowerCase();
+  for (const w of (list || [])) { const k = String(w || '').trim().toLowerCase(); if (k && hay.indexOf(k) >= 0) return k; }
+  return '';
+}
+async function commentBlocklist(env) {
+  try {
+    if (env && env.COMMENT_BLOCKLIST) {
+      return String(env.COMMENT_BLOCKLIST).split(/[\n,，]/).map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+    }
+    const row = await dbFirst(env.DB, "SELECT v FROM site_settings WHERE k = 'comment_blocklist'");
+    if (!row || !row.v) return [];
+    const raw = String(row.v);
+    let list = [];
+    try { const j = JSON.parse(raw); if (Array.isArray(j)) list = j; } catch (e) { list = raw.split(/[\n,，]/); }
+    return list.map(function (x) { return String(x || '').trim(); }).filter(Boolean);
+  } catch (e) { return []; }
+}
+
 const COMMENT_CAPS = { author: 30, content: 1000, perPost: 300, perMin: 5, likePerMin: 30 };
 
 /** 清除字符串中的 ASCII 控制字符（保留 \n \t）：防注入 / 干扰渲染的隐形字符 */
@@ -541,6 +561,9 @@ export async function handleComments(request, env, postId) {
     const content = sanitizeText(String((body && body.content) || '').trim()).slice(0, COMMENT_CAPS.content);
     if (!author) return json({ error: '请填写昵称' }, 400, request, env);
     if (!content) return json({ error: '评论内容不能为空' }, 400, request, env);
+    // 敏感词：命中即拒绝，避免灌水进入数据库
+    const hitWord = commentBlocklistHit(author + '\n' + content, await commentBlocklist(env));
+    if (hitWord) return json({ error: '内容包含敏感词：' + hitWord }, 400, request, env);
     // 回复：验证 parent_id（可选）
     let parentId = null;
     if (body && body.parent_id) {

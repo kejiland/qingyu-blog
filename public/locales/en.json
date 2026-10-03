@@ -438,6 +438,8 @@
   "admin.settings.aboutHint": "Markdown supported, rendered above the about body",
   "admin.settings.aboutPlaceholder": "Write the about page content (Markdown supported)…",
   "admin.settings.moderateComments": "Require comment moderation by default",
+  "admin.settings.blocklist": "Comment blocklist",
+  "admin.settings.blocklistHint": "One per line (comma separated also works). A comment or nickname containing any word is rejected",
   "admin.settings.announceTitle": "Announcement bar",
   "admin.settings.announceEnable": "Enable announcement bar",
   "admin.settings.announceText": "Announcement text",
