@@ -2813,7 +2813,8 @@
     } finally {
       btn.disabled = false;
     }
-  }  async function approveComment(content, cid, filter, tr) {
+  }
+  async function approveComment(content, cid, filter, tr) {
     // 无感刷新：审核通过后原行状态徽章就地更新为「已通过」，其余行与滚动位置不动
     try {
       await api('api/comments/' + enc(cid), { method: 'PUT', body: JSON.stringify({ status: 'approved' }) });
@@ -2882,9 +2883,9 @@
       var sel = !!mediaState.selected[m.id];
       return '<div class="ab-media-card' + (sel ? ' selected' : '') + '">' +
         '<label class="ab-media-check"><input type="checkbox" data-pick="' + enc(m.id) + '"' + (sel ? ' checked' : '') + '></label>' +
-        '<div class="ab-media-thumb"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
+        '<div class="ab-media-thumb" data-preview="' + enc(m.id) + '" title="' + t('admin.media.preview') + '"><img src="' + esc(m.thumbUrl || m.thumb_url || m.url) + '" alt="' + esc(m.name || '') + '"></div>' +
         '<div class="ab-media-meta"><div class="ab-media-name">' + esc(m.name || t('admin.media.colImage')) + '</div><div class="ab-media-size">' + fmtSize(m.size) + '</div></div>' +
-        '<div class="ab-media-actions"><button class="ab-btn sm" data-copy="' + enc(m.url) + '">' + t('admin.media.copy') + '</button><button class="ab-btn sm danger" data-delmedia="' + enc(m.id) + '">' + t('admin.media.delete') + '</button></div>' +
+        '<div class="ab-media-actions"><button class="ab-btn sm" data-copy="' + enc(m.url) + '">' + t('admin.media.copy') + '</button><button class="ab-btn sm" data-mdimg="' + enc(m.url) + '" data-mdname="' + esc(m.name || '') + '">' + t('admin.media.copyMarkdown') + '</button><button class="ab-btn sm danger" data-delmedia="' + enc(m.id) + '">' + t('admin.media.delete') + '</button></div>' +
       '</div>';
     }).join('') : '<div class="ab-card ab-empty" style="grid-column:1/-1"><div class="ab-empty-ico">🖼</div><p>' + (mediaState.kw ? t('admin.media.noMatch') : t('admin.media.empty')) + '</p></div>';
     if (pg) {
@@ -2905,6 +2906,15 @@
       });
     });
     grid.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { copyText(dec(b.getAttribute('data-copy'))); toast(t('admin.media.copied'), 'ok'); }); });
+    grid.querySelectorAll('[data-mdimg]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        var md = '![' + (b.getAttribute('data-mdname') || '') + '](' + dec(b.getAttribute('data-mdimg')) + ')';
+        copyText(md); toast(t('admin.media.copiedMd'), 'ok');
+      });
+    });
+    grid.querySelectorAll('[data-preview]').forEach(function (el) {
+      el.addEventListener('click', function () { openMediaLightbox(dec(el.getAttribute('data-preview'))); });
+    });
     grid.querySelectorAll('[data-delmedia]').forEach(function (b) { b.addEventListener('click', function () {
       var mid = dec(b.getAttribute('data-delmedia'));
       confirmModal(t('admin.media.delete'), '<p class="ab-muted">' + t('admin.media.deleteConfirm') + '</p>', async function () {
@@ -2912,6 +2922,64 @@
       }, t('admin.comments.delete'));
     }); });
     syncMediaSelection(content);
+  }
+  var mediaLightbox = { list: [], index: 0, el: null };
+  function ensureMediaLightbox() {
+    if (mediaLightbox.el) return mediaLightbox.el;
+    var el = document.createElement('div');
+    el.className = 'ab-lightbox';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-modal', 'true');
+    el.innerHTML = '<button type="button" class="ab-lb-close" data-lb="close" aria-label="' + t('lightbox.close') + '">✕</button>' +
+      '<button type="button" class="ab-lb-nav prev" data-lb="prev" aria-label="' + t('lightbox.prev') + '">‹</button>' +
+      '<img class="ab-lb-img" alt="">' +
+      '<button type="button" class="ab-lb-nav next" data-lb="next" aria-label="' + t('lightbox.next') + '">›</button>' +
+      '<div class="ab-lb-counter"></div>';
+    document.body.appendChild(el);
+    el.addEventListener('click', function (e) {
+      var act = (e.target && e.target.getAttribute) ? e.target.getAttribute('data-lb') : '';
+      if (act === 'close' || e.target === el) closeMediaLightbox();
+      else if (act === 'prev') stepMediaLightbox(-1);
+      else if (act === 'next') stepMediaLightbox(1);
+    });
+    document.addEventListener('keydown', function (e) {
+      if (!mediaLightbox.el || !mediaLightbox.el.classList.contains('open')) return;
+      if (e.key === 'Escape') closeMediaLightbox();
+      else if (e.key === 'ArrowLeft') stepMediaLightbox(-1);
+      else if (e.key === 'ArrowRight') stepMediaLightbox(1);
+    });
+    mediaLightbox.el = el;
+    return el;
+  }
+  function openMediaLightbox(id) {
+    var list = mediaFiltered();
+    var idx = -1;
+    for (var i = 0; i < list.length; i++) if (list[i].id === id) idx = i;
+    if (idx < 0) return;
+    mediaLightbox.list = list;
+    mediaLightbox.index = idx;
+    var el = ensureMediaLightbox();
+    el.classList.add('open');
+    showMediaLightbox();
+  }
+  function showMediaLightbox() {
+    var el = mediaLightbox.el;
+    if (!el) return;
+    var item = mediaLightbox.list[mediaLightbox.index];
+    if (!item) return;
+    var img = el.querySelector('.ab-lb-img');
+    if (img) { img.src = item.url || item.thumbUrl || item.thumb_url || ''; img.alt = item.name || ''; }
+    var counter = el.querySelector('.ab-lb-counter');
+    if (counter) counter.textContent = t('lightbox.counter', { current: mediaLightbox.index + 1, total: mediaLightbox.list.length });
+  }
+  function stepMediaLightbox(delta) {
+    var n = mediaLightbox.list.length;
+    if (!n) return;
+    mediaLightbox.index = (mediaLightbox.index + delta + n) % n;
+    showMediaLightbox();
+  }
+  function closeMediaLightbox() {
+    if (mediaLightbox.el) mediaLightbox.el.classList.remove('open');
   }
   function syncMediaSelection(content) {
     var ids = Object.keys(mediaState.selected);

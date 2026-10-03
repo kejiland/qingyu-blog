@@ -545,6 +545,18 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-media-card.selected { border-color: var(--ab-primary); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ab-primary) 38%, transparent); }
 .ab-media-check { position: absolute; top: 8px; left: 8px; z-index: 2; display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; background: rgba(255,255,255,.88); box-shadow: 0 2px 6px rgba(0,0,0,.18); cursor: pointer; }
 .ab-media-check input { margin: 0; cursor: pointer; }
+.ab-media-thumb { cursor: zoom-in; }
+
+/* ---------- 媒体大图预览 ---------- */
+.ab-lightbox { display: none; position: fixed; inset: 0; z-index: 300; background: rgba(0,0,0,.84); align-items: center; justify-content: center; }
+.ab-lightbox.open { display: flex; }
+.ab-lb-img { max-width: 88vw; max-height: 84vh; border-radius: 10px; box-shadow: 0 20px 50px rgba(0,0,0,.5); }
+.ab-lb-close { position: absolute; top: 18px; right: 22px; width: 38px; height: 38px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 16px; cursor: pointer; }
+.ab-lb-nav { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 50%; border: 0; background: rgba(255,255,255,.14); color: #fff; font-size: 24px; line-height: 1; cursor: pointer; }
+.ab-lb-nav.prev { left: 22px; }
+.ab-lb-nav.next { right: 22px; }
+.ab-lb-close:hover, .ab-lb-nav:hover { background: rgba(255,255,255,.3); }
+.ab-lb-counter { position: absolute; bottom: 18px; left: 50%; transform: translateX(-50%); color: rgba(255,255,255,.88); font-size: 12.5px; }
 
 /* ---------- 音乐管理：行内迷你播放器 + 空封面占位 ---------- */
 .ab-cover-ph {

@@ -1930,6 +1930,16 @@ tests.push(['编辑器：字数统计 / 阅读时长 / 快捷键 已接入', asy
   assert.ok(acss.includes('.ab-editor-stats'), '统计条样式');
 }]);
 
+tests.push(['后台媒体库：大图预览与复制 Markdown 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('data-preview'), '缩略图预览入口');
+  assert.ok(src.includes('data-mdimg'), '复制 Markdown 按钮');
+  assert.ok(src.includes('openMediaLightbox') && src.includes('stepMediaLightbox'), '灯箱逻辑');
+  assert.ok(src.includes('ab-lb-counter'), '灯箱计数');
+  const acss = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(acss.includes('.ab-lightbox') && acss.includes('.ab-lb-nav'), '灯箱样式');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
