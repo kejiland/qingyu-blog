@@ -1091,6 +1091,26 @@ html[data-theme="dark"] .post-card .mini-tags span {
 }
 .af-actions { display: flex; gap: 10px; margin-left: auto; }
 
+/* 分享菜单：点击展开「复制链接 / 系统分享 / 社交平台」 */
+.share-wrap { position: relative; display: inline-flex; }
+.share-menu {
+  position: absolute; right: 0; bottom: calc(100% + 8px); z-index: 40;
+  min-width: 172px; padding: 6px; border-radius: 12px;
+  background: var(--surface, var(--bg, #fff));
+  border: 1px solid var(--border, rgba(0,0,0,.12));
+  box-shadow: 0 12px 30px rgba(0,0,0,.14);
+  display: flex; flex-direction: column; gap: 2px;
+}
+.share-menu[hidden] { display: none; }
+.share-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px; border-radius: 8px; border: 0; background: none;
+  color: var(--text, inherit); font-size: 13.5px; text-align: left; cursor: pointer;
+  text-decoration: none; white-space: nowrap; font-family: inherit;
+}
+.share-item:hover { background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); }
+.share-item svg { flex: none; }
+
 /* 点赞：正文尾部，水平居中 */
 .like-bar {
   display: flex;

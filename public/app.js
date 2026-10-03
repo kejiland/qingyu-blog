@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.2';
+var BLOG_VERSION = '2.10.3';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2547,7 +2547,19 @@ async function renderPost(id) {
   var afEdit = adminOk()
     ? '<a class="btn" href="' + esc(href(postUrl(post.id) + 'edit')) + '">' + svgIcon('pen', 13) + ' ' + t('post.edit') + '</a>'
     : '';
-  html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + '<button class="btn" id="btnCopyLink">' + svgIcon('link', 14) + ' ' + t('post.copyLink') + '</button></div></div>';
+  var shareSupported = !!(typeof navigator !== 'undefined' && navigator.share);
+  var shareMenu = '<div class="share-wrap">'
+    + '<button class="btn" id="btnShare" aria-haspopup="true" aria-expanded="false" title="' + esc(t('post.share')) + '">' + svgIcon('external', 14) + ' ' + t('post.share') + '</button>'
+    + '<div class="share-menu" id="shareMenu" role="menu" hidden>'
+    + '<button class="share-item" id="btnCopyLink" data-share="copy" role="menuitem">' + svgIcon('link', 14) + ' ' + t('post.copyLink') + '</button>'
+    + (shareSupported ? '<button class="share-item" data-share="native" role="menuitem">' + svgIcon('send', 14) + ' ' + t('post.shareNative') + '</button>' : '')
+    + '<a class="share-item" data-share="weibo" role="menuitem" target="_blank" rel="noopener">' + t('post.shareWeibo') + '</a>'
+    + '<a class="share-item" data-share="x" role="menuitem" target="_blank" rel="noopener">' + t('post.shareX') + '</a>'
+    + '<a class="share-item" data-share="facebook" role="menuitem" target="_blank" rel="noopener">' + t('post.shareFacebook') + '</a>'
+    + '<a class="share-item" data-share="telegram" role="menuitem" target="_blank" rel="noopener">' + t('post.shareTelegram') + '</a>'
+    + '<a class="share-item" data-share="email" role="menuitem">' + t('post.shareEmail') + '</a>'
+    + '</div></div>';
+  html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + shareMenu + '</div></div>';
   // 双向链接与相关文章（静态模式本地计算，云端异步拉取）
   html += '<div class="relations-slot" id="postRelations"></div>';
 
@@ -2622,11 +2634,51 @@ async function renderPost(id) {
     });
   }
 
-  var copyBtn = document.querySelector('#btnCopyLink');
-  if (copyBtn) copyBtn.addEventListener('click', function () {
+  // 分享：复制链接 / 系统分享 / 社交平台（点击展开菜单）
+  (function initShare() {
+    var shareBtn = document.querySelector('#btnShare');
+    var menu = document.querySelector('#shareMenu');
+    if (!shareBtn || !menu) return;
     var url = location.origin + appRoot() + postUrl(post.id);
-    navigator.clipboard && navigator.clipboard.writeText(url) && (copyBtn.textContent = t('post.copied'));
-  });
+    var text = post.title || document.title || '';
+    var targets = {
+      weibo: 'https://service.weibo.com/share/share.php?url=' + encodeURIComponent(url) + '&title=' + encodeURIComponent(text),
+      x: 'https://twitter.com/intent/tweet?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text),
+      facebook: 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent(url),
+      telegram: 'https://t.me/share/url?url=' + encodeURIComponent(url) + '&text=' + encodeURIComponent(text),
+      email: 'mailto:?subject=' + encodeURIComponent(text) + '&body=' + encodeURIComponent(url)
+    };
+    function closeMenu() { menu.hidden = true; shareBtn.setAttribute('aria-expanded', 'false'); }
+    function openMenu() { menu.hidden = false; shareBtn.setAttribute('aria-expanded', 'true'); }
+    shareBtn.addEventListener('click', function (e) {
+      if (e && e.stopPropagation) e.stopPropagation();
+      if (menu.hidden) openMenu(); else closeMenu();
+    });
+    document.addEventListener('click', function (e) {
+      if (!menu.hidden && e.target !== shareBtn && !(menu.contains && menu.contains(e.target))) closeMenu();
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenu(); });
+    menu.querySelectorAll('[data-share]').forEach(function (el) {
+      var kind = el.getAttribute('data-share');
+      if (kind === 'copy') {
+        el.addEventListener('click', function () {
+          var done = function () {
+            el.textContent = t('post.copied');
+            closeMenu();
+            setTimeout(function () { el.innerHTML = svgIcon('link', 14) + ' ' + t('post.copyLink'); }, 1600);
+          };
+          if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done, done); else done();
+        });
+      } else if (kind === 'native') {
+        el.addEventListener('click', function () {
+          closeMenu();
+          if (navigator.share) { try { navigator.share({ title: text, url: url }).catch(function () {}); } catch (err) {} }
+        });
+      } else if (targets[kind]) {
+        el.setAttribute('href', targets[kind]);
+      }
+    });
+  })();
 
   // load comments（构建评论树：顶层 + 嵌套回复统一渲染）
   function refreshComments(list) {

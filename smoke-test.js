@@ -1518,6 +1518,18 @@ tests.push(['详情页：标签链接可点击、复制链接按钮、阅读时�
   assert.ok(d.html.includes('分钟阅读'), '阅读时长');
 }]);
 
+tests.push(['详情页：分享菜单（复制链接 / 系统分享 / 社交平台）', async () => {
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
+  assert.ok(d.html.includes('id="btnShare"'), '分享按钮存在');
+  assert.ok(d.html.includes('id="shareMenu"'), '分享菜单容器存在');
+  assert.ok(d.html.includes('data-share="copy"'), '复制链接项');
+  assert.ok(d.html.includes('data-share="weibo"'), '微博分享项');
+  assert.ok(d.html.includes('data-share="x"'), 'X 分享项');
+  assert.ok(d.html.includes('data-share="facebook"'), 'Facebook 分享项');
+  assert.ok(d.html.includes('data-share="telegram"'), 'Telegram 分享项');
+  assert.ok(d.html.includes('data-share="email"'), '邮件分享项');
+}]);
+
 tests.push(['非法路径不崩溃（decodeURIComponent 防护）', async () => {
   const n = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/%E4%B8%8D%E5%AE%8C%E6%95%B4%/');
   assert.ok(n.html.includes('内容不存在') || n.html.length > 0, '非法编码渲染兜底页');
