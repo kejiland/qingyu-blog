@@ -766,6 +766,8 @@
   "admin.editor.hr": "Divider",
   "admin.editor.codeBlock": "Code block",
   "admin.editor.langPlain": "Plain text",
+  "admin.editor.category": "Category",
+  "admin.editor.categoryPh": "e.g. Tech / Notes",
   "admin.editor.stats": "{chars} chars · {words} words · ~{minutes} min read",
   "admin.editor.shortcutHint": "Shortcuts: Ctrl/⌘ + B bold · I italic · K link · S save draft",
   "admin.editor.tableCol": "Column",

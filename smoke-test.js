@@ -2029,6 +2029,13 @@ tests.push(['高亮导出 / 导入 已接入', async () => {
   assert.ok(src.includes('post.hlImported'), '导入结果提示');
 }]);
 
+tests.push(['编辑器：分类选择 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abCategory'), '分类输入框');
+  assert.ok(src.includes('category: categoryValue'), '保存分类字段');
+  assert.ok(src.includes('fillCategoryOptions'), '分类候选填充');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

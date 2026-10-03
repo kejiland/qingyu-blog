@@ -2313,6 +2313,7 @@
         '<div class="ab-editor-meta">' +
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.tagsPlaceholder') + '</label><input class="ab-input" id="abTags" placeholder="' + t('admin.editor.tagsExample') + '" autocomplete="off"></div>' +
+          '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.category') + '</label><input class="ab-input" id="abCategory" list="abCategoryList" placeholder="' + t('admin.editor.categoryPh') + '" autocomplete="off"><datalist id="abCategoryList"></datalist></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.seriesLabel') + '</label><div class="ab-row"><input class="ab-input" id="abSeries" placeholder="' + t('admin.editor.seriesPlaceholder') + '" autocomplete="off"><input class="ab-input" id="abSeriesOrder" type="number" min="0" step="1" style="max-width:110px" placeholder="' + t('admin.editor.seriesOrder') + '"></div><label class="ab-hint">' + t('admin.editor.seriesHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label" for="abDate">' + t('admin.editor.dateLabel') + '</label><div class="ab-row"><input class="ab-input" id="abDate" type="datetime-local" step="60"><button class="ab-btn sm" id="abNow">' + t('admin.editor.setNow') + '</button></div><label class="ab-hint">' + t('admin.editor.dateHint') + '</label></div>' +
           (cloudOn() ? '<div class="ab-field" style="margin:0"><label class="ab-label" for="abSchedule">' + t('admin.editor.scheduleLabel') + '</label><input class="ab-input" id="abSchedule" type="datetime-local" step="60"><label class="ab-hint">' + t('admin.editor.scheduleHint') + '</label></div>' : '') +
@@ -2357,6 +2358,7 @@
       '</div>';
 
     bindEditor(content, route);
+    fillCategoryOptions(content);
     if (route.id) loadEditor(content, route.id);
     else {
       var dateInput = content.querySelector('#abDate');
@@ -2505,12 +2507,24 @@
     area.value = v.slice(0, s) + pre + rep + post + v.slice(e);
     area.selectionStart = area.selectionEnd = s + pre.length + rep.length;
   }
+  /** 用现有文章的分类填充下拉候选 */
+  async function fillCategoryOptions(content) {
+    var list = content.querySelector('#abCategoryList');
+    if (!list) return;
+    var posts = [];
+    try { posts = await listPosts(); } catch (e) {}
+    var seen = {};
+    posts.forEach(function (x) { if (x && x.category) seen[x.category] = 1; });
+    list.innerHTML = Object.keys(seen).sort().map(function (c) { return '<option value="' + esc(c) + '"></option>'; }).join('');
+  }
   async function loadEditor(content, id) {
     var p = await getPost(id);
     if (!p) { toast(t('admin.editor.notFound'), 'err'); return; }
     content.__editingPost = p;
     content.querySelector('#abTitle').value = p.title || '';
     content.querySelector('#abTags').value = (p.tags || []).join(', ');
+    var catEl = content.querySelector('#abCategory');
+    if (catEl) catEl.value = p.category || '';
     content.querySelector('#abSeries').value = p.series || '';
     content.querySelector('#abSeriesOrder').value = p.seriesOrder ? String(p.seriesOrder) : '';
     content.querySelector('#abCover').value = p.cover || '';
@@ -2523,6 +2537,8 @@
     if (scheduleInput && p.publishAt) scheduleInput.value = toDateTimeLocal(p.publishAt);
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
+    var catEl2 = content.querySelector('#abCategory');
+    if (catEl2) catEl2.value = p.category || '';
     updatePreview(content);
     updateEditorStats(content);
   }
@@ -2532,6 +2548,8 @@
     if (!title) { toast(t('admin.editor.noTitle'), 'err'); return; }
     var id = route.id || slug(title);
     var tags = content.querySelector('#abTags').value.split(/[,，]/).map(function (t) { return t.trim(); }).filter(Boolean);
+    var catInput = content.querySelector('#abCategory');
+    var categoryValue = catInput ? catInput.value.trim() : '';
 
     var wantPinned = !!content.querySelector('#abPinned').checked;
     var dateInput = content.querySelector('#abDate');
@@ -2563,7 +2581,7 @@
       seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: body, cover: content.querySelector('#abCover').value.trim(),
-      pinned: wantPinned, tags: tags,
+      pinned: wantPinned, tags: tags, category: categoryValue,
       status: status
     });
 

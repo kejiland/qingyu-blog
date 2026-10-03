@@ -766,6 +766,8 @@
   "admin.editor.hr": "区切り線",
   "admin.editor.codeBlock": "コードブロック",
   "admin.editor.langPlain": "プレーンテキスト",
+  "admin.editor.category": "カテゴリ",
+  "admin.editor.categoryPh": "例：技術 / 随筆",
   "admin.editor.stats": "{chars} 文字 · {words} 語 · 約 {minutes} 分",
   "admin.editor.shortcutHint": "ショートカット：Ctrl/⌘ + B 太字 · I 斜体 · K リンク · S 下書き保存",
   "admin.editor.tableCol": "列",

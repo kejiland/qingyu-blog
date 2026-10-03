@@ -766,6 +766,8 @@
   "admin.editor.hr": "구분선",
   "admin.editor.codeBlock": "코드 블록",
   "admin.editor.langPlain": "일반 텍스트",
+  "admin.editor.category": "카테고리",
+  "admin.editor.categoryPh": "예: 기술 / 에세이",
   "admin.editor.stats": "{chars}자 · {words}단어 · 약 {minutes}분",
   "admin.editor.shortcutHint": "단축키: Ctrl/⌘ + B 굵게 · I 기울임 · K 링크 · S 임시저장",
   "admin.editor.tableCol": "열",
