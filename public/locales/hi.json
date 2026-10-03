@@ -555,7 +555,7 @@
   "admin.pwdModal.confirmPwd": "वर्तमान पासवर्ड",
   "admin.pwdModal.newPwd": "नया पासवर्ड",
   "admin.pwdModal.change": "बदलें",
-  "admin.pwdModal.tooShort": "नया पासवर्ड कम से कम 6 अक्षर का होना चाहिए",
+  "admin.pwdModal.tooShort": "नया पासवर्ड कम से कम 8 अक्षर का होना चाहिए",
   "admin.pwdModal.success": "पासवर्ड बदल दिया गया",
   "admin.pwdModal.fail": "बदलने में विफल: ",
   "admin.sidebar.importExport": "आयात / निर्यात",

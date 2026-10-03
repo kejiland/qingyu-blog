@@ -555,7 +555,7 @@
   "admin.pwdModal.confirmPwd": "現在のパスワード",
   "admin.pwdModal.newPwd": "新しいパスワード",
   "admin.pwdModal.change": "変更する",
-  "admin.pwdModal.tooShort": "新しいパスワードは6文字以上必要です",
+  "admin.pwdModal.tooShort": "新しいパスワードは8文字以上必要です",
   "admin.pwdModal.success": "パスワードを変更しました",
   "admin.pwdModal.fail": "変更に失敗：",
   "admin.sidebar.importExport": "インポート / エクスポート",

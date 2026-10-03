@@ -555,7 +555,7 @@
   "admin.pwdModal.confirmPwd": "当前密码",
   "admin.pwdModal.newPwd": "新密码",
   "admin.pwdModal.change": "确认修改",
-  "admin.pwdModal.tooShort": "新密码至少 6 位",
+  "admin.pwdModal.tooShort": "新密码至少 8 位",
   "admin.pwdModal.success": "密码已修改",
   "admin.pwdModal.fail": "修改失败：",
   "admin.sidebar.importExport": "导入 / 导出",

@@ -4111,7 +4111,7 @@
     mask.querySelector('#abDoPwd').addEventListener('click', async function () {
       var cur = mask.querySelector('#abCurPwd').value, pwd = mask.querySelector('#abNewPwd').value;
       if (!cur || !pwd) { toast(t('admin.pwdRequired'), 'err'); return; }
-      if (pwd.length < 6) { toast(t('admin.pwdModal.tooShort'), 'err'); return; }
+      if (pwd.length < 8) { toast(t('admin.pwdModal.tooShort'), 'err'); return; }
       try {
         await api('api/admin/password', { method: 'POST', body: JSON.stringify({ current: cur, password: pwd }) });
         toast(t('admin.pwdModal.success'), 'ok');

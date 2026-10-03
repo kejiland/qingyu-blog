@@ -555,7 +555,7 @@
   "admin.pwdModal.confirmPwd": "Current Password",
   "admin.pwdModal.newPwd": "New Password",
   "admin.pwdModal.change": "Confirm",
-  "admin.pwdModal.tooShort": "New password must be at least 6 characters",
+  "admin.pwdModal.tooShort": "New password must be at least 8 characters",
   "admin.pwdModal.success": "Password changed",
   "admin.pwdModal.fail": "Failed to change: ",
   "admin.sidebar.importExport": "Import / Export",
