@@ -1886,6 +1886,16 @@ tests.push(['后台媒体库：搜索 / 分页 / 批量删除 已接入', async 
   assert.ok(acss.includes('.ab-media-check'), '选择框样式');
 }]);
 
+tests.push(['后台订阅者：搜索 / 状态筛选 / 分页 / 导出 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abSubKw'), '搜索框');
+  assert.ok(src.includes('abSubStatus'), '状态筛选');
+  assert.ok(src.includes('abSubPage'), '分页容器');
+  assert.ok(src.includes('filteredSubscribers'), '筛选逻辑');
+  assert.ok(src.includes('renderSubscribers'), '列表渲染');
+  assert.ok(src.includes('subState'), '分页状态');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

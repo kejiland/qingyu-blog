@@ -2864,11 +2864,20 @@
     if (status === 'pending') return t('admin.subscribers.pending');
     return t('admin.subscribers.unsubscribed');
   }
+  var subState = { list: [], kw: '', status: 'all', page: 1, per: 20 };
   function pageSubscribers(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.subscribers.title') + '</h1><p class="ab-page-sub">' + t('admin.subscribers.desc') + '</p></div>' +
       '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abSubExport">' + icon('download', 14) + ' ' + t('admin.subscribers.export') + '</button><button class="ab-btn" id="abSubRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div></div>' +
       '<div class="ab-grid cols-3" id="abSubStats"></div><div class="ab-card" id="abSubNotice" style="margin-bottom:16px"></div>' +
-      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.subscribers.colEmail') + '</th><th>' + t('admin.subscribers.colStatus') + '</th><th>' + t('admin.subscribers.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSubBody"></tbody></table></div></div>';
+      '<div class="ab-toolbar"><div class="ab-search"><input class="ab-input" id="abSubKw" placeholder="' + t('admin.subscribers.search') + '"></div>' +
+      '<select class="ab-select" id="abSubStatus" style="max-width:170px"><option value="all">' + t('admin.subscribers.filterAll') + '</option><option value="active">' + t('admin.subscribers.active') + '</option><option value="pending">' + t('admin.subscribers.pending') + '</option><option value="unsubscribed">' + t('admin.subscribers.unsubscribed') + '</option></select></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.subscribers.colEmail') + '</th><th>' + t('admin.subscribers.colStatus') + '</th><th>' + t('admin.subscribers.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSubBody"></tbody></table></div><div class="ab-pagination" id="abSubPage" style="padding:0 4px 6px"></div></div>';
+    var kw = content.querySelector('#abSubKw');
+    kw.value = subState.kw;
+    kw.addEventListener('input', debounce(function () { subState.kw = (kw.value || '').trim().toLowerCase(); subState.page = 1; renderSubscribers(content); }, 200));
+    var st = content.querySelector('#abSubStatus');
+    st.value = subState.status;
+    st.addEventListener('change', function () { subState.status = st.value; subState.page = 1; renderSubscribers(content); });
     content.querySelector('#abSubRefresh').addEventListener('click', function () { loadSubscribers(content); });
     content.querySelector('#abSubExport').addEventListener('click', function () { exportSubscribers(content); });
     loadSubscribers(content);
@@ -2885,9 +2894,31 @@
         { label: t('admin.subscribers.pending'), value: counts.pending, icon: 'clock' }
       ].map(function (x) { return '<div class="ab-card ab-stat"><div class="ab-stat-label">' + icon(x.icon, 16) + esc(x.label) + '</div><div class="ab-stat-value">' + esc(String(x.value)) + '</div></div>'; }).join('');
       content.querySelector('#abSubNotice').innerHTML = d && d.enabled ? '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + icon('send', 13) + ' Resend</span><b>' + t('admin.subscribers.enabled') + '</b></div>' : '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + t('admin.backup.disabledChip') + '</span><b>' + t('admin.subscribers.disabled') + '</b><span class="ab-muted">RESEND_API_KEY / BLOG_MAIL_FROM / SITE_URL</span></div>';
-      var list = (d && d.subscribers) || [];
-      if (!list.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.subscribers.empty') + '</td></tr>'; return; }
-      body.innerHTML = list.map(function (sub) {
+      subState.list = ((d && d.subscribers) || []).slice();
+      renderSubscribers(content);
+    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+  }
+  /** 订阅者列表：关键字 + 状态过滤，分页渲染（每页 20） */
+  function filteredSubscribers() {
+    var list = subState.list;
+    if (subState.status !== 'all') list = list.filter(function (s) { return s.status === subState.status; });
+    if (subState.kw) list = list.filter(function (s) { return String(s.email || '').toLowerCase().indexOf(subState.kw) >= 0; });
+    return list;
+  }
+  function renderSubscribers(content) {
+    var body = content.querySelector('#abSubBody');
+    var pg = content.querySelector('#abSubPage');
+    if (!body) return;
+    var list = filteredSubscribers();
+    var per = subState.per;
+    var totalPages = Math.max(1, Math.ceil(list.length / per));
+    if (subState.page > totalPages) subState.page = totalPages;
+    var page = subState.page;
+    var view = list.slice((page - 1) * per, page * per);
+    if (!view.length) {
+      body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + ((subState.kw || subState.status !== 'all') ? t('admin.subscribers.noMatch') : t('admin.subscribers.empty')) + '</td></tr>';
+    } else {
+      body.innerHTML = view.map(function (sub) {
         return '<tr><td>' + esc(sub.email) + '</td><td><span class="ab-status ' + (sub.status === 'active' ? 'published' : sub.status === 'pending' ? 'scheduled' : 'draft') + '">' + esc(subscriberStatusLabel(sub.status)) + '</span></td><td>' + esc(fmtTimestamp(sub.created_at)) + '</td><td class="col-actions"><button class="ab-btn sm danger" data-sub-delete="' + esc(sub.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
       }).join('');
       body.querySelectorAll('[data-sub-delete]').forEach(function (btn) {
@@ -2899,13 +2930,22 @@
           }, t('admin.comments.delete'));
         });
       });
-    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+    }
+    if (pg) {
+      pg.innerHTML = list.length > per
+        ? (page > 1 ? '<button class="ab-page-btn" data-p="' + (page - 1) + '">' + t('pagination.prev') + '</button>' : '') +
+          '<button class="ab-page-btn active">' + page + ' / ' + totalPages + '</button>' +
+          (page < totalPages ? '<button class="ab-page-btn" data-p="' + (page + 1) + '">' + t('pagination.next') + '</button>' : '')
+        : '';
+      pg.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { subState.page = parseInt(b.getAttribute('data-p'), 10) || 1; renderSubscribers(content); }); });
+    }
   }
   async function exportSubscribers(content) {
     try {
-      var d = await api('api/admin/subscribers');
+      // 导出遵循当前搜索 / 状态筛选；未筛选时导出全部
+      var list = subState.list.length ? filteredSubscribers() : ((await api('api/admin/subscribers')).subscribers || []);
       var rows = [['email', 'status', 'created_at']];
-      ((d && d.subscribers) || []).forEach(function (s) { rows.push([s.email, s.status, new Date(Number(s.created_at) || 0).toISOString()]); });
+      list.forEach(function (s) { rows.push([s.email, s.status, s.created_at ? new Date(Number(s.created_at) || 0).toISOString() : '']); });
       var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
       transferDownloadText('subscribers-' + transferStamp() + '.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');
     } catch (e) { toast(t('admin.subscribers.exportFail') + (e.message || e), 'err'); }
