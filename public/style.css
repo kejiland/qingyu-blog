@@ -3207,3 +3207,13 @@ html[data-theme="dark"] body.scrolled .topbar {
 .hl-btn { position: fixed; z-index: 80; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface, var(--bg, #fff)); color: var(--text, inherit); font-size: 13px; cursor: pointer; box-shadow: 0 8px 20px rgba(0,0,0,.16); font-family: inherit; }
 .hl-btn:hover { color: var(--accent); border-color: var(--accent); }
 .hl-btn[hidden] { display: none; }
+.hl-btn-note { font-size: 12.5px; }
+.hl-panel { position: fixed; right: 20px; top: 80px; z-index: 85; width: 300px; max-height: 60vh; overflow: auto; padding: 12px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface, var(--bg, #fff)); box-shadow: 0 12px 30px rgba(0,0,0,.18); font-size: 13px; }
+.hl-panel[hidden] { display: none; }
+.hl-panel-title { font-weight: 600; margin-bottom: 8px; }
+.hl-panel-list { display: flex; flex-direction: column; gap: 4px; }
+.hl-panel-item { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 7px 9px; border: 0; border-radius: 8px; background: transparent; color: var(--text, inherit); cursor: pointer; font-family: inherit; font-size: 13px; }
+.hl-panel-item:hover { background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); }
+.hl-panel-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hl-panel-note { font-size: 12px; color: var(--muted); }
+.hl-panel-empty { color: var(--muted); }

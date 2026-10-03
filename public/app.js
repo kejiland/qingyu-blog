@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.22';
+var BLOG_VERSION = '2.10.23';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -702,9 +702,15 @@ var HL_KEY = 'qingyu.highlights';
 function hlStore() {
   try { return JSON.parse(localStorage.getItem(HL_KEY) || '{}') || {}; } catch (e) { return {}; }
 }
+function hlNorm(item) {
+  if (typeof item === 'string') return { t: item, n: '' };
+  if (item && typeof item.t === 'string') return { t: item.t, n: String(item.n || '') };
+  return null;
+}
 function hlList(id) {
   var all = hlStore();
-  return Array.isArray(all[id]) ? all[id] : [];
+  var raw = Array.isArray(all[id]) ? all[id] : [];
+  return raw.map(hlNorm).filter(Boolean);
 }
 function hlSave(id, list) {
   try {
@@ -715,7 +721,9 @@ function hlSave(id, list) {
 }
 function applyHighlights(root, list) {
   if (!root || !list || !list.length || !document.createTreeWalker) return;
-  list.forEach(function (text) {
+  list.forEach(function (rawItem) {
+    var item = hlNorm(rawItem) || {};
+    var text = item.t;
     if (!text) return;
     var walker = document.createTreeWalker(root, 3, null);
     var node;
@@ -730,6 +738,7 @@ function applyHighlights(root, list) {
         range.setEnd(node, idx + text.length);
         var mark = document.createElement('mark');
         mark.className = 'hl';
+        if (item.n) { mark.setAttribute('data-note', item.n); mark.title = item.n; }
         range.surroundContents(mark);
       } catch (e) {}
       break;
@@ -2903,32 +2912,65 @@ async function renderPost(id) {
     applyHighlights(article, hlList(post.id));
 
     var tools = document.querySelector('.reading-tools');
-    var clearBtn = null;
+    var clearBtn = null, sumBtn = null;
     if (tools && tools.appendChild) {
+      sumBtn = document.createElement('button');
+      sumBtn.type = 'button'; sumBtn.className = 'rt-btn'; sumBtn.id = 'btnHlSummary';
+      sumBtn.textContent = t('post.hlSummary');
+      tools.appendChild(sumBtn);
       clearBtn = document.createElement('button');
-      clearBtn.type = 'button';
-      clearBtn.className = 'rt-btn';
-      clearBtn.id = 'btnClearHl';
+      clearBtn.type = 'button'; clearBtn.className = 'rt-btn'; clearBtn.id = 'btnClearHl';
       clearBtn.textContent = t('post.clearHl');
       tools.appendChild(clearBtn);
     }
+    var panel = document.createElement('div');
+    panel.className = 'hl-panel'; panel.id = 'hlPanel'; panel.hidden = true;
+    if (document.body && document.body.appendChild) document.body.appendChild(panel);
+    function renderPanel() {
+      var list = hlList(post.id);
+      panel.innerHTML = '<div class="hl-panel-title">' + t('post.hlSummary') + ' (' + list.length + ')</div>' +
+        (list.length ? '<div class="hl-panel-list">' + list.map(function (it, idx) {
+          return '<button type="button" class="hl-panel-item" data-hl-jump="' + idx + '"><span class="hl-panel-text">' + esc(it.t.slice(0, 60)) + '</span>' + (it.n ? '<span class="hl-panel-note">' + esc(it.n) + '</span>' : '') + '</button>';
+        }).join('') + '</div>' : '<div class="hl-panel-empty">' + t('post.hlEmpty') + '</div>');
+      panel.querySelectorAll('[data-hl-jump]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var idx = Number(b.getAttribute('data-hl-jump')) || 0;
+          var marks = article.querySelectorAll('mark.hl');
+          if (marks[idx] && marks[idx].scrollIntoView) marks[idx].scrollIntoView({ behavior: 'smooth', block: 'center' });
+          panel.hidden = true;
+        });
+      });
+    }
+    if (sumBtn) sumBtn.addEventListener('click', function () { renderPanel(); panel.hidden = !panel.hidden; });
     var bar = document.createElement('button');
     bar.type = 'button';
     bar.className = 'hl-btn';
     bar.id = 'hlBar';
     bar.hidden = true;
     bar.textContent = t('post.highlight');
-    if (document.body && document.body.appendChild) document.body.appendChild(bar);
+    var barNote = document.createElement('button');
+    barNote.type = 'button';
+    barNote.className = 'hl-btn hl-btn-note';
+    barNote.id = 'hlBarNote';
+    barNote.hidden = true;
+    barNote.textContent = t('post.hlWithNote');
+    if (document.body && document.body.appendChild) { document.body.appendChild(bar); document.body.appendChild(barNote); }
 
-    function hideHlBar() { bar.hidden = true; bar.removeAttribute('data-text'); }
-    bar.addEventListener('click', function () {
+    function hideHlBar() { bar.hidden = true; barNote.hidden = true; bar.removeAttribute('data-text'); }
+    function addHighlight(note) {
       var text = bar.getAttribute('data-text') || '';
       if (!text) return;
       var cur = hlList(post.id);
-      if (cur.indexOf(text) < 0) { cur.push(text); hlSave(post.id, cur); }
-      applyHighlights(article, [text]);
+      var exists = cur.some(function (x) { return x.t === text; });
+      if (!exists) { cur.push({ t: text, n: note || '' }); hlSave(post.id, cur); }
+      applyHighlights(article, [{ t: text, n: note || '' }]);
       hideHlBar();
       toast(t('post.highlighted'), 'ok');
+    }
+    bar.addEventListener('click', function () { addHighlight(''); });
+    barNote.addEventListener('click', function () {
+      var note = window.prompt ? window.prompt(t('post.hlNotePrompt'), '') : '';
+      addHighlight(String(note || '').trim());
     });
     if (clearBtn) clearBtn.addEventListener('click', function () {
       clearHighlights(article);
@@ -2943,9 +2985,11 @@ async function renderPost(id) {
         var r = sel.getRangeAt(0);
         var rect = r.getBoundingClientRect ? r.getBoundingClientRect() : null;
         if (!rect || (!rect.width && !rect.height)) { hideHlBar(); return; }
-        bar.hidden = false;
-        bar.style.top = Math.max(8, rect.top - 44) + 'px';
-        bar.style.left = Math.max(8, rect.left + rect.width / 2 - 40) + 'px';
+        var top = Math.max(8, rect.top - 44) + 'px';
+        var left = Math.max(8, rect.left + rect.width / 2 - 70) + 'px';
+        bar.hidden = false; barNote.hidden = false;
+        bar.style.top = top; bar.style.left = left;
+        barNote.style.top = top; barNote.style.left = 'calc(' + left + ' + 72px)';
         bar.setAttribute('data-text', text);
       }, 10);
     });

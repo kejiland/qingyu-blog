@@ -2013,8 +2013,9 @@ tests.push(['阅读位置记忆：保存 / 读取 / 清理', async () => {
 
 tests.push(['正文划线高亮：存储接口与渲染函数已接入', async () => {
   const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
-  ctx.hlSave('p1', ['句子一']);
-  assert.strictEqual(JSON.stringify(ctx.hlList('p1')), JSON.stringify(['句子一']), '高亮可保存与读回');
+  ctx.hlSave('p1', [{ t: '句子一', n: '备注' }]);
+  assert.strictEqual(ctx.hlList('p1')[0].n, '备注', '高亮备注可读回');
+  assert.strictEqual(ctx.hlList('p1')[0].t, '句子一', '高亮文本可读回');
   ctx.hlSave('p1', []);
   assert.strictEqual(JSON.stringify(ctx.hlList('p1')), '[]', '可清空');
   assert.strictEqual(typeof ctx.applyHighlights, 'function', '高亮渲染函数');
