@@ -480,6 +480,7 @@ function makeD1() {
     }
     if (s === 'SELECT 1 FROM posts WHERE id = ?') return t.posts.has(params[0]) ? { '1': 1 } : null;
     if (s === 'SELECT * FROM posts WHERE id = ?') return t.posts.get(params[0]) || null;
+    if (s === 'SELECT title FROM posts WHERE id = ?') { const row = t.posts.get(params[0]); return row ? { title: row.title } : null; }
     if (s === 'SELECT * FROM post_revisions WHERE post_id = ? ORDER BY created_at DESC, id DESC LIMIT 1') {
       return [...t.post_revisions.values()].filter((r) => r.post_id === params[0]).sort((a, b) => b.created_at - a.created_at || b.id - a.id)[0] || null;
     }
@@ -538,10 +539,10 @@ function makeD1() {
       const row = [...t.subscribers.values()].find((r) => r.email === params[1]); if (row) row.last_notified_at = params[0]; return { success: true };
     }
     if (s === 'DELETE FROM subscribers WHERE id = ?') { t.subscribers.delete(params[0]); return { success: true }; }
-    if (/^INSERT OR IGNORE INTO mail_outbox/.test(s)) {
-      const [post_id,to_email,status,attempts,error,created_at] = params;
+    if (/^INSERT(?: OR IGNORE)? INTO mail_outbox/.test(s)) {
+      const [post_id,to_email,status,attempts,error,created_at,kind,payload] = params;
       const key = post_id + '|' + to_email;
-      if (!t.mail_outbox.has(key)) t.mail_outbox.set(key, { id: ++seq, post_id, to_email, status, attempts, error, created_at, sent_at: null });
+      if (!t.mail_outbox.has(key)) t.mail_outbox.set(key, { id: ++seq, post_id, to_email, status, attempts, error, created_at, kind: kind || 'post', payload: payload || '', sent_at: null });
       return { success: true };
     }
     if (/^SELECT \* FROM mail_outbox WHERE status = 'pending' ORDER BY created_at ASC LIMIT \d+$/.test(s)) {
@@ -939,6 +940,29 @@ tests.push(['订阅：确认邮箱并发送新文章通知', async () => {
   }
 }]);
 
+tests.push(['邮件：新评论通知进入发件箱并发送给站长', async () => {
+  const { env, token, core } = await authEnv();
+  env.RESEND_API_KEY = 're_test';
+  env.BLOG_MAIL_FROM = 'blog@example.com';
+  env.SITE_URL = 'https://blog.example';
+  env.BLOG_ADMIN_EMAIL = 'owner@example.com';
+  const subscribe = await import('./functions/_lib/subscribe.js');
+  const authHeaders = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const created = await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: authHeaders, body: JSON.stringify({ id: 'notify-post', title: '评论通知文章', content: '正文' }) }), env);
+  assert.strictEqual(created.status, 201);
+  const posted = await core.handleComments(new Request('http://t/api/posts/notify-post/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ author: '读者', content: '这是一条测试评论' }) }), env, 'notify-post');
+  assert.strictEqual(posted.status, 201);
+  const row = [...env._d1.mail_outbox.values()][0];
+  assert.ok(row && row.kind === 'comment' && row.to_email === 'owner@example.com', '新评论进入站长通知发件箱');
+  const originalFetch = global.fetch;
+  const emails = [];
+  global.fetch = async function (url, opts) { emails.push(JSON.parse(opts.body)); return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } }); };
+  try {
+    const result = await subscribe.processMailOutbox(env, 20);
+    assert.strictEqual(result.sent, 1, '评论通知异步发送成功');
+    assert.ok(emails[0].subject.includes('评论通知文章') && emails[0].html.includes('这是一条测试评论'), '邮件正文包含文章和评论内容');
+  } finally { global.fetch = originalFetch; }
+}]);
 tests.push(['API：OG 分享图上传签名与文章字段', async () => {
   const { env, token, core } = await authEnv();
   env.R2_ACCESS_KEY_ID = 'test-key';

@@ -251,6 +251,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | **AI writing assistant** | One click for title suggestions / polish / translation (5 target languages); apply the result to the title, replace the body, append it, or copy it. The whole bar is not rendered when AI is unavailable |
 | Comment management | Global list (author / content / post / time / status / actions), keyword search, status filter, **approve** (badge updates in place, no table reload), delete (row fades out); the sidebar shows a live pending-count badge |
 | **AI comment tools** | Summarize recent comment threads (1-hour cache) and screen a single comment for spam (red / green verdict with a reason) |
+| **Comment email notifications** | New comments and replies are queued and delivered asynchronously by Cron. The recipient uses `BLOG_ADMIN_EMAIL` first, then the profile email |
 | Tag management | Tag list derived from the posts in real time; rename / delete with bulk updates |
 | Media library | Image upload (browser **direct to R2** via a presigned URL, metadata in D1), grid preview, copy URL, delete (removes the R2 object first, then the D1 row); static / non-cloud environments show an explanatory card |
 | **Music management** | Audio upload (direct to R2 with a percentage progress bar, drag-and-drop supported); **filename parsing fills in "song - artist"**; inline per-row preview (play / pause / seek / elapsed and total time), rename, delete (synced with the R2 object); inner-scrolling list card with a sticky table header |

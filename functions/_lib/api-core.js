@@ -556,6 +556,7 @@ export async function handleComments(request, env, postId) {
     await dbRun(env.DB,
       'INSERT INTO comments (id,post_id,author,content,date,status,parent_id) VALUES (?,?,?,?,?,?,?)',
       comment.id, postId, comment.author, comment.content, comment.date, comment.status, parentId);
+    await queueCommentNotification(env, postId, comment).catch(() => {});
     // 入库成功才计数（防刷屏）
     if (env.BLOG) {
       try { await env.BLOG.put(rk, String(cnt + 1), { expirationTtl: 120 }); } catch (e) {}
@@ -580,6 +581,24 @@ export async function handleCommentId(request, env, postId, cid) {
   return json({ ok: true }, 200, request, env);
 }
 
+/** 将新评论加入站长通知发件箱；未配置收件邮箱或邮件服务时静默跳过。 */
+async function queueCommentNotification(env, postId, comment) {
+  if (!env || !env.DB || !env.RESEND_API_KEY || !env.BLOG_MAIL_FROM || !env.SITE_URL) return false;
+  let to = String(env.BLOG_ADMIN_EMAIL || env.BLOG_MAIL_REPLY_TO || '').trim();
+  if (!to) {
+    try {
+      const row = await dbFirst(env.DB, "SELECT v FROM site_settings WHERE k = 'profile'");
+      const profile = row && row.v ? JSON.parse(row.v) : {};
+      to = String(profile.email || '').trim();
+    } catch (e) {}
+  }
+  if (!to) to = String(env.BLOG_MAIL_FROM || '').trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) return false;
+  const post = await dbFirst(env.DB, 'SELECT title FROM posts WHERE id = ?', postId).catch(() => null);
+  const payload = JSON.stringify({ postId: postId, postTitle: post ? post.title : '', author: comment.author, content: comment.content, status: comment.status, commentId: comment.id });
+  await dbRun(env.DB, 'INSERT INTO mail_outbox (post_id,to_email,status,attempts,error,created_at,kind,payload) VALUES (?,?,?,?,?,?,?,?)', postId, to, 'pending', 0, '', Date.now(), 'comment', payload);
+  return true;
+}
 /** 将已发布文章加入订阅通知发件箱；发送由 Cron 异步完成。 */
 export async function queuePostNotifications(env, post) {
   if (!env || !env.DB || !post || !post.id || (post.status || 'published') !== 'published') return { queued: 0 };

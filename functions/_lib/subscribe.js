@@ -108,11 +108,38 @@ async function sendPostNotification(env, outbox, post, sub) {
     '<p style="margin-top:32px;color:#999;font-size:12px">不想再收到邮件？<a href="' + escHtml(unsub) + '">取消订阅</a></p></div>';
   await sendEmail(env, sub.email, '新文章：' + (post.title || ''), html);
 }
+async function sendCommentNotification(env, row) {
+  var payload = {};
+  try { payload = row.payload ? JSON.parse(row.payload) : {}; } catch (e) { payload = {}; }
+  var base = publicBase(env);
+  var postTitle = payload.postTitle || '未命名文章';
+  var postUrl = base + '/posts/' + encodeURIComponent(payload.postId || '') + '/';
+  var adminUrl = base + '/admin/comments' + (payload.status === 'pending' ? '/pending' : '');
+  var statusLabel = payload.status === 'pending' ? '待审核' : '已通过';
+  var html = '<div style="font-family:system-ui,sans-serif;max-width:640px;margin:auto;line-height:1.7">' +
+    '<h2>收到新评论</h2>' +
+    '<p><b>' + escHtml(payload.author || '匿名') + '</b> 评论了《<a href="' + escHtml(postUrl) + '">' + escHtml(postTitle) + '</a>》</p>' +
+    '<blockquote style="margin:14px 0;padding:12px 14px;border-left:3px solid #c25e3a;background:#faf7f2;white-space:pre-wrap">' + escHtml(payload.content || '') + '</blockquote>' +
+    '<p>状态：' + escHtml(statusLabel) + '</p>' +
+    '<p><a href="' + escHtml(adminUrl) + '" style="display:inline-block;padding:10px 18px;border-radius:8px;background:#c25e3a;color:#fff;text-decoration:none">前往后台查看</a></p></div>';
+  await sendEmail(env, row.to_email, '新评论：' + postTitle, html);
+}
 export async function processMailOutbox(env, limit) {
   if (!mailConfigured(env)) return { sent: 0, failed: 0 };
   const rows = await dbAll(env.DB, "SELECT * FROM mail_outbox WHERE status = 'pending' ORDER BY created_at ASC LIMIT " + Math.max(1, Math.min(Number(limit) || 20, 50)));
   let sent = 0, failed = 0;
   for (const row of rows) {
+    if (row.kind === 'comment') {
+      try {
+        await sendCommentNotification(env, row);
+        await dbRun(env.DB, "UPDATE mail_outbox SET status = 'sent', sent_at = ?, attempts = attempts + 1, error = '' WHERE id = ?", Date.now(), row.id);
+        sent++;
+      } catch (e) {
+        failed++;
+        await dbRun(env.DB, 'UPDATE mail_outbox SET attempts = attempts + 1, error = ? WHERE id = ?', String(e.message || e).slice(0, 300), row.id);
+      }
+      continue;
+    }
     const post = await dbFirst(env.DB, 'SELECT * FROM posts WHERE id = ?', row.post_id);
     const sub = await dbFirst(env.DB, 'SELECT * FROM subscribers WHERE email = ?', row.to_email);
     if (!post || !sub || sub.status !== 'active' || (post.status || 'published') !== 'published') {
