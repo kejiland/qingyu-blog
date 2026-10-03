@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.34';
+var BLOG_VERSION = '2.10.35';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -805,6 +805,30 @@ function bindReadPos() {
     _readPosTimer = setTimeout(function () { _readPosTimer = null; readPosTick(); }, 500);
   }, { passive: true });
   window.addEventListener('beforeunload', readPosTick);
+}
+
+/* ---------- reading history / read-later (localStorage) ---------- */
+var HISTORY_KEY = 'qingyu.history';
+var LATER_KEY = 'qingyu.later';
+function _lsArr(k){try{var a=JSON.parse(localStorage.getItem(k)||'[]');return Array.isArray(a)?a:[]}catch(e){return[]}}
+function _lsSet(k,a){try{localStorage.setItem(k,JSON.stringify(a||[]))}catch(e){}}
+function historyList(){return _lsArr(HISTORY_KEY)}
+function historyRecord(post){
+  if(!post||!post.id)return;
+  var l=historyList().filter(function(x){return String(x.id)!==String(post.id)});
+  l.unshift({id:post.id,title:post.title||'',date:post.date||'',at:Date.now()});
+  _lsSet(HISTORY_KEY,l.slice(0,100));
+}
+function historyClear(){_lsSet(HISTORY_KEY,[])}
+function laterList(){return _lsArr(LATER_KEY)}
+function isLater(id){return laterList().some(function(x){return String(x.id)===String(id)})}
+function toggleLater(post){
+  var l=laterList();
+  var has=l.some(function(x){return String(x.id)===String(post.id)});
+  if(has)l=l.filter(function(x){return String(x.id)!==String(post.id)});
+  else l.unshift({id:post.id,title:post.title||'',date:post.date||'',at:Date.now()});
+  _lsSet(LATER_KEY,l);
+  return !has;
 }
 
 function updateTocActive() {
@@ -1890,6 +1914,7 @@ function app() { return document.querySelector('#app'); }
     { i18n: 'nav.home',     url: '/',          path: '/' },
     { i18n: 'nav.tags',     url: '/tags',      path: '/tags' },
     { i18n: 'nav.categories', url: '/categories', path: '/categories' },
+    { i18n: 'nav.history', url: '/history', path: '/history' },
     { i18n: 'nav.series',   url: '/series',    path: '/series' },
     { i18n: 'nav.popular',  url: '/popular',   path: '/popular' },
     { i18n: 'nav.archive',  url: '/archive',   path: '/archive' },
@@ -1911,6 +1936,7 @@ function app() { return document.querySelector('#app'); }
     '/': '首页',
     '/tags': '标签',
     '/categories': '分类',
+    '/history': '历史',
     '/series': '系列',
     '/popular': '热门',
     '/archive': '归档',
@@ -2952,6 +2978,12 @@ async function renderPost(id) {
       clearBtn.type = 'button'; clearBtn.className = 'rt-btn'; clearBtn.id = 'btnClearHl';
       clearBtn.textContent = t('post.clearHl');
       tools.appendChild(clearBtn);
+      var lb = document.createElement('button');
+      lb.type = 'button'; lb.className = 'rt-btn'; lb.id = 'btnLater';
+      function _laterLabel() { if (isLater(post.id)) { lb.textContent = t('post.removeLater'); } else { lb.textContent = t('post.saveLater'); } }
+      _laterLabel();
+      lb.addEventListener('click', function () { toggleLater(post); _laterLabel(); });
+      tools.appendChild(lb);
       // 高亮导出 / 导入（JSON，便于跨设备迁移）
       var expBtn = document.createElement('button');
       expBtn.type = 'button'; expBtn.className = 'rt-btn'; expBtn.id = 'btnHlExport';
@@ -3064,6 +3096,7 @@ async function renderPost(id) {
 
   // 阅读位置记忆：先恢复上次位置，滚动过程中持续记录
   _readPosCurrent = post.id;
+  historyRecord(post);
   bindReadPos();
   (function restoreReadPos() {
     var y = getReadPos(post.id);
@@ -3455,6 +3488,15 @@ function renderCategories() {
  *   · 可选审核（moderate_comments）
  * 不新增后端接口与数据表，避免重复实现安全逻辑。
  * ============================================================ */
+function renderHistory() {
+  var h=historyList(); var l2=laterList();
+  var out=renderNav(currentRoute().path);
+  out += '<main class="container page-fade"><h2 class="page-title">' + t('history.title') + '</h2>';
+  out += '<div class="ab-card"><div class="ab-section-title">' + t('history.reading') + ' (' + h.length + ')</div><div class="tag-cloud">' + h.map(function (x) { return '<a class="cloud-chip" href="' + esc(href(postUrl(x.id))) + '">' + esc(x.title || x.id) + '</a>'; }).join('') + '</div></div>';
+  out += '<div class="ab-card"><div class="ab-section-title">' + t('history.later') + ' (' + l2.length + ')</div><div class="tag-cloud">' + l2.map(function (x) { return '<a class="cloud-chip" href="' + esc(href(postUrl(x.id))) + '">' + esc(x.title || x.id) + '</a>'; }).join('') + '</div></div>';
+  out += '</main>' + renderFooter(); return out;
+}
+
 var GUESTBOOK_IDS = { note: 'gb-note', idea: 'gb-idea' };
 function guestbookId(kind) { return GUESTBOOK_IDS[kind] || GUESTBOOK_IDS.note; }
 
@@ -4561,6 +4603,7 @@ async function route() {
   else if (path === '/about') { app().innerHTML = renderAbout(); }
   else if (path === '/tags') { app().innerHTML = renderTags(); }
   else if (path === '/categories') { app().innerHTML = renderCategories(); }
+  else if (path === '/history') { app().innerHTML = renderHistory(); }
   else if (path === '/series') { app().innerHTML = renderSeriesList(); fitCardLineClamps(); }
   else if (path === '/popular') { app().innerHTML = renderPopular(); bindPopular(); }
   else if (path.indexOf('/series/') === 0) { var seriesName = ''; try { seriesName = decodeURIComponent(path.slice('/series/'.length)); } catch (e) { seriesName = path.slice('/series/'.length); } app().innerHTML = renderSeriesDetail(seriesName); fitCardLineClamps(); }
@@ -4594,7 +4637,7 @@ function updateSEO(path) {
   } else if (path === '/tags') {
     pageTitle = t('tags.title') + ' · ' + n;
     pageDesc = t('tags.title') + ' - ' + siteDesc;
-  } else if (path === '/categories') {
+  } else if (path === '/history') { pageTitle = t('history.title') + ' · ' + n; } else if (path === '/categories') {
     pageTitle = t('categories.title') + ' · ' + n;
     pageDesc = t('categories.title') + ' - ' + siteDesc;
   } else if (path === '/about') {

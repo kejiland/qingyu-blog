@@ -2150,7 +2150,7 @@ tests.push(['路由：未知路径返回 404、已知路由仍 200', async () =>
   const src = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
   assert.ok(src.includes('isKnownSpaRoute'), '存在已知路由判定');
   assert.ok(src.includes('spaNotFound ? 404 : res.status'), '未知路径改用 404 状态');
-  assert.ok(src.includes('archive|tags|categories|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
+  assert.ok(src.includes('archive|tags|categories|history|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
 }]);
 
 tests.push(['音乐接口：Workers 与 Pages 双形态均可用', async () => {
@@ -2504,7 +2504,7 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.ok(resolved[2].text, 'i18n key 解析出文本（' + resolved[2].text + '）');
   // 默认 NAV 常量解析后 8 项且不崩溃
   const def = b.ctx.resolveNav(b.ctx.NAV);
-  assert.strictEqual(def.length, 8, '默认 NAV 8 项');
+  assert.strictEqual(def.length, 9, '默认 NAV 8 项');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
