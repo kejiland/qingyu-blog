@@ -1948,6 +1948,15 @@ tests.push(['后台音乐管理：搜索与分页 已接入', async () => {
   assert.ok(src.includes('musicState'), '分页状态');
 }]);
 
+tests.push(['后台备份：列表分页与内容摘要 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('abBackupPage'), '分页容器');
+  assert.ok(src.includes('renderBackups'), '分页渲染');
+  assert.ok(src.includes('backupCountsHtml'), '内容摘要');
+  assert.ok(src.includes('backupState'), '分页状态');
+  assert.ok(src.includes('admin.backup.total'), '总数文案');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();

@@ -3154,35 +3154,67 @@
     if (reason === 'pre-restore') return t('admin.backup.reasonSafety');
     return t('admin.backup.reasonManual');
   }
+  var backupState = { list: [], page: 1, per: 10 };
   function pageBackups(content) {
     content.innerHTML =
       '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.backup.title') + '</h1><p class="ab-page-sub">' + t('admin.backup.desc') + '</p></div>' +
         '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abBackupRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button>' +
         '<button class="ab-btn primary" id="abBackupCreate">' + icon('save', 14) + ' ' + t('admin.backup.create') + '</button></div></div>' +
       '<div class="ab-card" id="abBackupNotice" style="margin-bottom:16px"></div>' +
-      '<div class="ab-card"><div class="ab-section-title">' + icon('save', 16) + ' ' + t('admin.backup.history') + '</div>' +
-        '<div class="ab-table-wrap" style="margin-top:12px"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.backup.colReason') + '</th><th>' + t('admin.backup.colSize') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abBackupBody"></tbody></table></div></div>';
+      '<div class="ab-card"><div class="ab-section-title">' + icon('save', 16) + ' ' + t('admin.backup.history') +
+        '<span class="ab-muted" id="abBackupTotal" style="font-weight:400;font-size:12.5px;margin-left:8px"></span></div>' +
+        '<div class="ab-table-wrap" style="margin-top:12px"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.backup.colReason') + '</th><th>' + t('admin.backup.colContents') + '</th><th>' + t('admin.backup.colSize') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abBackupBody"></tbody></table></div><div class="ab-pagination" id="abBackupPage" style="padding:0 4px 6px"></div></div>';
     content.querySelector('#abBackupRefresh').addEventListener('click', function () { loadBackups(content); });
     content.querySelector('#abBackupCreate').addEventListener('click', function () { createBackupManual(content); });
     loadBackups(content);
   }
+  /** 备份内容摘要：文章 / 评论 / 媒体 / 音乐 / 订阅者 */
+  function backupCountsHtml(counts) {
+    counts = counts || {};
+    var parts = [];
+    if (counts.posts) parts.push(t('admin.backup.cPosts') + ' ' + Number(counts.posts || 0));
+    if (counts.comments) parts.push(t('admin.backup.cComments') + ' ' + Number(counts.comments || 0));
+    if (counts.media) parts.push(t('admin.backup.cMedia') + ' ' + Number(counts.media || 0));
+    if (counts.music) parts.push(t('admin.backup.cMusic') + ' ' + Number(counts.music || 0));
+    if (counts.subscribers) parts.push(t('admin.backup.cSubs') + ' ' + Number(counts.subscribers || 0));
+    return parts.length ? '<span class="ab-muted" style="font-size:12.5px">' + esc(parts.join(' · ')) + '</span>' : '<span class="ab-muted">—</span>';
+  }
   async function loadBackups(content) {
     var body = content.querySelector('#abBackupBody');
     var notice = content.querySelector('#abBackupNotice');
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
     try {
       var d = await api('api/admin/backups');
       var configured = !!(d && d.configured);
-      var list = (d && d.backups) || [];
+      backupState.list = (d && d.backups) || [];
       notice.innerHTML = configured
         ? '<div class="ab-row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="ab-chip">' + icon('cloud', 13) + ' R2</span><b>' + t('admin.backup.enabled') + '</b><span class="ab-muted">' + t('admin.backup.schedule') + '</span></div>'
         : '<div class="ab-row" style="align-items:center;gap:8px;flex-wrap:wrap"><span class="ab-chip">' + t('admin.backup.disabledChip') + '</span><b>' + t('admin.backup.disabled') + '</b><span class="ab-muted">' + t('admin.backup.configureHint') + '</span></div>';
-      if (!list.length) {
-        body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.backup.empty') + '</td></tr>';
-        return;
-      }
-      body.innerHTML = list.map(function (b) {
-        return '<tr><td>' + esc(fmtTimestamp(b.createdAt)) + '</td><td><span class="ab-chip">' + esc(backupReasonLabel(b.reason)) + '</span></td><td>' + esc(fmtSize(b.size)) + '</td>' +
+      renderBackups(content);
+    } catch (e) {
+      notice.innerHTML = '<span class="ab-muted">' + esc(t('admin.backup.loadFail') + (e.message || e)) + '</span>';
+      body.innerHTML = '';
+    }
+  }
+  /** 备份列表：分页渲染（每页 10），显示内容摘要 */
+  function renderBackups(content) {
+    var body = content.querySelector('#abBackupBody');
+    var pg = content.querySelector('#abBackupPage');
+    var totalEl = content.querySelector('#abBackupTotal');
+    if (!body) return;
+    var list = backupState.list;
+    if (totalEl) totalEl.textContent = list.length ? t('admin.backup.total', { n: list.length }) : '';
+    var per = backupState.per;
+    var totalPages = Math.max(1, Math.ceil(list.length / per));
+    if (backupState.page > totalPages) backupState.page = totalPages;
+    var page = backupState.page;
+    var view = list.slice((page - 1) * per, page * per);
+    if (!view.length) {
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.backup.empty') + '</td></tr>';
+    } else {
+      body.innerHTML = view.map(function (b) {
+        return '<tr><td>' + esc(fmtTimestamp(b.createdAt)) + '</td><td><span class="ab-chip">' + esc(backupReasonLabel(b.reason)) + '</span></td>' +
+          '<td>' + backupCountsHtml(b.counts) + '</td><td>' + esc(fmtSize(b.size)) + '</td>' +
           '<td class="col-actions"><button class="ab-btn sm" data-backup-download="' + esc(b.id) + '">' + icon('download', 12) + ' ' + t('admin.backup.download') + '</button> ' +
           '<button class="ab-btn sm" data-backup-restore="' + esc(b.id) + '">' + icon('refresh', 12) + ' ' + t('admin.backup.restore') + '</button> ' +
           '<button class="ab-btn sm danger" data-backup-delete="' + esc(b.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
@@ -3212,9 +3244,14 @@
           }, t('admin.comments.delete'));
         });
       });
-    } catch (e) {
-      notice.innerHTML = '<span class="ab-muted">' + esc(t('admin.backup.loadFail') + (e.message || e)) + '</span>';
-      body.innerHTML = '';
+    }
+    if (pg) {
+      pg.innerHTML = list.length > per
+        ? (page > 1 ? '<button class="ab-page-btn" data-p="' + (page - 1) + '">' + t('pagination.prev') + '</button>' : '') +
+          '<button class="ab-page-btn active">' + page + ' / ' + totalPages + '</button>' +
+          (page < totalPages ? '<button class="ab-page-btn" data-p="' + (page + 1) + '">' + t('pagination.next') + '</button>' : '')
+        : '';
+      pg.querySelectorAll('[data-p]').forEach(function (b) { b.addEventListener('click', function () { backupState.page = parseInt(b.getAttribute('data-p'), 10) || 1; renderBackups(content); }); });
     }
   }
   async function createBackupManual(content) {
