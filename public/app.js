@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.32';
+var BLOG_VERSION = '2.10.33';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1889,6 +1889,7 @@ function app() { return document.querySelector('#app'); }
   var NAV = [
     { i18n: 'nav.home',     url: '/',          path: '/' },
     { i18n: 'nav.tags',     url: '/tags',      path: '/tags' },
+    { i18n: 'nav.categories', url: '/categories', path: '/categories' },
     { i18n: 'nav.series',   url: '/series',    path: '/series' },
     { i18n: 'nav.popular',  url: '/popular',   path: '/popular' },
     { i18n: 'nav.archive',  url: '/archive',   path: '/archive' },
@@ -1909,6 +1910,7 @@ function app() { return document.querySelector('#app'); }
   var NAV_DEFAULT_ZH = {
     '/': '首页',
     '/tags': '标签',
+    '/categories': '分类',
     '/series': '系列',
     '/popular': '热门',
     '/archive': '归档',
@@ -2167,9 +2169,12 @@ function homeListHtml(filtered, ads, adsEnabled, page, pageSize, emptyMsg, empty
  * 仅在第 1 页时显示「下一页」，末页时显示「上一页」，单页则不显示翻页器。 */
 function pagerHtml(page, totalPages) {
   if (totalPages <= 1) return '';
-  var tag = (currentRoute().query.tag) || '';
-  var prevHref = href('/', tag ? { tag: tag, page: page - 1 } : { page: page - 1 });
-  var nextHref = href('/', tag ? { tag: tag, page: page + 1 } : { page: page + 1 });
+  var q0 = currentRoute().query || {};
+  var tag = q0.tag || '';
+  var cat = q0.category || '';
+  function _pg(p) { var o = {}; if (tag) o.tag = tag; if (cat) o.category = cat; o.page = p; return href('/', o); }
+  var prevHref = _pg(page - 1);
+  var nextHref = _pg(page + 1);
   var parts = [];
   if (page > 1) parts.push('<a class="pager-btn" href="' + esc(prevHref) + '">' + t('pagination.prev') + '</a>');
   parts.push('<span class="pager-info">' + t('pagination.page', { current: page, total: totalPages }) + '</span>');
@@ -2182,6 +2187,7 @@ function renderHome() {
   var posts = sortPagePosts(getPublishedPosts());
   var cur = currentRoute();
   var tag = cur.query.tag || '';
+  var cat = cur.query.category || '';
   var ads = cfg.ads || {};
   var adsEnabled = !!ads.enabled;
   var pageSize = homePageSize();
@@ -2191,9 +2197,14 @@ function renderHome() {
   if (tag) {
     html += '<div class="current-tag"><span class="tag-chip">' + esc(tag) + ' <a class="tag-clear" href="' + esc(href('/')) + '">✕</a></span></div>';
   }
+  if (cat) {
+    html += '<div class="current-tag"><span class="tag-chip">' + svgIcon('tag', 13) + ' ' + esc(cat) + ' <a class="tag-clear" href="' + esc(href('/')) + '">✕</a></span></div>';
+  }
   html += renderHomeTagRow(posts, tag);
   if (adsEnabled && ads.belowSearch) html += '<div class="ad-slot"><span class="ad-label">' + t('ad.label') + '</span>' + ads.belowSearch + '</div>';
-  var filtered = tag ? posts.filter(function (p) { return (p.tags || []).indexOf(tag) >= 0; }) : posts;
+  var filtered = posts;
+  if (tag) filtered = filtered.filter(function (p) { return (p.tags || []).indexOf(tag) >= 0; });
+  if (cat) filtered = filtered.filter(function (p) { return String(p.category || '') === cat; });
   var body;
   // 云端探测中且尚无数据 → 显示加载动画（避免先渲染「还没有文章」空态，等数据到了才变列表）
   var cloudProbing = !_cloudReady && (cfg.mode === 'api' || cfg.mode === 'auto');
@@ -3418,6 +3429,19 @@ function renderTags() {
   return html;
 }
 
+function renderCategories() {
+  var posts = getPublishedPosts();
+  var counts = {};
+  posts.forEach(function (p) { var c = String(p.category || '').trim(); if (c) counts[c] = (counts[c] || 0) + 1; });
+  var names = Object.keys(counts).sort();
+  var html = renderNav(currentRoute().path);
+  html += '<main class="container page-fade"><h2 class="page-title">' + svgIcon('tag', 20) + ' ' + t('categories.title') + '</h2><div class="tag-cloud">';
+  names.forEach(function (c) { html += '<a class="cloud-chip" href="' + esc(href('/', { category: c })) + '">' + esc(c) + '<span class="cloud-count">' + counts[c] + '</span></a>'; });
+  if (!names.length) html += '<p class="ab-muted">' + t('categories.empty') + '</p>';
+  html += '</div></main>' + renderFooter();
+  return html;
+}
+
 /* ============================================================
  * 留言板（云端，复用评论域的安全管道）
  * ------------------------------------------------------------
@@ -4536,6 +4560,7 @@ async function route() {
   else if (path === '/subscribe') { app().innerHTML = renderSubscribe(); bindSubscribe(); }
   else if (path === '/about') { app().innerHTML = renderAbout(); }
   else if (path === '/tags') { app().innerHTML = renderTags(); }
+  else if (path === '/categories') { app().innerHTML = renderCategories(); }
   else if (path === '/series') { app().innerHTML = renderSeriesList(); fitCardLineClamps(); }
   else if (path === '/popular') { app().innerHTML = renderPopular(); bindPopular(); }
   else if (path.indexOf('/series/') === 0) { var seriesName = ''; try { seriesName = decodeURIComponent(path.slice('/series/'.length)); } catch (e) { seriesName = path.slice('/series/'.length); } app().innerHTML = renderSeriesDetail(seriesName); fitCardLineClamps(); }
@@ -4569,6 +4594,9 @@ function updateSEO(path) {
   } else if (path === '/tags') {
     pageTitle = t('tags.title') + ' · ' + n;
     pageDesc = t('tags.title') + ' - ' + siteDesc;
+  } else if (path === '/categories') {
+    pageTitle = t('categories.title') + ' · ' + n;
+    pageDesc = t('categories.title') + ' - ' + siteDesc;
   } else if (path === '/about') {
     pageTitle = t('about.title') + ' · ' + n;
     pageDesc = t('about.desc');

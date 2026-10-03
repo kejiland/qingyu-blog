@@ -2145,7 +2145,7 @@ tests.push(['路由：未知路径返回 404、已知路由仍 200', async () =>
   const src = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
   assert.ok(src.includes('isKnownSpaRoute'), '存在已知路由判定');
   assert.ok(src.includes('spaNotFound ? 404 : res.status'), '未知路径改用 404 状态');
-  assert.ok(src.includes('archive|tags|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
+  assert.ok(src.includes('archive|tags|categories|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
 }]);
 
 tests.push(['音乐接口：Workers 与 Pages 双形态均可用', async () => {
@@ -2157,6 +2157,23 @@ tests.push(['音乐接口：Workers 与 Pages 双形态均可用', async () => {
   }
   const cap = fs.readFileSync(path.join(dir, 'functions/api/[[path]].js'), 'utf8');
   assert.ok(cap.includes('api\\/music'), 'catch-all 白名单已登记音乐路由');
+}]);
+
+tests.push(['分类：分类页 / 首页筛选 / 路由白名单', async () => {
+  const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  ctx.window.BLOG_POSTS = [{ id: 'c1', title: '技术文', date: '2026-01-02', category: '技术', content: 'x', tags: [] }, { id: 'c2', title: '随笔文', date: '2026-01-01', category: '随笔', content: 'y', tags: [] }];
+  setRoute(ctx, '/categories');
+  await ctx.route();
+  const html = ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.includes('分类'), '分类页渲染');
+  assert.ok(html.includes('技术') && html.includes('随笔'), '列出分类');
+  setRoute(ctx, '/?category=' + encodeURIComponent('技术'));
+  await ctx.route();
+  const home = ctx.document.querySelector('#app').innerHTML;
+  assert.ok(home.includes('技术文'), '按分类筛选命中');
+  assert.ok(!home.includes('随笔文'), '其他分类被过滤');
+  const w = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
+  assert.ok(w.includes('categories'), 'worker 路由白名单含 /categories');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
@@ -2466,9 +2483,9 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.strictEqual(resolved[1].children[0].text, '写作', '子项 text 生效');
   assert.strictEqual(resolved[1].children[1].url, 'https://friend.example', '子项外链保留');
   assert.ok(resolved[2].text, 'i18n key 解析出文本（' + resolved[2].text + '）');
-  // 默认 NAV 常量解析后 7 项且不崩溃
+  // 默认 NAV 常量解析后 8 项且不崩溃
   const def = b.ctx.resolveNav(b.ctx.NAV);
-  assert.strictEqual(def.length, 7, '默认 NAV 7 项');
+  assert.strictEqual(def.length, 8, '默认 NAV 8 项');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {

@@ -24,7 +24,7 @@ import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.
 /** 已知的前端路由：只有这些路径才用 200 返回 SPA 外壳，其余无扩展名路径按 404 返回 */
 function isKnownSpaRoute(pathname) {
   return pathname === '/' ||
-    /^\/(archive|tags|about|guestbook|popular|subscribe|series|write)\/?$/.test(pathname) ||
+    /^\/(archive|tags|categories|about|guestbook|popular|subscribe|series|write)\/?$/.test(pathname) ||
     /^\/posts\/[^/]+\/?$/.test(pathname) ||
     /^\/posts\/[^/]+\/edit\/?$/.test(pathname) ||
     /^\/series\/[^/]+\/?$/.test(pathname) ||
