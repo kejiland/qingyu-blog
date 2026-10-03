@@ -652,6 +652,7 @@
         { key: 'media', label: t('admin.sidebar.media'), icon: 'image', href: '/admin/media' },
         { key: 'music', label: t('admin.sidebar.musicManage'), icon: 'music', href: '/admin/music' },
         { key: 'subscribers', label: t('admin.sidebar.subscribers'), icon: 'send', href: '/admin/subscribers' },
+        { key: 'audit', label: t('admin.sidebar.audit'), icon: 'clock', href: '/admin/audit' },
         { key: 'backup', label: t('admin.sidebar.backups'), icon: 'save', href: '/admin/backups' },
         { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
@@ -803,6 +804,7 @@
     if (path === '/admin/media') return { key: 'media', page: 'media' };
     if (path === '/admin/music') return { key: 'music', page: 'music' };
     if (path === '/admin/subscribers') return { key: 'subscribers', page: 'subscribers' };
+    if (path === '/admin/audit') return { key: 'audit', page: 'audit' };
     if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
@@ -955,6 +957,7 @@
     if (route.page === 'media') return pageMedia(content);
     if (route.page === 'music') return pageMusic(content);
     if (route.page === 'subscribers') return pageSubscribers(content);
+    if (route.page === 'audit') return pageAudit(content);
     if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
@@ -3301,6 +3304,55 @@
       var data = await api('api/admin/backups/' + enc(id));
       transferDownloadText('qingyu-backup-' + id + '.json', JSON.stringify(data, null, 2), 'application/json;charset=utf-8');
     } catch (e) { toast(t('admin.backup.downloadFail') + (e.message || e), 'err'); }
+  }
+
+
+  /* ====================== 操作审计日志 ====================== */
+  var auditState = { logs: [], action: 'all' };
+  var AUDIT_ACTIONS = ['post.delete', 'media.delete', 'settings.update', 'backup.create', 'backup.restore', 'backup.delete', 'audit.clear'];
+  function auditActionLabel(a) {
+    var key = 'admin.audit.a.' + String(a || '').replace(/[^a-z.]/g, '');
+    var label = t(key);
+    return (label && label !== key) ? label : String(a || '—');
+  }
+  function pageAudit(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.audit.title') + '</h1><p class="ab-page-sub">' + t('admin.audit.desc') + '</p></div>' +
+      '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abAuditRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button>' +
+      '<button class="ab-btn danger" id="abAuditClear">' + icon('trash', 14) + ' ' + t('admin.audit.clear') + '</button></div></div>' +
+      '<div class="ab-toolbar"><select class="ab-select" id="abAuditFilter" style="max-width:220px"><option value="all">' + t('admin.audit.allTypes') + '</option>' +
+        AUDIT_ACTIONS.map(function (a) { return '<option value="' + a + '">' + esc(auditActionLabel(a)) + '</option>'; }).join('') + '</select>' +
+        '<span class="ab-muted" id="abAuditInfo"></span></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.backup.colTime') + '</th><th>' + t('admin.audit.colAction') + '</th><th>' + t('admin.audit.colTarget') + '</th><th>' + t('admin.audit.colIp') + '</th></tr></thead><tbody id="abAuditBody"></tbody></table></div></div>';
+    content.querySelector('#abAuditRefresh').addEventListener('click', function () { loadAudit(content); });
+    var f = content.querySelector('#abAuditFilter');
+    f.value = auditState.action;
+    f.addEventListener('change', function () { auditState.action = f.value; loadAudit(content); });
+    content.querySelector('#abAuditClear').addEventListener('click', function () {
+      confirmModal(t('admin.audit.clear'), '<p class="ab-muted">' + t('admin.audit.clearConfirm') + '</p>', async function () {
+        try { await api('api/admin/audit', { method: 'DELETE' }); toast(t('admin.audit.cleared'), 'ok'); loadAudit(content); }
+        catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
+      }, t('admin.audit.clear'));
+    });
+    loadAudit(content);
+  }
+  async function loadAudit(content) {
+    var body = content.querySelector('#abAuditBody');
+    var info = content.querySelector('#abAuditInfo');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    try {
+      var url = 'api/admin/audit?limit=300' + (auditState.action !== 'all' ? '&action=' + enc(auditState.action) : '');
+      var d = await api(url);
+      auditState.logs = (d && d.logs) || [];
+      if (info) info.textContent = t('admin.audit.total', { n: auditState.logs.length });
+      if (!auditState.logs.length) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.audit.empty') + '</td></tr>'; return; }
+      body.innerHTML = auditState.logs.map(function (r) {
+        return '<tr><td class="ab-td-date">' + esc(fmtTimestamp(r.created_at)) + '</td>' +
+          '<td><span class="ab-chip">' + esc(auditActionLabel(r.action)) + '</span></td>' +
+          '<td style="max-width:340px"><div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(((r.target || '') + (r.detail ? ' · ' + r.detail : '')) || '—') + '</div></td>' +
+          '<td class="ab-muted">' + esc(r.ip || '—') + '</td></tr>';
+      }).join('');
+    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
   }
 
   /* ====================== 博客设置 ====================== */

@@ -440,6 +440,7 @@ export async function handlePostId(request, env, id) {
     await dbBatch(env.DB, stmts);
     await dbRun(env.DB, 'DELETE FROM stats_daily WHERE post_id = ?', id).catch(() => {});
     await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + id]);
+    await recordAudit(env, request, 'post.delete', id);
     return json({ ok: true }, 200, request, env);
   }
 
@@ -1476,6 +1477,7 @@ export async function handleMediaId(request, env, id) {
     console.error('[media] delete failed:', e && e.message, e);
     return json({ error: '删除失败，请稍后重试' }, 500, request, env);
   }
+  await recordAudit(env, request, 'media.delete', id);
   return json({ ok: true }, 200, request, env);
 }
 
@@ -1516,6 +1518,7 @@ export async function handleSettings(request, env) {
         return json({ error: '设置保存失败，请稍后重试' }, 500, request, env);
       }
     }
+    await recordAudit(env, request, 'settings.update', Object.keys(body).join(','));
     return json({ ok: true, saved: stmts.length }, 200, request, env, { 'Cache-Control': NO_CACHE });
   }
   return json({ error: 'Method not allowed' }, 405, request, env);
@@ -1577,4 +1580,56 @@ export async function handleStatsTrend(request, env) {
     trend.push({ date: d, views: e.views, likes: e.likes });
   }
   return json({ ok: true, trend: trend }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+
+/* ============================================================
+ * 后台操作审计日志（audit_log 表）
+ *   GET    /api/admin/audit   最近操作（默认 200 条，可按 action 过滤）
+ *   DELETE /api/admin/audit   清空日志
+ * 记录失败一律静默，绝不影响主业务流程。
+ * ============================================================ */
+
+/** 写入一条审计日志（永不抛出） */
+export async function recordAudit(env, request, action, target, detail) {
+  try {
+    if (!env || !env.DB || !action) return;
+    const ip = request ? clientIp(request) : '';
+    await dbRun(env.DB,
+      'INSERT INTO audit_log (id,action,target,detail,ip,created_at) VALUES (?,?,?,?,?,?)',
+      'a-' + randomToken(12), String(action), String(target || '').slice(0, 200),
+      String(detail || '').slice(0, 300), String(ip || ''), Date.now());
+  } catch (e) { /* 审计失败不影响业务 */ }
+}
+
+/** GET /api/admin/audit · DELETE /api/admin/audit */
+export async function handleAuditLog(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+
+  if (request.method === 'GET') {
+    let limit = 200, action = '';
+    try {
+      const sp = new URL(request.url).searchParams;
+      const l = Number(sp.get('limit'));
+      if (l > 0 && l <= 500) limit = Math.floor(l);
+      action = String(sp.get('action') || '');
+    } catch (e) {}
+    let sql = 'SELECT * FROM audit_log';
+    const params = [];
+    if (action) { sql += ' WHERE action = ?'; params.push(action); }
+    sql += ' ORDER BY created_at DESC, id DESC LIMIT ' + limit;
+    const rows = await dbAll(env.DB, sql, ...params).catch(() => []);
+    const counts = {};
+    (rows || []).forEach(function (r) { counts[r.action] = (counts[r.action] || 0) + 1; });
+    return json({ ok: true, logs: rows || [], counts: counts }, 200, request, env, { 'Cache-Control': NO_CACHE });
+  }
+
+  if (request.method === 'DELETE') {
+    await dbRun(env.DB, 'DELETE FROM audit_log');
+    await recordAudit(env, request, 'audit.clear', '');
+    return json({ ok: true }, 200, request, env);
+  }
+
+  return json({ error: 'Method not allowed' }, 405, request, env);
 }

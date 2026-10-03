@@ -462,7 +462,7 @@ function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
-    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map()
+    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
@@ -571,6 +571,19 @@ function makeD1() {
       t.backups.set(id, { id, object_key, size, reason, created_at, counts }); return { success: true };
     }
     if (s === 'DELETE FROM backups WHERE id = ?') { t.backups.delete(params[0]); return { success: true }; }
+    /* audit_log */
+    if (/^INSERT INTO audit_log/.test(s)) {
+      const [id, action, target, detail, ip, created_at] = params;
+      t.audit_log.set(id, { id, action, target, detail, ip, created_at });
+      return { success: true };
+    }
+    if (/^SELECT \* FROM audit_log/.test(s)) {
+      let rows = [...t.audit_log.values()];
+      if (s.indexOf('WHERE action = ?') >= 0) rows = rows.filter((r) => r.action === params[0]);
+      rows.sort((a, b) => (b.created_at || 0) - (a.created_at || 0));
+      return rows;
+    }
+    if (/^DELETE FROM audit_log/.test(s)) { t.audit_log.clear(); return { success: true }; }
     /* comments */
     if (/^SELECT \*(, rowid AS rid)? FROM comments WHERE post_id = \?/.test(s) && /ORDER BY (rowid|COALESCE)/.test(s)) {
       let rows = [...t.comments.values()].filter((r) => r.post_id === params[0]).map((r) => Object.assign({ rid: r.__rowid }, r));
@@ -1963,6 +1976,29 @@ tests.push(['后台仪表盘：存储与订阅概览卡片 已接入', async () 
   assert.ok(src.includes('loadStorageOverview'), '概览加载函数');
   assert.ok(src.includes('admin.dashboard.sMedia') && src.includes('admin.dashboard.sBackups'), '概览指标文案');
   assert.ok(src.includes("api('api/admin/subscribers')") && src.includes("api('api/admin/backups')"), '数据来源');
+}]);
+
+tests.push(['后台：操作审计日志 记录 / 过滤 / 清空', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-audit';
+  const auth = { Authorization: 'Bearer tok-audit' };
+  await core.recordAudit(env, new Request('http://t/x', { headers: auth }), 'post.delete', 'p1');
+  await core.recordAudit(env, new Request('http://t/x', { headers: auth }), 'backup.create', 'b1');
+  let r = await core.handleAuditLog(new Request('http://t/api/admin/audit', { headers: auth }), env);
+  assert.strictEqual(r.status, 200, '列表 200');
+  let d = await r.json();
+  assert.strictEqual(d.logs.length, 2, '写入两条日志');
+  assert.strictEqual(d.counts['post.delete'], 1, '按类型统计');
+  r = await core.handleAuditLog(new Request('http://t/api/admin/audit?action=backup.create', { headers: auth }), env);
+  d = await r.json();
+  assert.strictEqual(d.logs.length, 1, '按类型过滤');
+  r = await core.handleAuditLog(new Request('http://t/api/admin/audit'), env);
+  assert.strictEqual(r.status, 401, '未登录读取 401');
+  r = await core.handleAuditLog(new Request('http://t/api/admin/audit', { method: 'DELETE', headers: auth }), env);
+  assert.strictEqual(r.status, 200, '清空 200');
+  d = await (await core.handleAuditLog(new Request('http://t/api/admin/audit', { headers: auth }), env)).json();
+  assert.strictEqual(d.logs.length, 1, '清空后仅保留清空动作本身');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

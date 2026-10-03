@@ -46,6 +46,7 @@ const KNOWN_ROUTES = [
   /^\/api\/feed\.xml$/,
   /^\/api\/sitemap\.xml$/,
   /^\/api\/admin\/post-analytics$/,
+  /^\/api\/admin\/audit$/,
   /^\/api\/admin\/(setup|login|logout|password)$/,
   /^\/api\/ai\/(ping|summary|assist|comments)$/
 ];

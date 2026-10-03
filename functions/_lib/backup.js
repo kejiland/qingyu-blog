@@ -4,7 +4,7 @@
  * 复用现有 R2 S3 兼容凭据，单独使用 R2_BACKUP_BUCKET，避免把
  * 备份写入公开的音乐/媒体桶。自动备份由 Worker Cron 每日触发。
  * ============================================================ */
-import { json, corsPreflight, isWriteAuthed, unauthorized, dbAll, dbFirst, dbRun, dbBatch } from './api-core.js';
+import { json, corsPreflight, isWriteAuthed, unauthorized, dbAll, dbFirst, dbRun, dbBatch, recordAudit } from './api-core.js';
 import { presignPut, presignGet, r2DeleteObject } from './music.js';
 
 const BACKUP_FORMAT = 'qingyu-blog-backup';
@@ -132,6 +132,7 @@ export async function handleBackups(request, env) {
     if (!backupConfigured(env)) return json({ error: 'R2 备份桶未配置（请设置 R2_BACKUP_BUCKET）' }, 503, request, env);
     try {
       const backup = await createBackup(env, 'manual');
+      await recordAudit(env, request, 'backup.create', backup && backup.id);
       return json({ ok: true, backup: backup }, 201, request, env, { 'Cache-Control': 'no-store' });
     } catch (e) {
       return json({ error: e.message || '备份失败' }, 500, request, env);
@@ -158,6 +159,7 @@ export async function handleBackupId(request, env, id) {
     if (!row) return json({ error: '备份不存在' }, 404, request, env);
     try { await r2DeleteObject(env, row.object_key, env.R2_BACKUP_BUCKET); } catch (e) {}
     await dbRun(env.DB, 'DELETE FROM backups WHERE id = ?', id);
+    await recordAudit(env, request, 'backup.delete', id);
     return json({ ok: true }, 200, request, env);
   }
   return json({ error: 'Method not allowed' }, 405, request, env);
@@ -170,6 +172,7 @@ export async function handleBackupRestore(request, env, id) {
   if (!backupConfigured(env)) return json({ error: 'R2 备份桶未配置' }, 503, request, env);
   try {
     const result = await restoreBackup(env, id);
+    await recordAudit(env, request, 'backup.restore', id);
     return json({ ok: true, result: result }, 200, request, env, { 'Cache-Control': 'no-store' });
   } catch (e) {
     return json({ error: e.message || '恢复失败' }, 500, request, env);
