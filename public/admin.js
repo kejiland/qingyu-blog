@@ -2303,6 +2303,11 @@
             '<button class="ab-tool" data-md="link" title="' + t('admin.editor.link') + '">' + icon('link', 15) + '</button>' +
             '<button class="ab-tool" data-md="img" title="' + t('admin.editor.image') + '">' + icon('image', 15) + '</button>' +
             '<button class="ab-tool" data-md="wiki" title="' + t('admin.editor.wiki') + '">[[ ]]</button>' +
+            '<button class="ab-tool" data-md="table" title="' + t('admin.editor.table') + '">▦</button>' +
+            '<button class="ab-tool" data-md="task" title="' + t('admin.editor.task') + '">☑</button>' +
+            '<button class="ab-tool" data-md="hr" title="' + t('admin.editor.hr') + '">―</button>' +
+            '<button class="ab-tool" data-md="codeblock" title="' + t('admin.editor.codeBlock') + '">{ }</button>' +
+            '<select class="ab-tool-select" id="abMdLang" title="' + t('admin.editor.codeBlock') + '" aria-label="' + t('admin.editor.codeBlock') + '"><option value="">' + t('admin.editor.langPlain') + '</option><option value="js">JavaScript</option><option value="ts">TypeScript</option><option value="python">Python</option><option value="bash">Bash</option><option value="json">JSON</option><option value="html">HTML</option><option value="css">CSS</option><option value="sql">SQL</option><option value="go">Go</option><option value="java">Java</option></select>' +
             '<button class="ab-tool" id="abSmoji" title="' + t('admin.editor.emoji') + '" aria-label="' + t('admin.editor.emoji') + '">😊</button>' +
           '</div>' +
           '<textarea class="ab-editor-area" id="abBody" placeholder="' + t('admin.editor.writeHint') + '"></textarea>' +
@@ -2341,7 +2346,11 @@
       insertPastedImage(content, area, file);
     });
     content.querySelector('#abToolbar').querySelectorAll('[data-md]').forEach(function (b) {
-      b.addEventListener('click', function () { insertMd(area, b.getAttribute('data-md')); updatePreview(content); area.focus(); });
+      b.addEventListener('click', function () {
+        var langSel = content.querySelector('#abMdLang');
+        insertMd(area, b.getAttribute('data-md'), { lang: langSel ? langSel.value : '' });
+        updatePreview(content); area.focus();
+      });
     });
     var dateInput = content.querySelector('#abDate');
     var nowBtn = content.querySelector('#abNow');
@@ -2405,7 +2414,8 @@
     area.style.height = 'auto';
     area.style.height = Math.max(area.scrollHeight, 420) + 'px';
   }
-  function insertMd(area, type) {
+  function insertMd(area, type, opts) {
+    opts = opts || {};
     var s = area.selectionStart, e = area.selectionEnd, v = area.value;
     var sel = v.slice(s, e), pre = '', post = '', rep = sel;
     if (type === 'bold') { pre = '**'; post = '**'; }
@@ -2414,6 +2424,16 @@
     else if (type === 'quote') { pre = '> '; }
     else if (type === 'code') { pre = '`'; post = '`'; }
     else if (type === 'ul') { pre = '- '; }
+    else if (type === 'task') { pre = '- [ ] '; }
+    else if (type === 'hr') { rep = (s > 0 && v.charAt(s - 1) !== '\n' ? '\n' : '') + '---\n'; }
+    else if (type === 'table') {
+      var col = t('admin.editor.tableCol'), cell = t('admin.editor.tableCell');
+      rep = '| ' + col + '1 | ' + col + '2 | ' + col + '3 |\n| --- | --- | --- |\n| ' + cell + ' | ' + cell + ' | ' + cell + ' |\n';
+    }
+    else if (type === 'codeblock') {
+      var lang = String(opts.lang || '').trim();
+      rep = '```' + lang + '\n' + (sel || '') + '\n```';
+    }
     else if (type === 'link') { rep = '[' + (sel || t('editor.linkBtn')) + '](https://)'; }
     else if (type === 'img') { rep = '![' + (sel || t('editor.imgBtn')) + '](https://)'; }
     else if (type === 'wiki') { rep = '[[' + (sel || t('admin.editor.wiki')) + ']]'; }

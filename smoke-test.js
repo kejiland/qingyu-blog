@@ -1908,6 +1908,18 @@ tests.push(['后台文章列表：批量置顶 / 取消置顶 / 删除 已接入
   assert.ok(acss.includes('.ab-bulk'), '批量条样式');
 }]);
 
+tests.push(['编辑器工具栏：表格 / 任务列表 / 分割线 / 代码块语言 已接入', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('data-md="table"'), '表格按钮');
+  assert.ok(src.includes('data-md="task"'), '任务列表按钮');
+  assert.ok(src.includes('data-md="hr"'), '分割线按钮');
+  assert.ok(src.includes('data-md="codeblock"'), '代码块按钮');
+  assert.ok(src.includes('abMdLang'), '代码块语言选择器');
+  assert.ok(src.includes("type === 'table'") && src.includes("type === 'codeblock'"), '插入逻辑');
+  const acss = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(acss.includes('.ab-tool-select'), '语言选择器样式');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
