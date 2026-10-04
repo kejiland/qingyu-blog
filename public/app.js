@@ -6,7 +6,14 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.59';
+var BLOG_VERSION = '2.10.60';
+
+/* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
+ * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
+if (typeof t !== 'function') {
+  window.t = function (key) { return key; };
+  try { t = window.t; } catch (e) { /* 严格模式下赋值到未声明标识符会抛错，忽略即可 */ }
+}
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -5885,6 +5892,16 @@ window.reportClientError = reportClientError;
 
 window.__bootPromise = (async function () {
   initErrorReporting();
+  // i18n 自愈：本应已由 i18n.js 提供；若缺失（加载失败）则这里再补一次，失败也不影响渲染
+  if (!(window.__i18n && window.__i18n.loadLocale)) {
+    await new Promise(function (resolve) {
+      var sc = document.createElement('script');
+      sc.src = appRoot() + 'i18n.min.js?v=' + BLOG_VERSION;
+      sc.onload = function () { resolve(true); };
+      sc.onerror = function () { resolve(false); };
+      document.head.appendChild(sc);
+    });
+  }
   var cfg = getConfig();
   applyTheme(getTheme());
   applyAccent(getAccent());

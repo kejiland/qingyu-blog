@@ -4023,6 +4023,21 @@ tests.push(['仪表盘：统一骨架屏 + 趋势图质感增强', async () => {
   assert.ok(sources.indexOf('手机') >= 0, '设备类型已本地化');
 }]);
 
+/* 回归：i18n.js 未加载（网络/缓存异常）时，页面不能因 “t is not defined” 整页崩溃 */
+tests.push(['i18n 缺失兜底：app.js 仍能启动（不再 t is not defined）', async () => {
+  const { ctx, appEl, win } = makeCtx({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  setRoute(ctx, '/');
+  // 故意不加载 i18n.js，模拟 i18n.min.js 加载失败 / 被拦截 / 缓存缺失
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'posts.js'), 'utf8'), ctx, { filename: 'posts.js' });
+  win.BLOG_POSTS = TEST_POSTS;
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'app.js'), 'utf8'), ctx, { filename: 'app.js' });
+  assert.strictEqual(typeof win.t, 'function', 'app.js 在 window 上装了 t 兜底');
+  if (typeof ctx.t !== 'function') ctx.t = win.t;   // 模拟浏览器里 window === 全局
+  await win.__bootPromise;
+  assert.ok((appEl.innerHTML || '').length > 0, '页面仍然渲染出内容');
+  assert.strictEqual(typeof win.t, 'function', 't 仍可用');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;
