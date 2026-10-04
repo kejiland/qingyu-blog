@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.60** (2026-10-04).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.61** (2026-10-04).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -200,7 +200,8 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-04 | Content & distribution | Per-post SEO, Mermaid / KaTeX, draft preview links, static site export, print / PDF, Webmention, multi-author |
 | 2026-10-04 | Admin & observability | Feature switches, media / music / subscriber / backup pagination improvements, health check, error log, country / source / device insight, dashboard smoke coverage |
 | 2026-10-04 | Stability | i18n fallback and self-healing, admin comments / post pagination regression fixes, source tracking fix, UI runtime smoke tests |
-| 2026-10-04 | Documentation | Docs moved under `docs/`; README, deployment guides, security docs, llms.txt and this development guide synced to v2.10.60 |
+| 2026-10-04 | Documentation | Docs moved under `docs/`; README, deployment guides, security docs, llms.txt and this development guide synced to v2.10.61 |
+| 2026-10-04 | Navigation | Legacy `nav_menu` data is merged with newly added defaults on first load; once saved, items deliberately removed by the owner are not re-added |
 
 ---
 

@@ -2691,7 +2691,7 @@ tests.push(['保存文件：系统对话框原地覆盖，不支持时回退下�
 
 tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文本/子菜单/外链', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
-  // 默认主导航渲染：7 项（首页/标签/系列/热门/归档/留言/关于）
+  // 默认主导航渲染：9 项（首页/标签/分类/历史/系列/热门/归档/留言/关于）
   const mainNav = (b.html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
   assert.ok(mainNav.includes('>首页<') || mainNav.includes('>Home<'), '默认导航含首页（i18n）');
   assert.ok(mainNav.includes('>归档<') || mainNav.includes('>Archive<'), '默认导航含归档');
@@ -2715,7 +2715,26 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.ok(resolved[2].text, 'i18n key 解析出文本（' + resolved[2].text + '）');
   // 默认 NAV 常量解析后 8 项且不崩溃
   const def = b.ctx.resolveNav(b.ctx.NAV);
-  assert.strictEqual(def.length, 9, '默认 NAV 8 项');
+  assert.strictEqual(def.length, 9, '默认 NAV 9 项');
+  // 旧 nav_menu 没有 nav_defaults_version 时，新默认项应自动补齐，但不覆盖自定义项。
+  b.ctx._siteSettings = {
+    nav_menu: JSON.stringify([
+      { text: '首页', url: '/' }, { text: '标签', url: '/tags' },
+      { text: '归档', url: '/archive' }, { text: '留言板', url: '/guestbook' },
+      { text: '关于', url: '/about' }, { text: '监控', url: 'https://status.example' }
+    ]),
+    nav_defaults_version: '0'
+  };
+  const mergedNav = b.ctx.navItems();
+  assert.ok(mergedNav.some(function (x) { return x.url === '/categories'; }), '旧导航自动补充分类');
+  assert.ok(mergedNav.some(function (x) { return x.url === '/history'; }), '旧导航自动补充历史');
+  assert.ok(mergedNav.some(function (x) { return x.url === '/series'; }), '旧导航自动补充系列');
+  assert.ok(mergedNav.some(function (x) { return x.url === '/popular'; }), '旧导航自动补充热门');
+  assert.ok(mergedNav.some(function (x) { return x.url === 'https://status.example'; }), '自动补默认项时保留自定义项');
+  b.ctx._siteSettings.nav_defaults_version = String(b.ctx.NAV_DEFAULT_VERSION);
+  b.ctx._siteSettings.nav_menu = JSON.stringify([{ text: '首页', url: '/' }, { text: '归档', url: '/archive' }]);
+  const respectedNav = b.ctx.navItems();
+  assert.ok(!respectedNav.some(function (x) { return x.url === '/categories'; }), '版本已同步后不再把用户删除的默认项加回');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
