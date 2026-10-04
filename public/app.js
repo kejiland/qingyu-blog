@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.45';
+var BLOG_VERSION = '2.10.46';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1432,7 +1432,10 @@ async function incView(postId) {
   } catch (e) {}
   if (_cloudOn()) {
     try {
-      var data = await apiFetch(statApi(postId), { method: 'POST', body: JSON.stringify({ action: 'views' }) });
+      // 上报 document.referrer：fetch 的 Referer 头是「本站当前页」，无法反映真实来路
+      var docRef = '';
+      try { docRef = String((typeof document !== 'undefined' && document.referrer) || '').slice(0, 500); } catch (e) { docRef = ''; }
+      var data = await apiFetch(statApi(postId), { method: 'POST', body: JSON.stringify({ action: 'views', ref: docRef }) });
       var s = (data && data.stats) || { views: 0, likes: 0 };
       _statsCache[postId] = s;
       return s;

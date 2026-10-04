@@ -462,7 +462,7 @@ function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
-    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map()
+    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
@@ -710,6 +710,25 @@ function makeD1() {
     if (s === 'SELECT * FROM stats_daily') return [];
     /* stats_daily (聚合表，测试仅需不报错) */
     if (/^INSERT INTO stats_daily/.test(s)) { return { success: true }; }
+    /* stats_sources（访问来源 / 设备按天聚合） */
+    if (/^INSERT INTO stats_sources/.test(s)) {
+      const [post_id, date, kind, name] = params;
+      const key = [post_id, date, kind, name].join('|');
+      const row = t.stats_sources.get(key) || { post_id, date, kind, name, views: 0 };
+      row.views = (Number(row.views) || 0) + 1;
+      t.stats_sources.set(key, row);
+      return { success: true };
+    }
+    if (/^SELECT kind,name,SUM\(views\) AS views FROM stats_sources WHERE date >= \? GROUP BY kind,name ORDER BY views DESC$/.test(s)) {
+      const since = String(params[0] || '');
+      const agg = {};
+      [...t.stats_sources.values()].filter((r) => String(r.date) >= since).forEach((r) => {
+        const key = r.kind + '|' + r.name;
+        if (!agg[key]) agg[key] = { kind: r.kind, name: r.name, views: 0 };
+        agg[key].views += Number(r.views) || 0;
+      });
+      return Object.keys(agg).map((k) => agg[k]).sort((a, b) => b.views - a.views);
+    }
     /* admin_auth */
     if (s === "SELECT * FROM admin_auth WHERE k = ?") return t.admin_auth.get(params[0]) || null;
     if (/^INSERT INTO admin_auth/.test(s)) {
@@ -2431,6 +2450,38 @@ tests.push(['统计：API 阅读数/点赞 累计与校验', async () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'wat' })
   }), env, 'p1');
   assert.strictEqual(r.status, 400, '非法 action 400');
+}]);
+
+/* 访问来源 / 设备：浏览时记录（外链 / 站内 / 直达 / 旧客户端回退），点赞不记录 */
+tests.push(['访问来源 / 设备：浏览时按天记录（点赞不记录）', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-src';
+  const hit = (id, ua, opts) => core.handleStats(new Request('http://blog.example/api/posts/' + id + '/stats', {
+    method: 'POST',
+    headers: Object.assign({ 'Content-Type': 'application/json', 'User-Agent': ua }, (opts && opts.referer) ? { 'Referer': opts.referer } : {}),
+    body: JSON.stringify((opts && opts.body) ? opts.body : { action: 'views' })
+  }), env, id);
+  // 外链来源：前端上报 document.referrer
+  await hit('p1', 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15', { body: { action: 'views', ref: 'https://www.google.com/search?q=x' } });
+  // 站内来源
+  await hit('p2', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)', { body: { action: 'views', ref: 'https://blog.example/posts/other/' } });
+  // 直接访问：ref 空串，不应误判为站内
+  await hit('p3', 'Mozilla/5.0 (Windows NT 10.0)', { body: { action: 'views', ref: '' } });
+  // 旧客户端：无 ref 字段 → 回退 Referer 头
+  await hit('p4', 'Mozilla/5.0 (Linux; Android 13)', { referer: 'https://t.co/abc' });
+  // 点赞不应产生来源 / 设备记录
+  await hit('p5', 'Mozilla/5.0', { body: { action: 'like' } });
+  const d = await (await core.handleStatsSources(new Request('http://t/api/admin/stats/sources?days=30', { headers: { Authorization: 'Bearer tok-src' } }), env)).json();
+  const refs = d.referrers.map((x) => x.name);
+  const devs = d.devices.map((x) => x.name);
+  assert.ok(refs.indexOf('google.com') >= 0, '外链来源已记录: ' + refs.join(','));
+  assert.ok(refs.indexOf('internal') >= 0, '站内来源记为 internal');
+  assert.ok(refs.indexOf('direct') >= 0, '直接访问记为 direct');
+  assert.ok(refs.indexOf('t.co') >= 0, '旧客户端回退 Referer 头: ' + refs.join(','));
+  assert.ok(devs.indexOf('mobile') >= 0 && devs.indexOf('desktop') >= 0, '设备类型已记录: ' + devs.join(','));
+  assert.strictEqual(d.refTotal, 4, '四次浏览计入四次来源（点赞不计）');
+  assert.strictEqual(d.devTotal, 4, '四次浏览计入四次设备（点赞不计）');
 }]);
 
 tests.push(['统计（静态模式）：本机阅读数/点赞 + 详情页元素', async () => {

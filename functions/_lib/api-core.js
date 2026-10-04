@@ -998,27 +998,6 @@ export async function handleStats(request, env, postId) {
           await env.BLOG.put(dk, '1', { expirationTtl: LIKE_DEDUP_TTL });
         } catch (e) {}
       }
-      // 访问来源 / 设备（按天聚合，表可能尚未迁移 → 失败静默）
-    try {
-      const ua = String(request.headers.get('User-Agent') || '');
-      const dev = /(bot|crawler|spider)/i.test(ua) ? 'bot'
-        : (/iPad|Tablet|Pad/i.test(ua) ? 'tablet'
-        : (/Mobile|Android|iPhone|iPod/i.test(ua) ? 'mobile' : 'desktop'));
-      let ref = 'direct';
-      const rawRef = String(request.headers.get('Referer') || '');
-      if (rawRef) {
-        try {
-          const h = new URL(rawRef).hostname.replace(/^www\./, '');
-          let self = '';
-          try { self = new URL(request.url).hostname.replace(/^www\./, ''); } catch (e) {}
-          ref = (h && h !== self) ? h : 'internal';
-        } catch (e) { ref = 'direct'; }
-      }
-      await dbBatch(env.DB, [
-        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'device', dev] },
-        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'ref', ref] }
-      ]);
-    } catch (e) {}
     // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
       const afterLike = await dbFirst(env.DB, 'SELECT * FROM stats WHERE post_id = ?', postId) || {};
       const s = { likes: Number(afterLike.likes) || 0, views: Number(afterLike.views) || 0 };
@@ -1060,6 +1039,31 @@ export async function handleStats(request, env, postId) {
     await dbRun(env.DB,
       'INSERT INTO stats_daily (post_id,date,views,likes) VALUES (?,?,1,0) ON CONFLICT(post_id,date) DO UPDATE SET views = views + 1',
       postId, todayView).catch(() => {});
+    // 访问来源 / 设备（按天聚合，表可能尚未迁移 → 失败静默）：只在计入浏览时记录
+    try {
+      const ua = String(request.headers.get('User-Agent') || '');
+      const dev = /(bot|crawler|spider)/i.test(ua) ? 'bot'
+        : (/iPad|Tablet|Pad/i.test(ua) ? 'tablet'
+        : (/Mobile|Android|iPhone|iPod/i.test(ua) ? 'mobile' : 'desktop'));
+      let ref = 'direct';
+      // 前端会带 document.referrer（fetch 的 Referer 头恒为本站页面，无法反映来路）；
+      // 带 ref 字段（含空串）时以它为准：空串=直接访问，避免把直达流量误判成站内；
+      // 未带 ref 字段的旧客户端回退到 Referer 头。
+      const hasClientRef = !!(body && Object.prototype.hasOwnProperty.call(body, 'ref'));
+      const rawRef = hasClientRef ? String(body.ref || '').slice(0, 500) : String(request.headers.get('Referer') || '');
+      if (rawRef) {
+        try {
+          const h = new URL(rawRef).hostname.replace(/^www\./, '');
+          let self = '';
+          try { self = new URL(request.url).hostname.replace(/^www\./, ''); } catch (e) {}
+          ref = (h && h !== self) ? h : 'internal';
+        } catch (e) { ref = 'direct'; }
+      }
+      await dbBatch(env.DB, [
+        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'device', dev] },
+        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'ref', ref] }
+      ]);
+    } catch (e) {}
     // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
     const afterView = await dbFirst(env.DB, 'SELECT * FROM stats WHERE post_id = ?', postId) || {};
     const s = { likes: Number(afterView.likes) || 0, views: Number(afterView.views) || 0 };
