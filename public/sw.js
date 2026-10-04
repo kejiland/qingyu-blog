@@ -8,7 +8,7 @@
  * ============================================================ */
 'use strict';
 
-var CACHE_VERSION = '2.10.46';
+var CACHE_VERSION = '2.10.47';
 var SHELL_CACHE = 'qingyu-shell-' + CACHE_VERSION;
 var RUNTIME_CACHE = 'qingyu-runtime-' + CACHE_VERSION;
 var SHELL = [

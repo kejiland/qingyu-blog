@@ -2952,7 +2952,6 @@
       '<div class="ab-search"><input class="ab-input" id="abCmtKw" placeholder="' + t('admin.comments.search') + '"></div>' +
       '<select class="ab-select" id="abCmtFilter" style="max-width:160px"><option value="all">' + t('admin.comments.all') + '</option><option value="pending"' + (filter === 'pending' ? ' selected' : '') + '>' + t('admin.comments.pendingStatus') + '</option><option value="approved">' + t('admin.comments.approved') + '</option></select>' +
       '</div><div class="ab-ai-comments" id="abAiComments"></div><div class="ab-bulk" id="abCmtBulk" style="display:none"><span class="ab-muted" id="abCmtSelInfo"></span><button class="ab-btn sm primary" id="abCmtApprove">' + icon('check', 13) + ' ' + t('admin.comments.bulkApprove') + '</button><button class="ab-btn sm" id="abCmtPending">' + icon('clock', 13) + ' ' + t('admin.comments.bulkPending') + '</button><button class="ab-btn sm danger" id="abCmtDelete">' + icon('trash', 13) + ' ' + t('admin.comments.bulkDelete') + '</button></div><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th class="col-check"><input type="checkbox" id="abCmtAll" aria-label="' + t('admin.comments.selectPage') + '"></th><th>' + t('admin.comments.colAuthor') + '</th><th>' + t('admin.comments.colContent') + '</th><th>' + t('admin.comments.colPost') + '</th><th>' + t('admin.comments.colDate') + '</th><th>' + t('comment.like') + '</th><th>' + t('admin.comments.colStatus') + '</th><th class="col-actions">' + t('admin.comments.colActions') + '</th></tr></thead><tbody id="abCmtBody"></tbody></table></div>';
-    var cmtSel = cmtSelMap;
     content.querySelector('#abCmtApprove').addEventListener('click', function () { bulkCommentOp(content, 'approve', filter); });
     content.querySelector('#abCmtPending').addEventListener('click', function () { bulkCommentOp(content, 'pending', filter); });
     content.querySelector('#abCmtDelete').addEventListener('click', function () { bulkCommentOp(content, 'delete', filter); });
@@ -3002,49 +3001,50 @@
   }
 
   async function loadComments(content, filter) {
+
     var body = content.querySelector('#abCmtBody');
     if (!body) return;
     body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
-    var d;
-    try { d = await api('api/comments?status=' + (filter === 'pending' ? 'pending' : 'all')); } catch (e) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
-    var list = (d && d.comments) || [];
-    var kw = (content.querySelector('#abCmtKw').value || '').trim().toLowerCase();
-    if (kw) list = list.filter(function (c) { return ((c.author || '') + ' ' + (c.content || '')).toLowerCase().indexOf(kw) >= 0; });
-    if (!list.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.dashboard.noComments') + '</td></tr>'; return; }
-    // 建立 id → 评论 映射，以便展示“回复了某人”的父子关系
-    var cmtById = {};
-    list.forEach(function (c) { cmtById[c.id] = c; });
-    body.innerHTML = list.map(function (c) {
-      var st = c.status || 'approved';
-      var pinned = !!c.pinned, featured = !!c.featured;
-      // 二级及以上回复：标注其父评论，便于后台追踪回复链
-      var replyTag = '';
-      if (c.parent_id) {
-        var parent = cmtById[c.parent_id];
-        if (parent) replyTag = ' <span class="ab-cmt-replyto">' + esc(t('comment.replyTo', { author: parent.author || t('admin.comments.anonymous') })) + '</span>';
-        else replyTag = ' <span class="ab-cmt-replyto">#' + esc(c.parent_id) + '</span>';
-      }
-      var badges = '';
-      if (pinned) badges += ' <span class="ab-cmt-badge pinned">' + icon('pin', 11) + t('comment.pinned') + '</span>';
-      if (featured) badges += ' <span class="ab-cmt-badge featured">' + icon('star', 11) + t('comment.featured') + '</span>';
-      var actions = '';
-      if (st === 'pending') actions += '<button class="ab-btn sm primary" data-approve="' + enc(c.id) + '">' + icon('check', 13) + ' ' + t('admin.comments.approve') + '</button> ';
-      actions += '<button class="ab-btn sm' + (pinned ? ' primary' : '') + '" data-pin="' + enc(c.id) + '" data-on="' + (pinned ? '1' : '0') + '">' + icon('pin', 13) + ' ' + (pinned ? t('comment.unpinComment') : t('comment.pinComment')) + '</button> ';
-      actions += '<button class="ab-btn sm' + (featured ? ' primary' : '') + '" data-feat="' + enc(c.id) + '" data-on="' + (featured ? '1' : '0') + '">' + icon('star', 13) + ' ' + (featured ? t('comment.unfeature') : t('comment.feature')) + '</button> ';
-      actions += '<button class="ab-btn sm danger" data-delcmt="' + enc(c.id) + '">' + icon('trash', 13) + ' ' + t('admin.comments.delete') + '</button>';
-      var picked = !!cmtSel[c.id];
-      return '<tr' + (pinned ? ' class="ab-cmt-pinned"' : '') + (picked ? ' class-selected' : '') + '>' +
-        '<td class="col-check"><input type="checkbox" data-cpick="' + enc(c.id) + '"' + (picked ? ' checked' : '') + '></td>' +
-        '<td>' + esc(c.author || t('admin.comments.anonymous')) + '</td>' +
-        '<td style="max-width:320px">' + esc((c.content || '').slice(0, 120)) + replyTag + badges + '</td>' +
-        '<td>' + esc(c.post_title || c.post_id || '—') + '</td>' +
-        '<td>' + esc(fmtDate(c.date)) + '</td>' +
-        '<td style="text-align:center;white-space:nowrap">' + icon('heart', 12) + ' ' + esc(String(Number(c.likes) || 0)) + '</td>' +
-        '<td><span class="ab-status ' + st + '">' + (st === 'pending' ? t('admin.comments.pendingStatus') : t('admin.comments.approved')) + '</span></td>' +
-        '<td class="col-actions">' + actions + '</td>' +
-      '</tr>';
-    }).join('');
-    body.querySelectorAll('[data-cpick]').forEach(function (cb) {
+    try {
+      var d = await api('api/comments?status=' + (filter === 'pending' ? 'pending' : 'all'));
+      var list = (d && d.comments) || [];
+      var kw = (content.querySelector('#abCmtKw').value || '').trim().toLowerCase();
+      if (kw) list = list.filter(function (c) { return ((c.author || '') + ' ' + (c.content || '')).toLowerCase().indexOf(kw) >= 0; });
+      if (!list.length) { body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.dashboard.noComments') + '</td></tr>'; return; }
+      // 建立 id → 评论 映射，以便展示“回复了某人”的父子关系
+      var cmtById = {};
+      list.forEach(function (c) { cmtById[c.id] = c; });
+      body.innerHTML = list.map(function (c) {
+        var st = c.status || 'approved';
+        var pinned = !!c.pinned, featured = !!c.featured;
+        // 二级及以上回复：标注其父评论，便于后台追踪回复链
+        var replyTag = '';
+        if (c.parent_id) {
+          var parent = cmtById[c.parent_id];
+          if (parent) replyTag = ' <span class="ab-cmt-replyto">' + esc(t('comment.replyTo', { author: parent.author || t('admin.comments.anonymous') })) + '</span>';
+          else replyTag = ' <span class="ab-cmt-replyto">#' + esc(c.parent_id) + '</span>';
+        }
+        var badges = '';
+        if (pinned) badges += ' <span class="ab-cmt-badge pinned">' + icon('pin', 11) + t('comment.pinned') + '</span>';
+        if (featured) badges += ' <span class="ab-cmt-badge featured">' + icon('star', 11) + t('comment.featured') + '</span>';
+        var actions = '';
+        if (st === 'pending') actions += '<button class="ab-btn sm primary" data-approve="' + enc(c.id) + '">' + icon('check', 13) + ' ' + t('admin.comments.approve') + '</button> ';
+        actions += '<button class="ab-btn sm' + (pinned ? ' primary' : '') + '" data-pin="' + enc(c.id) + '" data-on="' + (pinned ? '1' : '0') + '">' + icon('pin', 13) + ' ' + (pinned ? t('comment.unpinComment') : t('comment.pinComment')) + '</button> ';
+        actions += '<button class="ab-btn sm' + (featured ? ' primary' : '') + '" data-feat="' + enc(c.id) + '" data-on="' + (featured ? '1' : '0') + '">' + icon('star', 13) + ' ' + (featured ? t('comment.unfeature') : t('comment.feature')) + '</button> ';
+        actions += '<button class="ab-btn sm danger" data-delcmt="' + enc(c.id) + '">' + icon('trash', 13) + ' ' + t('admin.comments.delete') + '</button>';
+        var picked = !!cmtSelMap[c.id];
+        return '<tr' + (pinned ? ' class="ab-cmt-pinned"' : '') + (picked ? ' class-selected' : '') + '>' +
+          '<td class="col-check"><input type="checkbox" data-cpick="' + enc(c.id) + '"' + (picked ? ' checked' : '') + '></td>' +
+          '<td>' + esc(c.author || t('admin.comments.anonymous')) + '</td>' +
+          '<td style="max-width:320px">' + esc((c.content || '').slice(0, 120)) + replyTag + badges + '</td>' +
+          '<td>' + esc(c.post_title || c.post_id || '—') + '</td>' +
+          '<td>' + esc(fmtDate(c.date)) + '</td>' +
+          '<td style="text-align:center;white-space:nowrap">' + icon('heart', 12) + ' ' + esc(String(Number(c.likes) || 0)) + '</td>' +
+          '<td><span class="ab-status ' + st + '">' + (st === 'pending' ? t('admin.comments.pendingStatus') : t('admin.comments.approved')) + '</span></td>' +
+          '<td class="col-actions">' + actions + '</td>' +
+        '</tr>';
+      }).join('');
+      body.querySelectorAll('[data-cpick]').forEach(function (cb) {
       cb.addEventListener('change', function () {
         var id = dec(cb.getAttribute('data-cpick'));
         if (cb.checked) cmtSelMap[id] = 1; else delete cmtSelMap[id];
@@ -3053,26 +3053,30 @@
     });
     syncCmtSelection(content);
     body.querySelectorAll('[data-approve]').forEach(function (b) { b.addEventListener('click', function () { approveComment(content, dec(b.getAttribute('data-approve')), filter, b.closest('tr')); }); });
-    body.querySelectorAll('[data-pin]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'pinned'); }); });
-    body.querySelectorAll('[data-feat]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'featured'); }); });
-    body.querySelectorAll('[data-delcmt]').forEach(function (b) {
-      b.addEventListener('click', function () {
-        var cid = dec(b.getAttribute('data-delcmt'));
-        var tr = b.closest('tr');
-        confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.comments.deleteConfirm') + '</p>', async function () {
-          // 无感刷新：请求期间先半透明即时反馈，成功后行淡出移除，不整表重拉
-          if (tr) { tr.style.opacity = '0.45'; tr.style.pointerEvents = 'none'; }
-          try {
-            await api('api/comments/' + enc(cid), { method: 'DELETE' });
-            toast(t('admin.comments.deleted'), 'ok');
-            seamlessRemoveRow(body, tr, t('admin.dashboard.noComments'));
-          } catch (e) {
-            if (tr) { tr.style.opacity = ''; tr.style.pointerEvents = ''; }
-            toast(t('admin.postList.opFail') + (e.message || e), 'err');
-          }
-        }, t('admin.comments.delete'));
+      body.querySelectorAll('[data-pin]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'pinned'); }); });
+      body.querySelectorAll('[data-feat]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'featured'); }); });
+      body.querySelectorAll('[data-delcmt]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          var cid = dec(b.getAttribute('data-delcmt'));
+          var tr = b.closest('tr');
+          confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.comments.deleteConfirm') + '</p>', async function () {
+            // 无感刷新：请求期间先半透明即时反馈，成功后行淡出移除，不整表重拉
+            if (tr) { tr.style.opacity = '0.45'; tr.style.pointerEvents = 'none'; }
+            try {
+              await api('api/comments/' + enc(cid), { method: 'DELETE' });
+              toast(t('admin.comments.deleted'), 'ok');
+              seamlessRemoveRow(body, tr, t('admin.dashboard.noComments'));
+            } catch (e) {
+              if (tr) { tr.style.opacity = ''; tr.style.pointerEvents = ''; }
+              toast(t('admin.postList.opFail') + (e.message || e), 'err');
+            }
+          }, t('admin.comments.delete'));
+        });
       });
-    });
+    } catch (e) {
+      // 渲染期异常同样兜底，避免一直停在加载态（回归：cmtSel 未定义曾导致永久转圈）
+      body.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
+    }
   }
   // 切换评论置顶 / 精选（就地更新按钮与徽章，不重拉整表）
   async function toggleCommentFlag(content, btn, key) {

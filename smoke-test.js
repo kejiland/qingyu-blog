@@ -17,7 +17,7 @@ const PUB = path.join(dir, 'public');
 const stubEl = () => ({
   addEventListener() {}, removeEventListener() {}, textContent: '', innerHTML: '', value: '',
   style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
-  closest: () => null, focus() {}, disabled: false,
+  closest: () => null, focus() {}, disabled: false, insertAdjacentHTML() {},
   setAttribute() {}, getAttribute: () => '', removeAttribute() {}, hasAttribute: () => false,
   querySelector: () => null, querySelectorAll: () => [],
   click() {}, scrollIntoView() {},
@@ -3539,6 +3539,86 @@ tests.push(['后台（新版 UI）：全部文章页云端分页渲染（serverT
   assert.ok(body.indexOf('加载失败') < 0 && body.indexOf('serverTotal') < 0, '列表未显示加载失败');
   const pg = content.querySelector('#abPostPage').innerHTML || '';
   assert.ok(pg.indexOf('3') >= 0, '分页显示服务端总页数 3');
+}]);
+
+/* 新版后台 UI：全部评论页加载渲染（回归：不再一直转圈） */
+tests.push(['后台（新版 UI）：全部评论页加载并渲染', async () => {
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/comments?status=') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, comments: [
+      { id: 'c1', post_id: 'p1', post_title: '文章一', author: '甲', content: '第一条评论', date: '2026-01-02 10:00', status: 'approved', likes: 2, pinned: 1, featured: 0 },
+      { id: 'c2', post_id: 'p1', post_title: '文章一', author: '乙', content: '待审核评论', date: '2026-01-03 11:00', status: 'pending', likes: 0 },
+      { id: 'c3', post_id: 'p1', author: '丙', content: '一条回复', date: '2026-01-03 12:00', status: 'approved', parent_id: 'c1' }
+    ] }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/admin/comments');
+  const appEl = mountAdminUi(b);
+  await new Promise((r) => setTimeout(r, 80));
+  const content = appEl.querySelector('#abContent');
+  const body = content.querySelector('#abCmtBody').innerHTML || '';
+  assert.ok(body.indexOf('第一条评论') >= 0, '评论行已渲染');
+  assert.ok(body.indexOf('甲') >= 0 && body.indexOf('乙') >= 0, '作者列已渲染');
+  assert.ok(body.indexOf('待审核') >= 0, '状态列已渲染');
+  assert.ok(body.indexOf('加载中') < 0, '不再停留在加载态');
+  // 接口失败也必须落到错误行，而不是一直转圈
+  const fnFail = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/comments?status=') >= 0) return { ok: false, status: 500, json: async () => ({ error: 'boom' }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b2 = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fnFail }, '/admin/comments');
+  const appEl2 = mountAdminUi(b2);
+  await new Promise((r) => setTimeout(r, 80));
+  const body2 = appEl2.querySelector('#abContent').querySelector('#abCmtBody').innerHTML || '';
+  assert.ok(body2.indexOf('加载失败') >= 0 && body2.indexOf('加载中') < 0, '接口失败显示错误行而非一直转圈');
+}]);
+
+/* 新版后台 UI：所有页面逐个挂载，任何未捕获异常都视为失败（覆盖跨函数作用域变量名笔误） */
+tests.push(['后台（新版 UI）：所有页面挂载无运行时异常', async () => {
+  const errors = [];
+  const onRej = (e) => errors.push(e);
+  process.on('unhandledRejection', onRej);
+  const fn = async (url) => {
+    const u = String(url);
+    const ok = (obj) => ({ ok: true, status: 200, json: async () => obj });
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/comments?status=') >= 0) return ok({ ok: true, comments: [{ id: 'c1', post_id: 'p1', post_title: '文章一', author: '甲', content: '一条评论', date: '2026-01-02 10:00', status: 'approved', likes: 1, pinned: 1, featured: 0 }] });
+    if (/\/api\/posts\/[^?]+\?_=/.test(u) || /\/api\/posts\/edit-1(\?|$)/.test(u)) return ok({ ok: true, post: { id: 'edit-1', title: '编辑文', date: '2026-01-01', content: 'x', tags: [], protected: false } });
+    if (u.indexOf('/api/posts?') >= 0) return ok({ ok: true, posts: [{ id: 'p1', title: '文章一', date: '2026-01-01', tags: [], status: 'published', pinned: false }], total: 1, page: 1, per: 10, pages: 1 });
+    if (/\/api\/posts\/edit-1(\?|$)/.test(u)) return ok({ post: { id: 'edit-1', title: '编辑文', date: '2026-01-01', content: 'x', tags: [], protected: false } });
+    if (u.indexOf('/api/posts') >= 0) return ok({ ok: true, posts: [] });
+    if (u.indexOf('/api/settings') >= 0) return ok({ ok: true, settings: {} });
+    if (u.indexOf('/api/media') >= 0) return ok({ ok: true, media: [] });
+    if (u.indexOf('/api/music') >= 0) return ok({ ok: true, music: [] });
+    if (u.indexOf('/api/admin/subscribers') >= 0) return ok({ ok: true, enabled: false, counts: { total: 0, active: 0, pending: 0, unsubscribed: 0 }, groups: [], subscribers: [] });
+    if (u.indexOf('/api/admin/backups') >= 0) return ok({ ok: true, configured: false, backups: [] });
+    if (u.indexOf('/api/admin/audit') >= 0) return ok({ ok: true, logs: [], total: 0, page: 1, pages: 1 });
+    if (u.indexOf('/api/admin/health') >= 0) return ok({ ok: true, items: [] });
+    if (u.indexOf('/api/admin/stats/sources') >= 0) return ok({ ok: true, referrers: [], devices: [], refTotal: 0, devTotal: 0 });
+    if (u.indexOf('/api/admin/stats/trend') >= 0) return ok({ ok: true, days: 30, views: [], comments: [] });
+    if (u.indexOf('/api/admin/post-analytics') >= 0) return ok({ ok: true, items: [], range: 'all' });
+    if (u.indexOf('/api/tags') >= 0) return ok({ ok: true, tags: [] });
+    if (u.indexOf('/api/ai/') >= 0) return ok({ ok: false });
+    return ok({ ok: true });
+  };
+  const routes = ['/admin', '/admin/posts', '/admin/posts/new', '/admin/posts/edit-1/edit', '/admin/comments', '/admin/comments/pending', '/admin/tags', '/admin/series', '/admin/media', '/admin/music', '/admin/subscribers', '/admin/audit', '/admin/health', '/admin/backup', '/admin/settings', '/admin/transfer'];
+  try {
+    for (const r of routes) {
+      const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, r);
+      const appEl = mountAdminUi(b);
+      await new Promise((res) => setTimeout(res, 60));
+      const html = appEl.querySelector('#abContent').innerHTML || '';
+      assert.ok(html.length > 0, r + ' 渲染了内容');
+    }
+  } finally {
+    process.removeListener('unhandledRejection', onRej);
+  }
+  assert.deepStrictEqual(errors.map((e) => String((e && e.message) || e)), [], '挂载过程中无未捕获异常');
 }]);
 
 /* ---------- 运行 ---------- */
