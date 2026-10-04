@@ -3361,44 +3361,59 @@
     if (status === 'pending') return t('admin.subscribers.pending');
     return t('admin.subscribers.unsubscribed');
   }
-  var subState = { list: [], kw: '', status: 'all', page: 1, per: 20 };
+  var subState = { list: [], groups: [], enabled: false, kw: '', status: 'all', group: 'all', page: 1, per: 20 };
   function pageSubscribers(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.subscribers.title') + '</h1><p class="ab-page-sub">' + t('admin.subscribers.desc') + '</p></div>' +
-      '<div class="ab-row" style="gap:8px"><button class="ab-btn" id="abSubExport">' + icon('download', 14) + ' ' + t('admin.subscribers.export') + '</button><button class="ab-btn" id="abSubRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div></div>' +
-      '<div class="ab-grid cols-3" id="abSubStats"></div><div class="ab-card" id="abSubNotice" style="margin-bottom:16px"></div>' +
+      '<div class="ab-row" style="gap:8px"><button class="ab-btn primary" id="abSubBroadcast">' + icon('send', 14) + ' ' + t('admin.subscribers.broadcast') + '</button><button class="ab-btn" id="abSubExport">' + icon('download', 14) + ' ' + t('admin.subscribers.export') + '</button><button class="ab-btn" id="abSubRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div></div>' +
+      '<div class="ab-grid cols-4" id="abSubStats"></div><div class="ab-card" id="abSubNotice" style="margin-bottom:16px"></div>' +
       '<div class="ab-toolbar"><div class="ab-search"><input class="ab-input" id="abSubKw" placeholder="' + t('admin.subscribers.search') + '"></div>' +
-      '<select class="ab-select" id="abSubStatus" style="max-width:170px"><option value="all">' + t('admin.subscribers.filterAll') + '</option><option value="active">' + t('admin.subscribers.active') + '</option><option value="pending">' + t('admin.subscribers.pending') + '</option><option value="unsubscribed">' + t('admin.subscribers.unsubscribed') + '</option></select></div>' +
-      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.subscribers.colEmail') + '</th><th>' + t('admin.subscribers.colStatus') + '</th><th>' + t('admin.subscribers.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSubBody"></tbody></table></div><div class="ab-pagination" id="abSubPage" style="padding:0 4px 6px"></div></div>';
+      '<select class="ab-select" id="abSubStatus" style="max-width:170px"><option value="all">' + t('admin.subscribers.filterAll') + '</option><option value="active">' + t('admin.subscribers.active') + '</option><option value="pending">' + t('admin.subscribers.pending') + '</option><option value="unsubscribed">' + t('admin.subscribers.unsubscribed') + '</option></select>' +
+      '<select class="ab-select" id="abSubGroup" style="max-width:190px"></select></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.subscribers.colEmail') + '</th><th>' + t('admin.subscribers.colGroups') + '</th><th>' + t('admin.subscribers.colStatus') + '</th><th>' + t('admin.subscribers.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abSubBody"></tbody></table></div><div class="ab-pagination" id="abSubPage" style="padding:0 4px 6px"></div></div>';
     var kw = content.querySelector('#abSubKw');
     kw.value = subState.kw;
     kw.addEventListener('input', debounce(function () { subState.kw = (kw.value || '').trim().toLowerCase(); subState.page = 1; renderSubscribers(content); }, 200));
     var st = content.querySelector('#abSubStatus');
     st.value = subState.status;
     st.addEventListener('change', function () { subState.status = st.value; subState.page = 1; renderSubscribers(content); });
+    var grp = content.querySelector('#abSubGroup');
+    grp.addEventListener('change', function () { subState.group = grp.value; subState.page = 1; renderSubscribers(content); });
     content.querySelector('#abSubRefresh').addEventListener('click', function () { loadSubscribers(content); });
     content.querySelector('#abSubExport').addEventListener('click', function () { exportSubscribers(content); });
+    content.querySelector('#abSubBroadcast').addEventListener('click', function () { openBroadcastModal(content); });
     loadSubscribers(content);
   }
   async function loadSubscribers(content) {
     var body = content.querySelector('#abSubBody');
-    body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('site.loading') + '</td></tr>';
     try {
       var d = await api('api/admin/subscribers');
       var counts = (d && d.counts) || { total: 0, active: 0, pending: 0, unsubscribed: 0 };
+      subState.groups = (d && d.groups) || [];
+      subState.enabled = !!(d && d.enabled);
       content.querySelector('#abSubStats').innerHTML = [
         { label: t('admin.subscribers.total'), value: counts.total, icon: 'send' },
         { label: t('admin.subscribers.active'), value: counts.active, icon: 'check' },
-        { label: t('admin.subscribers.pending'), value: counts.pending, icon: 'clock' }
+        { label: t('admin.subscribers.pending'), value: counts.pending, icon: 'clock' },
+        { label: t('admin.subscribers.statGroups'), value: subState.groups.length, icon: 'list' }
       ].map(function (x) { return '<div class="ab-card ab-stat"><div class="ab-stat-label">' + icon(x.icon, 16) + esc(x.label) + '</div><div class="ab-stat-value">' + esc(String(x.value)) + '</div></div>'; }).join('');
       content.querySelector('#abSubNotice').innerHTML = d && d.enabled ? '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + icon('send', 13) + ' Resend</span><b>' + t('admin.subscribers.enabled') + '</b></div>' : '<div class="ab-row" style="gap:8px;align-items:center"><span class="ab-chip">' + t('admin.backup.disabledChip') + '</span><b>' + t('admin.subscribers.disabled') + '</b><span class="ab-muted">RESEND_API_KEY / BLOG_MAIL_FROM / SITE_URL</span></div>';
+      var groupSel = content.querySelector('#abSubGroup');
+      if (groupSel) {
+        groupSel.innerHTML = '<option value="all">' + t('admin.subscribers.filterGroup') + '</option>' + subState.groups.map(function (g) { return '<option value="' + esc(g.name) + '">' + esc(g.name) + ' (' + Number(g.count || 0) + ')</option>'; }).join('');
+        var stillThere = subState.group === 'all' || subState.groups.some(function (g) { return g.name === subState.group; });
+        if (!stillThere) subState.group = 'all';
+        groupSel.value = subState.group;
+      }
       subState.list = ((d && d.subscribers) || []).slice();
       renderSubscribers(content);
-    } catch (e) { body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
+    } catch (e) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + esc(e.message || e) + '</td></tr>'; }
   }
   /** 订阅者列表：关键字 + 状态过滤，分页渲染（每页 20） */
   function filteredSubscribers() {
     var list = subState.list;
     if (subState.status !== 'all') list = list.filter(function (s) { return s.status === subState.status; });
+    if (subState.group !== 'all') list = list.filter(function (s) { return (s.groups || []).indexOf(subState.group) >= 0; });
     if (subState.kw) list = list.filter(function (s) { return String(s.email || '').toLowerCase().indexOf(subState.kw) >= 0; });
     return list;
   }
@@ -3413,11 +3428,22 @@
     var page = subState.page;
     var view = list.slice((page - 1) * per, page * per);
     if (!view.length) {
-      body.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:34px" class="ab-muted">' + ((subState.kw || subState.status !== 'all') ? t('admin.subscribers.noMatch') : t('admin.subscribers.empty')) + '</td></tr>';
+      body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + ((subState.kw || subState.status !== 'all' || subState.group !== 'all') ? t('admin.subscribers.noMatch') : t('admin.subscribers.empty')) + '</td></tr>';
     } else {
       body.innerHTML = view.map(function (sub) {
-        return '<tr><td>' + esc(sub.email) + '</td><td><span class="ab-status ' + (sub.status === 'active' ? 'published' : sub.status === 'pending' ? 'scheduled' : 'draft') + '">' + esc(subscriberStatusLabel(sub.status)) + '</span></td><td>' + esc(fmtTimestamp(sub.created_at)) + '</td><td class="col-actions"><button class="ab-btn sm danger" data-sub-delete="' + esc(sub.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
+        var groups = Array.isArray(sub.groups) ? sub.groups : [];
+        var groupCell = (groups.length ? groups.map(function (g) { return '<span class="ab-chip cat">' + esc(g) + '</span>'; }).join(' ') : '<span class="ab-muted">' + t('admin.subscribers.groupNone') + '</span>') +
+          ' <button class="ab-btn sm" data-sub-groups="' + esc(sub.id) + '">' + icon('pen', 11) + ' ' + t('admin.subscribers.editGroups') + '</button>';
+        return '<tr><td>' + esc(sub.email) + '</td><td class="ab-td-tags">' + groupCell + '</td><td><span class="ab-status ' + (sub.status === 'active' ? 'published' : sub.status === 'pending' ? 'scheduled' : 'draft') + '">' + esc(subscriberStatusLabel(sub.status)) + '</span></td><td>' + esc(fmtTimestamp(sub.created_at)) + '</td><td class="col-actions"><button class="ab-btn sm danger" data-sub-delete="' + esc(sub.id) + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
       }).join('');
+      body.querySelectorAll('[data-sub-groups]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var sid = btn.getAttribute('data-sub-groups');
+          var target = null;
+          for (var i = 0; i < subState.list.length; i++) { if (String(subState.list[i].id) === String(sid)) { target = subState.list[i]; break; } }
+          if (target) editSubscriberGroups(content, target);
+        });
+      });
       body.querySelectorAll('[data-sub-delete]').forEach(function (btn) {
         btn.addEventListener('click', function () {
           var id = btn.getAttribute('data-sub-delete');
@@ -3446,6 +3472,67 @@
       var csv = rows.map(function (r) { return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(','); }).join('\n');
       transferDownloadText('subscribers-' + transferStamp() + '.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');
     } catch (e) { toast(t('admin.subscribers.exportFail') + (e.message || e), 'err'); }
+  }
+
+  /* 编辑单个订阅者的分组（逗号分隔） */
+  function editSubscriberGroups(content, sub) {
+    var mask = document.createElement('div');
+    mask.className = 'ab-modal-mask';
+    mask.innerHTML = '<div class="ab-modal"><h3>' + t('admin.subscribers.editGroups') + '</h3>' +
+      '<p class="ab-muted" style="margin:0 0 10px">' + esc(sub.email) + '</p>' +
+      '<input class="ab-input" id="abSubGroupsInput" placeholder="' + t('admin.subscribers.groupsPlaceholder') + '" value="' + esc((sub.groups || []).join(', ')) + '">' +
+      '<label class="ab-hint">' + t('admin.subscribers.groupsHint') + '</label>' +
+      '<div class="ab-modal-actions"><button class="ab-btn ghost" data-act="cancel">' + t('confirm.cancel') + '</button><button class="ab-btn primary" id="abSubGroupsSave">' + t('confirm.yes') + '</button></div></div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function (e) { if (e.target === mask || e.target.getAttribute('data-act') === 'cancel') mask.remove(); });
+    var input = mask.querySelector('#abSubGroupsInput');
+    if (input) input.focus();
+    mask.querySelector('#abSubGroupsSave').addEventListener('click', async function () {
+      var raw = input ? input.value : '';
+      var groups = raw.split(/[,，]/).map(function (x) { return x.trim(); }).filter(Boolean);
+      try {
+        await api('api/admin/subscribers/' + enc(sub.id), { method: 'PUT', body: JSON.stringify({ groups: groups }) });
+        mask.remove();
+        toast(t('admin.subscribers.groupsSaved'), 'ok');
+        loadSubscribers(content);
+      } catch (e) { toast(t('admin.subscribers.groupsSaveFail') + (e.message || e), 'err'); }
+    });
+  }
+  /* 群发邮件：按分组多选（留空=全部已确认订阅者）写入发件箱 */
+  function openBroadcastModal(content) {
+    if (!subState.enabled) { toast(t('admin.subscribers.broadcastMailDisabled'), 'err'); return; }
+    var groupBoxes = (subState.groups || []).map(function (g) {
+      return '<label style="display:flex;align-items:center;gap:6px;font-size:13px"><input type="checkbox" class="ab-bc-group" value="' + esc(g.name) + '"> ' + esc(g.name) + ' <span class="ab-muted">(' + Number(g.count || 0) + ')</span></label>';
+    }).join('');
+    var mask = document.createElement('div');
+    mask.className = 'ab-modal-mask';
+    mask.innerHTML = '<div class="ab-modal" style="max-width:560px"><h3>' + t('admin.subscribers.broadcastTitle') + '</h3>' +
+      '<div class="ab-field"><label class="ab-label">' + t('admin.subscribers.broadcastTarget') + '</label>' +
+      (groupBoxes ? '<div style="display:flex;flex-wrap:wrap;gap:10px;max-height:120px;overflow:auto">' + groupBoxes + '</div>' : '') +
+      '<label class="ab-hint">' + t('admin.subscribers.broadcastGroupsHint') + '</label></div>' +
+      '<div class="ab-field"><label class="ab-label">' + t('admin.subscribers.broadcastSubject') + '</label><input class="ab-input" id="abBcSubject" maxlength="160"></div>' +
+      '<div class="ab-field"><label class="ab-label">' + t('admin.subscribers.broadcastBody') + '</label><textarea class="ab-textarea" id="abBcBody" style="min-height:160px" maxlength="20000"></textarea></div>' +
+      '<div class="ab-modal-actions"><button class="ab-btn ghost" data-act="cancel">' + t('confirm.cancel') + '</button><button class="ab-btn primary" id="abBcSend">' + t('admin.subscribers.broadcastSend') + '</button></div></div>';
+    document.body.appendChild(mask);
+    mask.addEventListener('click', function (e) { if (e.target === mask || e.target.getAttribute('data-act') === 'cancel') mask.remove(); });
+    mask.querySelector('#abBcSend').addEventListener('click', async function () {
+      var subject = mask.querySelector('#abBcSubject').value.trim();
+      var text = mask.querySelector('#abBcBody').value.trim();
+      var groups = [];
+      mask.querySelectorAll('.ab-bc-group').forEach(function (cb) { if (cb.checked) groups.push(cb.value); });
+      if (!subject) { toast(t('admin.subscribers.broadcastNeedSubject'), 'err'); return; }
+      if (!text) { toast(t('admin.subscribers.broadcastNeedBody'), 'err'); return; }
+      var btn = mask.querySelector('#abBcSend');
+      btn.disabled = true;
+      try {
+        var r = await api('api/admin/subscribers/broadcast', { method: 'POST', body: JSON.stringify({ subject: subject, body: text, groups: groups }) });
+        var n = (r && r.queued) || 0;
+        if (n > 0) toast(t('admin.subscribers.broadcastQueued', { n: n }), 'ok');
+        else toast(t('admin.subscribers.broadcastEmpty'), 'err');
+        mask.remove();
+      } catch (e) { toast(t('admin.subscribers.broadcastFail') + (e.message || e), 'err'); }
+      btn.disabled = false;
+    });
   }
 
   /* ====================== 备份与恢复 ====================== */

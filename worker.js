@@ -17,7 +17,7 @@ import { onRequest as aiAssist } from './functions/api/ai/assist.js';
 import { onRequest as aiComments } from './functions/api/ai/comments.js';
 import { handleMusic, handleMusicId, handleMusicUploadUrl } from './functions/_lib/music.js';
 import { handleBackups, handleBackupId, handleBackupRestore, createBackup } from './functions/_lib/backup.js';
-import { handleSubscribe, handleSubscribeConfirm, handleUnsubscribe, handleSubscribersAdmin, handleSubscriberId, processMailOutbox } from './functions/_lib/subscribe.js';
+import { handleSubscribe, handleSubscribeConfirm, handleUnsubscribe, handleSubscribersAdmin, handleSubscriberId, handleSubscriberBroadcast, processMailOutbox } from './functions/_lib/subscribe.js';
 import { handleOgUploadUrl } from './functions/_lib/og.js';
 import { handleMediaUploadUrl, deleteMediaObject } from './functions/_lib/media.js';
 
@@ -99,6 +99,9 @@ export default {
     }
     if (url.pathname === '/api/admin/subscribers') {
       return handleSubscribersAdmin(request, env);
+    }
+    if (url.pathname === '/api/admin/subscribers/broadcast') {
+      return handleSubscriberBroadcast(request, env);
     }
     let subscriberMatch = url.pathname.match(/^\/api\/admin\/subscribers\/([^/]+)$/);
     if (subscriberMatch) {

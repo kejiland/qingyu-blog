@@ -525,13 +525,16 @@ function makeD1() {
     if (s === "SELECT email FROM subscribers WHERE status = 'active'") {
       return [...t.subscribers.values()].filter((r) => r.status === 'active').map((r) => ({ email: r.email }));
     }
+    if (s === "SELECT * FROM subscribers WHERE status = 'active'") {
+      return [...t.subscribers.values()].filter((r) => r.status === 'active');
+    }
     if (s === 'SELECT * FROM subscribers ORDER BY created_at DESC') {
       return [...t.subscribers.values()].sort((a, b) => b.created_at - a.created_at);
     }
     if (/^INSERT INTO subscribers/.test(s)) {
       const [id,email,status,token,locale,created_at,confirmed_at,unsubscribed_at,last_notified_at] = params;
       const old = [...t.subscribers.values()].find((r) => r.email === email);
-      t.subscribers.set(old ? old.id : id, { id: old ? old.id : id, email, status, token, locale, created_at, confirmed_at, unsubscribed_at, last_notified_at });
+      t.subscribers.set(old ? old.id : id, { id: old ? old.id : id, email, status, token, locale, groups: (old && old.groups) || '[]', created_at, confirmed_at, unsubscribed_at, last_notified_at });
       return { success: true };
     }
     if (s === "UPDATE subscribers SET status = 'active', confirmed_at = ?, unsubscribed_at = NULL WHERE id = ?") {
@@ -539,6 +542,9 @@ function makeD1() {
     }
     if (s === "UPDATE subscribers SET status = 'unsubscribed', unsubscribed_at = ? WHERE id = ?") {
       const row = t.subscribers.get(params[1]); if (row) { row.status = 'unsubscribed'; row.unsubscribed_at = params[0]; } return { success: true };
+    }
+    if (s === 'UPDATE subscribers SET groups = ? WHERE id = ?') {
+      const row = t.subscribers.get(params[1]); if (row) row.groups = params[0]; return { success: true };
     }
     if (s === 'UPDATE subscribers SET last_notified_at = ? WHERE email = ?') {
       const row = [...t.subscribers.values()].find((r) => r.email === params[1]); if (row) row.last_notified_at = params[0]; return { success: true };
@@ -554,8 +560,9 @@ function makeD1() {
       const limit = Number(s.split('LIMIT ')[1]) || 20;
       return [...t.mail_outbox.values()].filter((r) => r.status === 'pending').sort((a, b) => a.created_at - b.created_at).slice(0, limit);
     }
-    if (s === "UPDATE mail_outbox SET status = 'skipped', error = 'article or subscriber unavailable', sent_at = ? WHERE id = ?") {
-      const row = t.mail_outbox.get([...t.mail_outbox.keys()].find((k) => t.mail_outbox.get(k).id === params[1])); if (row) { row.status = 'skipped'; row.error = 'article or subscriber unavailable'; row.sent_at = params[0]; } return { success: true };
+    const skipM = /^UPDATE mail_outbox SET status = 'skipped', error = '([^']*)', sent_at = \? WHERE id = \?$/.exec(s);
+    if (skipM) {
+      const row = [...t.mail_outbox.values()].find((r) => r.id === params[1]); if (row) { row.status = 'skipped'; row.error = skipM[1]; row.sent_at = params[0]; } return { success: true };
     }
     if (s === "UPDATE mail_outbox SET status = 'sent', sent_at = ?, attempts = attempts + 1, error = '' WHERE id = ?") {
       const row = [...t.mail_outbox.values()].find((r) => r.id === params[1]); if (row) { row.status = 'sent'; row.sent_at = params[0]; row.attempts++; row.error = ''; } return { success: true };
@@ -3276,7 +3283,7 @@ tests.push(['i18n：五个语言包键数一致且含加密文案', async () => 
   const maps = langs.map((l) => JSON.parse(fs.readFileSync(path.join(PUB, 'locales', l + '.json'), 'utf8')));
   const counts = maps.map((m) => Object.keys(m).length);
   assert.ok(counts.every((c) => c === counts[0]), '各语言键数一致: ' + counts.join('/'));
-  const need = ['post.lockedTitle','post.lockedDesc','post.lockedPlaceholder','post.unlock','post.unlocked','post.unlockFail','admin.editor.protect','admin.editor.protectHint','admin.editor.protectPwdPh','admin.editor.protectEncrypted','admin.editor.protectUnlock','admin.editor.protectNeedPwd','admin.editor.protectUnlocked','admin.editor.protectFail','admin.editor.protectNeedUnlock','admin.editor.protectShow','admin.editor.protectHide','admin.editor.protectRemembered'];
+  const need = ['post.lockedTitle','post.lockedDesc','post.lockedPlaceholder','post.unlock','post.unlocked','post.unlockFail','admin.editor.protect','admin.editor.protectHint','admin.editor.protectPwdPh','admin.editor.protectEncrypted','admin.editor.protectUnlock','admin.editor.protectNeedPwd','admin.editor.protectUnlocked','admin.editor.protectFail','admin.editor.protectNeedUnlock','admin.editor.protectShow','admin.editor.protectHide','admin.editor.protectRemembered','admin.subscribers.colGroups','admin.subscribers.broadcastQueued','admin.subscribers.broadcastMailDisabled'];
   maps.forEach((m, i) => { need.forEach((k) => assert.ok(typeof m[k] === 'string' && m[k], langs[i] + ' 缺 ' + k)); });
 }]);
 
@@ -3304,6 +3311,60 @@ tests.push(['后台文章列表分页：云端不重复切片、静态本地切�
   const body = src.slice(src.indexOf('async function loadPosts'), src.indexOf('function enc(s)'));
   assert.ok(/var serverTotal\s*=\s*0/.test(body), 'loadPosts 内声明 serverTotal');
   assert.ok(body.indexOf('paginatePosts(') >= 0, 'loadPosts 使用纯分页函数');
+}]);
+
+/* 订阅分组：PUT 保存分组（去重/中英逗号）+ 列表返回分组与计数 */
+tests.push(['订阅分组：PUT 保存分组 + 列表返回分组与计数', async () => {
+  const { env, token } = await authEnv();
+  const subscribe = await import('./functions/_lib/subscribe.js');
+  env._d1.subscribers.set('s1', { id: 's1', email: 'a@example.com', status: 'active', token: 'tok-a', locale: 'zh-CN', groups: '[]', created_at: 1 });
+  env._d1.subscribers.set('s2', { id: 's2', email: 'b@example.com', status: 'active', token: 'tok-b', locale: 'zh-CN', groups: '[]', created_at: 2 });
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  let r = await subscribe.handleSubscriberId(new Request('http://t/api/admin/subscribers/s1', { method: 'PUT', headers: auth, body: JSON.stringify({ groups: ['newsletter', 'VIP', 'newsletter', '  '] }) }), env, 's1');
+  assert.strictEqual(r.status, 200, 'PUT 分组返回 200');
+  assert.deepStrictEqual((await r.json()).groups, ['newsletter', 'VIP'], '分组去重去空');
+  const list = await (await subscribe.handleSubscribersAdmin(new Request('http://t/api/admin/subscribers', { headers: auth }), env)).json();
+  const s1 = list.subscribers.filter((x) => x.id === 's1')[0];
+  assert.deepStrictEqual(s1.groups, ['newsletter', 'VIP'], '列表返回分组数组');
+  assert.ok(list.groups.some((g) => g.name === 'newsletter' && g.count === 1), '分组聚合计数');
+  r = await subscribe.handleSubscriberId(new Request('http://t/api/admin/subscribers/s2', { method: 'PUT', headers: auth, body: JSON.stringify({ groups: 'newsletter，VIP' }) }), env, 's2');
+  assert.deepStrictEqual((await r.json()).groups, ['newsletter', 'VIP'], '支持中英文逗号分隔');
+}]);
+
+/* 订阅群发：按分组入队 + 必填校验 + Cron 异步发送 */
+tests.push(['订阅群发：按分组入队，Cron 异步发送且校验必填', async () => {
+  const { env, token } = await authEnv();
+  env.RESEND_API_KEY = 're_test';
+  env.BLOG_MAIL_FROM = 'blog@example.com';
+  env.SITE_URL = 'https://blog.example';
+  const subscribe = await import('./functions/_lib/subscribe.js');
+  env._d1.subscribers.set('s1', { id: 's1', email: 'a@example.com', status: 'active', token: 'tok-a', locale: 'zh-CN', groups: '["newsletter"]', created_at: 1 });
+  env._d1.subscribers.set('s2', { id: 's2', email: 'b@example.com', status: 'active', token: 'tok-b', locale: 'zh-CN', groups: '["vip"]', created_at: 2 });
+  env._d1.subscribers.set('s3', { id: 's3', email: 'c@example.com', status: 'active', token: 'tok-c', locale: 'zh-CN', groups: '[]', created_at: 3 });
+  env._d1.subscribers.set('s4', { id: 's4', email: 'd@example.com', status: 'pending', token: 'tok-d', locale: 'zh-CN', groups: '["newsletter"]', created_at: 4 });
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  const post = (body) => subscribe.handleSubscriberBroadcast(new Request('http://t/api/admin/subscribers/broadcast', { method: 'POST', headers: auth, body: JSON.stringify(body) }), env);
+  assert.strictEqual((await post({ body: 'x' })).status, 400, '缺主题拒绝');
+  assert.strictEqual((await post({ subject: 's' })).status, 400, '缺正文拒绝');
+  let r = await post({ subject: '分组通知', body: '你好 newsletter', groups: ['newsletter'] });
+  assert.strictEqual((await r.json()).queued, 1, '仅命中已确认的 newsletter 订阅者（pending 不计）');
+  r = await post({ subject: '全员通知', body: '大家好', groups: [] });
+  assert.strictEqual((await r.json()).queued, 3, '留空发送全部已确认订阅者');
+  const emails = [];
+  const originalFetch = global.fetch;
+  global.fetch = async function (url, opts) {
+    if (String(url).indexOf('api.resend.com') >= 0) { emails.push(JSON.parse(opts.body)); return new Response(JSON.stringify({ id: 'm' + emails.length }), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
+    return originalFetch(url, opts);
+  };
+  try {
+    const result = await subscribe.processMailOutbox(env, 50);
+    assert.strictEqual(result.sent, 4, '4 封全部发出');
+    assert.ok(emails.some((m) => m.subject === '分组通知'), '含分组通知邮件');
+    assert.ok(emails.some((m) => m.subject === '全员通知'), '含全员通知邮件');
+    assert.ok(emails.some((m) => String(m.html || '').indexOf('取消订阅') >= 0), '群发含退订入口');
+  } finally {
+    global.fetch = originalFetch;
+  }
 }]);
 
 /* ---------- 运行 ---------- */
