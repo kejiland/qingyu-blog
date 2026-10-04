@@ -3976,6 +3976,41 @@ tests.push(['多作者：字段往返 + 作者列表 / 作者主页', async () =
   assert.ok(worker.indexOf('/authors') >= 0, 'SPA 路由白名单含作者页');
 }]);
 
+/* 仪表盘：统一骨架屏（不再个别转圈）+ 趋势图质感 */
+tests.push(['仪表盘：统一骨架屏 + 趋势图质感增强', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('function skStatCards') && src.includes('function skRows') && src.includes('function skChartBox'), '骨架屏组件已定义');
+  assert.ok(src.indexOf('id="abStats">\' + skStatCards(5)') >= 0, '统计卡使用骨架屏');
+  assert.ok(src.indexOf('id="abSourcesBody">\' + skRows(3)') >= 0, '来源卡使用骨架屏（不再单独转圈）');
+  assert.ok(src.indexOf('id="abStorageBody">\' + skRows(4)') >= 0, '存储卡使用骨架屏（不再单独转圈）');
+  assert.ok(src.indexOf('id="abTrendViews">\' + skChartBox()') >= 0, '趋势卡使用骨架屏');
+  assert.ok(src.indexOf('function smoothLinePath') >= 0, '曲线平滑处理');
+  assert.ok(src.indexOf('linearGradient') >= 0 && src.indexOf('class="area"') >= 0, '渐变面积填充');
+  assert.ok(src.indexOf('class="grid"') >= 0, '水平网格线');
+  const css = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(css.includes('.ab-sk') && css.includes('@keyframes abSk'), '骨架屏样式与动画');
+  assert.ok(css.includes('.ab-chart .grid') && css.includes('.ab-chart .area'), '趋势图样式增强');
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/stats/trend') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, days: 30, trend: [{ date: '2026-01-01', views: 5 }, { date: '2026-01-02', views: 9 }] }) };
+    if (u.indexOf('/api/admin/stats/sources') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, referrers: [], devices: [], refTotal: 0, devTotal: 0 }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    if (u.indexOf('/api/comments') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, comments: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/admin');
+  const appEl = mountAdminUi(b);
+  await new Promise((r) => setTimeout(r, 90));
+  const root = appEl.querySelector('#abContent');
+  const trend = root.querySelector('#abTrendViews').innerHTML || '';
+  assert.ok(trend.indexOf('ab-chart-box') >= 0, '仪表盘渲染出趋势图');
+  assert.ok(trend.indexOf('class="area"') >= 0, '趋势图含渐变面积');
+  assert.ok(trend.indexOf('class="grid"') >= 0, '趋势图含网格线');
+  const stats = root.querySelector('#abStats').innerHTML || '';
+  assert.ok(stats.indexOf('ab-sk') < 0 && stats.indexOf('ab-stat-value') >= 0, '统计卡已用数据替换骨架屏');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

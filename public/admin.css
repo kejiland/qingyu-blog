@@ -881,3 +881,18 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
   .ab-nav-item:not(.active):hover,
   .ab-row-act:hover { transform: none !important; }
 }
+
+/* 仪表盘骨架屏：所有卡片统一占位（替代个别卡片的单独转圈） */
+.ab-sk { display: block; border-radius: 6px; background: linear-gradient(90deg, var(--ab-hover) 25%, color-mix(in srgb, var(--ab-hover) 55%, var(--ab-card-solid)) 37%, var(--ab-hover) 63%); background-size: 400% 100%; animation: abSk 1.5s ease-in-out infinite; }
+@keyframes abSk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.ab-sk-round { width: 30px; height: 30px; border-radius: 50%; flex: 0 0 30px; }
+.ab-sk-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; }
+.ab-sk-chart { height: 210px; }
+@media (prefers-reduced-motion: reduce) { .ab-sk { animation: none; } }
+
+/* 趋势图质感：网格 + 渐变面积 + 圆润曲线 */
+.ab-chart .grid { stroke: var(--ab-border); stroke-width: 1; stroke-dasharray: 2 4; opacity: .55; }
+.ab-chart .area { stroke: none; }
+.ab-chart .line { stroke-linecap: round; stroke-linejoin: round; }
+.ab-chart .ylab { font-size: 10px; }
+.ab-chart .dot { transition: r .12s ease, fill .12s ease; }

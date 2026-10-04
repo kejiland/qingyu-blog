@@ -1045,18 +1045,31 @@
   }
 
   /* ====================== 仪表盘 ====================== */
+  /* 仪表盘骨架屏：所有卡片统一用同一套占位，避免个别卡片单独转圈 */
+  function skBar(w, h, extra) { return '<span class="ab-sk" style="width:' + w + ';height:' + (h || 12) + 'px;' + (extra || '') + '"></span>'; }
+  function skStatCards(n) {
+    var out = '';
+    for (var i = 0; i < n; i++) out += '<div class="ab-card ab-stat">' + skBar('42%', 11) + skBar('58%', 24, 'margin-top:12px') + '</div>';
+    return out;
+  }
+  function skChartBox() { return '<div class="ab-sk-chart">' + skBar('100%', 0, 'height:100%;border-radius:12px') + '</div>'; }
+  function skRows(n) {
+    var out = '';
+    for (var i = 0; i < n; i++) out += '<div class="ab-sk-row"><span class="ab-sk ab-sk-round"></span>' + skBar('100%', 12) + '</div>';
+    return out;
+  }
   function pageDashboard(content) {
     content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.dashboard.title') + '</h1><p class="ab-page-sub">' + t('admin.dashboard.desc') + '</p></div></div>' +
-      '<div class="ab-grid cols-5" id="abStats"></div>' +
+      '<div class="ab-grid cols-5" id="abStats">' + skStatCards(5) + '</div>' +
       '<div class="ab-grid cols-2">' +
-        '<div class="ab-card"><div class="ab-section-title">' + icon('eye', 16) + ' ' + t('admin.dashboard.visitTrend') + '</div><div id="abTrendViews"></div></div>' +
-        '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.commentTrend') + '</div><div id="abTrendCmt"></div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('eye', 16) + ' ' + t('admin.dashboard.visitTrend') + '</div><div id="abTrendViews">' + skChartBox() + '</div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.commentTrend') + '</div><div id="abTrendCmt">' + skChartBox() + '</div></div>' +
       '</div>' +
-      '<div class="ab-card" id="abSourcesCard"><div class="ab-section-title">' + icon('globe', 16) + ' ' + t('admin.dashboard.sourcesTitle') + '</div><div id="abSourcesBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>' +
-      '<div class="ab-card" id="abStorageCard"><div class="ab-section-title">' + icon('cloud', 16) + ' ' + t('admin.dashboard.storageTitle') + '</div><div id="abStorageBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>' +
+      '<div class="ab-card" id="abSourcesCard"><div class="ab-section-title">' + icon('globe', 16) + ' ' + t('admin.dashboard.sourcesTitle') + '</div><div id="abSourcesBody">' + skRows(3) + '</div></div>' +
+      '<div class="ab-card" id="abStorageCard"><div class="ab-section-title">' + icon('cloud', 16) + ' ' + t('admin.dashboard.storageTitle') + '</div><div id="abStorageBody">' + skRows(4) + '</div></div>' +
       '<div class="ab-grid cols-2">' +
-        '<div class="ab-card"><div class="ab-section-title">' + icon('doc', 16) + ' ' + t('admin.dashboard.latestPosts') + '</div><div class="ab-feed" id="abRecentPosts"></div></div>' +
-        '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.latestComments') + '</div><div class="ab-feed" id="abRecentCmt"></div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('doc', 16) + ' ' + t('admin.dashboard.latestPosts') + '</div><div class="ab-feed" id="abRecentPosts">' + skRows(3) + '</div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.latestComments') + '</div><div class="ab-feed" id="abRecentCmt">' + skRows(3) + '</div></div>' +
       '</div>';
 
     loadDashboard(content);
@@ -1179,22 +1192,47 @@
   var _chartData = {}; // metric → days[]，供交互浮层读取
   var _feedTimer = null; // 最新评论自动滚动定时器（离开页面时清理）
 
-  /* 趋势折线图：SVG 折线/数据点 + HTML 时间轴刻度 + 点击/悬停浮层（时间·访问·评论） */
+  /* 趋势折线图：平滑曲线 + 渐变面积 + 网格与刻度 + 数据点 + 悬停/点击浮层 */
+  function smoothLinePath(pts) {
+    if (!pts.length) return '';
+    if (pts.length < 3) return pts.map(function (p, i) { return (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
+    var d = 'M' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
+    for (var i = 0; i < pts.length - 1; i++) {
+      var p0 = pts[i - 1] || pts[i], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2] || p2;
+      var c1x = p1[0] + (p2[0] - p0[0]) / 6, c1y = p1[1] + (p2[1] - p0[1]) / 6;
+      var c2x = p2[0] - (p3[0] - p1[0]) / 6, c2y = p2[1] - (p3[1] - p1[1]) / 6;
+      d += ' C' + c1x.toFixed(1) + ' ' + c1y.toFixed(1) + ',' + c2x.toFixed(1) + ' ' + c2y.toFixed(1) + ',' + p2[0].toFixed(1) + ' ' + p2[1].toFixed(1);
+    }
+    return d;
+  }
   function lineChart(days, metric) {
-    var w = 520, h = 200, pad = 28;
+    var w = 520, h = 200, pad = 30, padTop = 16;
     var n = days.length;
     if (!n) return '<div class="ab-empty"><p>' + t('admin.dashboard.noData') + '</p></div>';
     _chartData[metric] = days;
     var values = days.map(function (d) { return Number(d[metric]) || 0; });
     var max = Math.max(1, Math.max.apply(null, values));
+    var plotH = h - pad - padTop;
     var step = (w - pad * 2) / Math.max(1, n - 1);
     var pts = values.map(function (v, i) {
-      return [pad + i * step, h - pad - (v / max) * (h - pad * 2)];
+      return [pad + i * step, h - pad - (v / max) * plotH];
     });
-    var path = pts.map(function (p, i) { return (i === 0 ? 'M' : 'L') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); }).join(' ');
-    var dots = pts.map(function (p) { return '<circle class="dot" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.6"/>'; }).join('');
+    var line = smoothLinePath(pts);
+    var area = line + ' L' + pts[n - 1][0].toFixed(1) + ' ' + (h - pad) + ' L' + pts[0][0].toFixed(1) + ' ' + (h - pad) + ' Z';
+    var dots = pts.map(function (p, i) {
+      return '<circle class="dot" data-i="' + i + '" cx="' + p[0].toFixed(1) + '" cy="' + p[1].toFixed(1) + '" r="2.6"/>';
+    }).join('');
     var base = '<line class="axis" x1="' + pad + '" y1="' + (h - pad) + '" x2="' + (w - pad) + '" y2="' + (h - pad) + '"/>';
-    var guide = '<line class="guide" x1="0" y1="' + pad + '" x2="0" y2="' + (h - pad) + '"/>';
+    var guide = '<line class="guide" x1="0" y1="' + padTop + '" x2="0" y2="' + (h - pad) + '"/>';
+    // 水平网格线：0 / 25% / 50% / 75% / 100%
+    var grid = [0, 0.25, 0.5, 0.75, 1].map(function (f) {
+      var y = padTop + plotH * f;
+      return '<line class="grid" x1="' + pad + '" y1="' + y.toFixed(1) + '" x2="' + (w - pad) + '" y2="' + y.toFixed(1) + '"/>';
+    }).join('');
+    // Y 轴刻度：峰值与 0
+    var yLabels = '<text class="lbl ylab" x="' + (pad - 7) + '" y="' + (padTop + 4) + '" text-anchor="end">' + esc(String(max)) + '</text>' +
+      '<text class="lbl ylab" x="' + (pad - 7) + '" y="' + (h - pad + 3) + '" text-anchor="end">0</text>';
+    var uid = 'abGrad-' + metric;
     // 时间轴刻度：约 6 个（首尾必含），格式 M/D
     var tickEvery = Math.max(1, Math.ceil(n / 6));
     var ticks = [];
@@ -1204,13 +1242,20 @@
       return '<span class="tick" style="left:' + (pts[i][0] / w * 100).toFixed(2) + '%">' + esc(days[i].date.slice(5).replace('-', '/')) + '</span>';
     }).join('');
     return '<div class="ab-chart-box" data-metric="' + metric + '">' +
-      '<svg class="ab-chart" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' + base + guide +
-      '<path class="line" d="' + path + '"/>' + dots + '</svg>' +
+      '<svg class="ab-chart" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="' + uid + '" x1="0" y1="0" x2="0" y2="1">' +
+        '<stop offset="0%" stop-color="var(--ab-primary)" stop-opacity="0.32"/>' +
+        '<stop offset="70%" stop-color="var(--ab-primary)" stop-opacity="0.06"/>' +
+        '<stop offset="100%" stop-color="var(--ab-primary)" stop-opacity="0"/>' +
+      '</linearGradient></defs>' +
+      grid + base + yLabels +
+      '<path class="area" d="' + area + '" fill="url(#' + uid + ')"/>' +
+      '<path class="line" d="' + line + '"/>' + guide + dots +
+      '</svg>' +
       '<div class="ab-axis">' + axisHtml + '</div>' +
       '<div class="ab-chart-tip"></div>' +
     '</div>';
   }
-
   /* 趋势图交互：悬停实时预览 + 点击固定浮层（时间 · 访问 · 评论） */
   function bindTrendCharts(content) {
     var W = 520, H = 200, PAD = 28;
