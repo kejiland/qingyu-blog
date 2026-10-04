@@ -10,7 +10,7 @@ import { handleSearch } from './functions/_lib/search.js';
 import { handlePostRelations } from './functions/_lib/relations.js';
 import { handlePopular } from './functions/_lib/popular.js';
 import { handlePostAnalytics } from './functions/_lib/analytics.js';
-import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleCommentLike, handleMedia, handleMediaId, handleSettings, handleAuditLog, handleTags, handleStatsSources, handleHealth, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
+import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleCommentLike, handleMedia, handleMediaId, handleSettings, handleAuditLog, handleTags, handleStatsSources, handleHealth, handleCommentsBulk, handleAdminPassword, handleStatsTrend, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
@@ -144,6 +144,11 @@ export default {
     }
     if (url.pathname === '/api/stats/trend') {
       return handleStatsTrend(request, env);
+    }
+    let cb = url.pathname.match(/^\/api\/admin\/comments\/bulk$/);
+    if (cb) {
+      if (request.method === 'OPTIONS') return corsPreflight(request, env);
+      return handleCommentsBulk(request, env);
     }
     let hc = url.pathname.match(/^\/api\/admin\/health$/);
     if (hc) {

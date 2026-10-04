@@ -1825,3 +1825,24 @@ export async function handleHealth(request, env) {
   items.push({ key: 'mail', ok: !!(env.RESEND_API_KEY && env.BLOG_MAIL_FROM && env.SITE_URL), bound: !!env.RESEND_API_KEY });
   return json({ ok: true, items: items, checkedAt: Date.now() }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
+
+/** POST /api/admin/comments/bulk（需登录）：批量通过 / 待审 / 删除 */
+export async function handleCommentsBulk(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  const body = (await request.json().catch(() => null)) || {};
+  const op = String(body.op || '');
+  const ids = Array.isArray(body.ids) ? body.ids.map(String).filter(Boolean).slice(0, 200) : [];
+  if (!ids.length || ['approve', 'pending', 'delete'].indexOf(op) < 0) {
+    return json({ error: '参数不完整' }, 400, request, env);
+  }
+  const stmts = ids.map(function (id) {
+    if (op === 'delete') return { sql: 'DELETE FROM comments WHERE id = ?', params: [id] };
+    return { sql: 'UPDATE comments SET status = ? WHERE id = ?', params: [op === 'approve' ? 'approved' : 'pending', id] };
+  });
+  await dbBatch(env.DB, stmts);
+  await recordAudit(env, request, 'comment.bulk', op + ' x' + ids.length);
+  return json({ ok: true, updated: ids.length, op: op }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}

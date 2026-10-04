@@ -2862,7 +2862,20 @@
     content.innerHTML += '<div class="ab-toolbar">' +
       '<div class="ab-search"><input class="ab-input" id="abCmtKw" placeholder="' + t('admin.comments.search') + '"></div>' +
       '<select class="ab-select" id="abCmtFilter" style="max-width:160px"><option value="all">' + t('admin.comments.all') + '</option><option value="pending"' + (filter === 'pending' ? ' selected' : '') + '>' + t('admin.comments.pendingStatus') + '</option><option value="approved">' + t('admin.comments.approved') + '</option></select>' +
-      '</div><div id="abAiComments" class="ab-ai-comments"></div><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.comments.colAuthor') + '</th><th>' + t('admin.comments.colContent') + '</th><th>' + t('admin.comments.colPost') + '</th><th>' + t('admin.comments.colDate') + '</th><th>' + t('comment.like') + '</th><th>' + t('admin.comments.colStatus') + '</th><th class="col-actions">' + t('admin.comments.colActions') + '</th></tr></thead><tbody id="abCmtBody"></tbody></table></div>';
+      '</div><div class="ab-ai-comments" id="abAiComments"></div><div class="ab-bulk" id="abCmtBulk" style="display:none"><span class="ab-muted" id="abCmtSelInfo"></span><button class="ab-btn sm primary" id="abCmtApprove">' + icon('check', 13) + ' ' + t('admin.comments.bulkApprove') + '</button><button class="ab-btn sm" id="abCmtPending">' + icon('clock', 13) + ' ' + t('admin.comments.bulkPending') + '</button><button class="ab-btn sm danger" id="abCmtDelete">' + icon('trash', 13) + ' ' + t('admin.comments.bulkDelete') + '</button></div><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th class="col-check"><input type="checkbox" id="abCmtAll" aria-label="' + t('admin.comments.selectPage') + '"></th><th>' + t('admin.comments.colAuthor') + '</th><th>' + t('admin.comments.colContent') + '</th><th>' + t('admin.comments.colPost') + '</th><th>' + t('admin.comments.colDate') + '</th><th>' + t('comment.like') + '</th><th>' + t('admin.comments.colStatus') + '</th><th class="col-actions">' + t('admin.comments.colActions') + '</th></tr></thead><tbody id="abCmtBody"></tbody></table></div>';
+    var cmtSel = cmtSelMap;
+    content.querySelector('#abCmtApprove').addEventListener('click', function () { bulkCommentOp(content, 'approve', filter); });
+    content.querySelector('#abCmtPending').addEventListener('click', function () { bulkCommentOp(content, 'pending', filter); });
+    content.querySelector('#abCmtDelete').addEventListener('click', function () { bulkCommentOp(content, 'delete', filter); });
+    content.querySelector('#abCmtAll').addEventListener('change', function () {
+      var on = this.checked;
+      content.querySelectorAll('#abCmtBody [data-cpick]').forEach(function (cb) {
+        var id = dec(cb.getAttribute('data-cpick'));
+        if (on) cmtSelMap[id] = 1; else delete cmtSelMap[id];
+        cb.checked = on;
+      });
+      syncCmtSelection(content);
+    });
     bindComments(content);
     loadComments(content, filter);
     initAbAiComments(content);
@@ -2873,6 +2886,32 @@
     kw.addEventListener('input', debounce(function () { loadComments(content, f.value); }, 250));
     f.addEventListener('change', function () { loadComments(content, f.value); });
   }
+  var cmtSelMap = {};
+  function syncCmtSelection(content) {
+    var ids = Object.keys(cmtSelMap);
+    var bar = content.querySelector('#abCmtBulk');
+    var info = content.querySelector('#abCmtSelInfo');
+    if (bar) bar.style.display = ids.length ? 'flex' : 'none';
+    if (info) info.textContent = t('admin.comments.bulkSelected', { n: ids.length });
+  }
+  async function bulkCommentOp(content, op, filter) {
+    var ids = Object.keys(cmtSelMap);
+    if (!ids.length) return;
+    var run = async function () {
+      try {
+        await api('api/admin/comments/bulk', { method: 'POST', body: JSON.stringify({ op: op, ids: ids }) });
+        toast(t('admin.comments.bulkDone', { n: ids.length }), 'ok');
+        cmtSelMap = {};
+        loadComments(content, filter);
+      } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
+    };
+    if (op === 'delete') {
+      confirmModal(t('admin.comments.bulkDelete'), '<p class="ab-muted">' + t('admin.comments.bulkDeleteConfirm', { n: ids.length }) + '</p>', run, t('admin.comments.delete'));
+      return;
+    }
+    run();
+  }
+
   async function loadComments(content, filter) {
     var body = content.querySelector('#abCmtBody');
     if (!body) return;
@@ -2904,7 +2943,9 @@
       actions += '<button class="ab-btn sm' + (pinned ? ' primary' : '') + '" data-pin="' + enc(c.id) + '" data-on="' + (pinned ? '1' : '0') + '">' + icon('pin', 13) + ' ' + (pinned ? t('comment.unpinComment') : t('comment.pinComment')) + '</button> ';
       actions += '<button class="ab-btn sm' + (featured ? ' primary' : '') + '" data-feat="' + enc(c.id) + '" data-on="' + (featured ? '1' : '0') + '">' + icon('star', 13) + ' ' + (featured ? t('comment.unfeature') : t('comment.feature')) + '</button> ';
       actions += '<button class="ab-btn sm danger" data-delcmt="' + enc(c.id) + '">' + icon('trash', 13) + ' ' + t('admin.comments.delete') + '</button>';
-      return '<tr' + (pinned ? ' class="ab-cmt-pinned"' : '') + '>' +
+      var picked = !!cmtSel[c.id];
+      return '<tr' + (pinned ? ' class="ab-cmt-pinned"' : '') + (picked ? ' class-selected' : '') + '>' +
+        '<td class="col-check"><input type="checkbox" data-cpick="' + enc(c.id) + '"' + (picked ? ' checked' : '') + '></td>' +
         '<td>' + esc(c.author || t('admin.comments.anonymous')) + '</td>' +
         '<td style="max-width:320px">' + esc((c.content || '').slice(0, 120)) + replyTag + badges + '</td>' +
         '<td>' + esc(c.post_title || c.post_id || '—') + '</td>' +
@@ -2914,6 +2955,14 @@
         '<td class="col-actions">' + actions + '</td>' +
       '</tr>';
     }).join('');
+    body.querySelectorAll('[data-cpick]').forEach(function (cb) {
+      cb.addEventListener('change', function () {
+        var id = dec(cb.getAttribute('data-cpick'));
+        if (cb.checked) cmtSelMap[id] = 1; else delete cmtSelMap[id];
+        syncCmtSelection(content);
+      });
+    });
+    syncCmtSelection(content);
     body.querySelectorAll('[data-approve]').forEach(function (b) { b.addEventListener('click', function () { approveComment(content, dec(b.getAttribute('data-approve')), filter, b.closest('tr')); }); });
     body.querySelectorAll('[data-pin]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'pinned'); }); });
     body.querySelectorAll('[data-feat]').forEach(function (b) { b.addEventListener('click', function () { toggleCommentFlag(content, b, 'featured'); }); });

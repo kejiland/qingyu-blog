@@ -2258,6 +2258,22 @@ tests.push(['health check api', async () => {
   ['db','kv','r2media','r2backup','ai','mail'].forEach(function (k) { assert.ok(keys.indexOf(k) >= 0, 'has ' + k); });
 }]);
 
+tests.push(['bulk comment ops', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-cb';
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer tok-cb' };
+  env._d1.comments.set('cb1', { id: 'cb1', post_id: 'p', status: 'pending', __rowid: 1 });
+  env._d1.comments.set('cb2', { id: 'cb2', post_id: 'p', status: 'pending', __rowid: 2 });
+  let r = await core.handleCommentsBulk(new Request('http://t/api/admin/comments/bulk', { method: 'POST', headers: auth, body: JSON.stringify({ op: 'approve', ids: ['cb1', 'cb2'] }) }), env);
+  assert.strictEqual(r.status, 200, 'approve ok');
+  assert.strictEqual(env._d1.comments.get('cb1').status, 'approved', 'status updated');
+  r = await core.handleCommentsBulk(new Request('http://t/api/admin/comments/bulk', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ op: 'approve', ids: ['cb1'] }) }), env);
+  assert.strictEqual(r.status, 401, 'auth required');
+  await core.handleCommentsBulk(new Request('http://t/api/admin/comments/bulk', { method: 'POST', headers: auth, body: JSON.stringify({ op: 'delete', ids: ['cb2'] }) }), env);
+  assert.strictEqual(env._d1.comments.has('cb2'), false, 'deleted');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');
