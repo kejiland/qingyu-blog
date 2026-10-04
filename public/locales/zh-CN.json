@@ -890,5 +890,18 @@
   "admin.subscribers.broadcastQueued": "已加入发送队列：{n} 位订阅者",
   "admin.subscribers.broadcastEmpty": "没有符合条件的已确认订阅者",
   "admin.subscribers.broadcastFail": "群发失败：",
-  "admin.subscribers.broadcastMailDisabled": "邮件服务未配置，无法群发"
+  "admin.subscribers.broadcastMailDisabled": "邮件服务未配置，无法群发",
+  "admin.settings.features": "功能开关",
+  "admin.settings.featPaging": "首页分页",
+  "admin.settings.featPageSize": "每页文章数",
+  "admin.settings.featPageSizeHint": "设为 0 表示不分页、全部显示",
+  "admin.settings.featAds": "广告位",
+  "admin.settings.featAdsEnable": "启用广告位",
+  "admin.settings.featAdsEnableHint": "关闭时前台完全不输出广告代码",
+  "admin.settings.featAdsClient": "AdSense 客户端 ID",
+  "admin.settings.featAdsBelow": "首页列表上方代码",
+  "admin.settings.featAdsBetween": "首页列表间隔代码",
+  "admin.settings.featAdsBetweenEvery": "间隔篇数",
+  "admin.settings.featAdsContent": "文章详情底部代码",
+  "admin.settings.featAdsCodeHint": "代码为原始 HTML/脚本，请自行保证安全"
 }

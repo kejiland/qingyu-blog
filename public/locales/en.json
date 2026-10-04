@@ -890,5 +890,18 @@
   "admin.subscribers.broadcastQueued": "Queued for {n} subscriber(s)",
   "admin.subscribers.broadcastEmpty": "No confirmed subscribers match",
   "admin.subscribers.broadcastFail": "Broadcast failed: ",
-  "admin.subscribers.broadcastMailDisabled": "Mail service is not configured; broadcasting is unavailable"
+  "admin.subscribers.broadcastMailDisabled": "Mail service is not configured; broadcasting is unavailable",
+  "admin.settings.features": "Feature switches",
+  "admin.settings.featPaging": "Home pagination",
+  "admin.settings.featPageSize": "Posts per page",
+  "admin.settings.featPageSizeHint": "Set to 0 to disable paging and show all posts",
+  "admin.settings.featAds": "Ad slots",
+  "admin.settings.featAdsEnable": "Enable ads",
+  "admin.settings.featAdsEnableHint": "When off, no ad code is emitted at all",
+  "admin.settings.featAdsClient": "AdSense client ID",
+  "admin.settings.featAdsBelow": "Code above the home list",
+  "admin.settings.featAdsBetween": "Code between home list items",
+  "admin.settings.featAdsBetweenEvery": "Insert every N posts",
+  "admin.settings.featAdsContent": "Code at the bottom of posts",
+  "admin.settings.featAdsCodeHint": "Raw HTML/script is inserted as-is — make sure it is safe"
 }

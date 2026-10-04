@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.44';
+var BLOG_VERSION = '2.10.45';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -994,20 +994,26 @@ function getConfig() {
   var footer = cfg.footer || {};
   if (siteInfo.copyright) footer = Object.assign({}, footer, { copyrightName: siteInfo.copyright });
   if (siteInfo.footerText) footer = Object.assign({}, footer, { decl: siteInfo.footerText });
+  // 后台「功能开关」保存的运行时配置（site_settings.features）：首页分页 / 广告位
+  // 覆盖 config.js 的默认值，站长无需改代码即可开关。
+  var features = (s && s.features != null) ? parseJsonSafe(s.features) : {};
+  var featAds = (features && typeof features.ads === 'object' && features.ads) ? features.ads : {};
+  var ads = Object.assign({}, cfg.ads || {}, featAds);
+  var featPageSize = (features && features.pageSize != null && Number(features.pageSize) >= 0) ? Math.floor(Number(features.pageSize)) : null;
   return {
     mode: cfg.mode || 'auto',
     apiBase: cfg.apiBase || '',
     siteUrl: cfg.siteUrl || (typeof location !== 'undefined' ? location.origin : ''),
     writeToken: cfg.writeToken || '',
     adminPwd: cfg.adminPwd || '',
-    pageSize: (typeof cfg.pageSize === 'number' && cfg.pageSize >= 0) ? cfg.pageSize : 8,
+    pageSize: (featPageSize != null) ? featPageSize : ((typeof cfg.pageSize === 'number' && cfg.pageSize >= 0) ? cfg.pageSize : 8),
     nav: parseArrSafe(s && s.nav_menu),
     footerNav: parseArrSafe(s && s.footer_nav),
     friendLinks: parseArrSafe(s && s.friend_links),
     footer: footer,
     site: siteInfo,        // 站点信息（头像/名称/简介）供关于页等使用
     profile: prof,         // 个人信息（头像/昵称/简介/邮箱）供关于页等使用
-    ads: cfg.ads || {}
+    ads: ads
   };
 }
 

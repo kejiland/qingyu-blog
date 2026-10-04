@@ -890,5 +890,18 @@
   "admin.subscribers.broadcastQueued": "कतार में जोड़ा गया: {n} ग्राहक",
   "admin.subscribers.broadcastEmpty": "कोई पुष्ट ग्राहक मेल नहीं खाता",
   "admin.subscribers.broadcastFail": "ब्रॉडकास्ट विफल: ",
-  "admin.subscribers.broadcastMailDisabled": "मेल सेवा कॉन्फ़िगर नहीं है, ब्रॉडकास्ट उपलब्ध नहीं"
+  "admin.subscribers.broadcastMailDisabled": "मेल सेवा कॉन्फ़िगर नहीं है, ब्रॉडकास्ट उपलब्ध नहीं",
+  "admin.settings.features": "फ़ीचर स्विच",
+  "admin.settings.featPaging": "होम पेजिनेशन",
+  "admin.settings.featPageSize": "प्रति पृष्ठ पोस्ट",
+  "admin.settings.featPageSizeHint": "0 पर सेट करने पर पेजिनेशन बंद और सभी पोस्ट दिखेंगे",
+  "admin.settings.featAds": "विज्ञापन स्लॉट",
+  "admin.settings.featAdsEnable": "विज्ञापन सक्षम करें",
+  "admin.settings.featAdsEnableHint": "बंद होने पर विज्ञापन कोड बिल्कुल नहीं डाला जाएगा",
+  "admin.settings.featAdsClient": "AdSense क्लाइंट ID",
+  "admin.settings.featAdsBelow": "होम सूची के ऊपर कोड",
+  "admin.settings.featAdsBetween": "होम सूची के बीच का कोड",
+  "admin.settings.featAdsBetweenEvery": "हर N पोस्ट पर डालें",
+  "admin.settings.featAdsContent": "पोस्ट के नीचे का कोड",
+  "admin.settings.featAdsCodeHint": "कच्चा HTML/स्क्रिप्ट यथावत डाला जाता है — सुरक्षा स्वयं जाँचें"
 }

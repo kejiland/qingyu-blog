@@ -4080,6 +4080,7 @@
     if (!cloudOn()) return;
     content.innerHTML += '<div class="ab-tabs">' +
       '<div class="ab-tab active" data-tab="site">' + t('admin.settings.siteInfo') + '</div>' +
+      '<div class="ab-tab" data-tab="features">' + t('admin.settings.features') + '</div>' +
       '<div class="ab-tab" data-tab="profile">' + t('admin.settings.profile') + '</div>' +
       '<div class="ab-tab" data-tab="nav">' + t('admin.settings.navMenu') + '</div>' +
       '<div class="ab-tab" data-tab="footerNav">' + t('admin.settings.footerNav') + '</div>' +
@@ -4092,7 +4093,7 @@
   }
   var settingsCache = {};
   // 内存草稿：各 tab 未保存的输入在此暂存，切换 tab 不丢失数据
-  var settingsDraft = { site: {}, profile: {}, nav: [], footerNav: [], links: [] };
+  var settingsDraft = { site: {}, features: { pageSize: 8, ads: {} }, profile: {}, nav: [], footerNav: [], links: [] };
   async function loadSettings(content) {
     try { var d = await api('api/settings'); settingsCache = (d && d.settings) || {}; } catch (e) { settingsCache = {}; }
     // 同步到前台全局变量，确保前台渲染时读取到最新的站点设置
@@ -4120,6 +4121,7 @@
       announceClosable: site.announceClosable !== false,
       moderate: s.moderate_comments === '1'
     };
+    syncFeaturesDraft();
     settingsDraft.profile = {
       name: prof.name || '', bio: prof.bio || '', avatar: prof.avatar || '', email: prof.email || ''
     };
@@ -4160,6 +4162,17 @@
     return fallback;
   }
   // 从当前 DOM 把可见 tab 的输入保存进草稿（tab 切换/保存前调用，保证不丢数据）
+  function syncFeaturesDraft() {
+    var feat = safeJson(settingsCache.features);
+    var cfgNow = cfg() || {};
+    var baseAds = (cfgNow.ads && typeof cfgNow.ads === 'object') ? cfgNow.ads : {};
+    var featAds = (feat && typeof feat.ads === 'object' && feat.ads) ? feat.ads : {};
+    var baseSize = Number(cfgNow.pageSize);
+    settingsDraft.features = {
+      pageSize: (feat && feat.pageSize != null) ? Number(feat.pageSize) : (isFinite(baseSize) && baseSize >= 0 ? Math.floor(baseSize) : 8),
+      ads: Object.assign({}, baseAds, featAds)
+    };
+  }
   function saveTabToDraft(content) {
     if (content.querySelector('#abSiteName') !== null) {
       settingsDraft.site = {
@@ -4180,6 +4193,22 @@
       settingsDraft.profile = {
         name: val(content, '#abProfileName'), bio: val(content, '#abProfileBio'),
         avatar: val(content, '#abProfileAvatar'), email: val(content, '#abProfileEmail')
+      };
+    }
+    if (content.querySelector('#abFeatPageSize') !== null) {
+      var psRaw = val(content, '#abFeatPageSize');
+      var prevSize = (settingsDraft.features && settingsDraft.features.pageSize != null) ? settingsDraft.features.pageSize : 8;
+      var everyRaw = val(content, '#abAdsBetweenEvery');
+      settingsDraft.features = {
+        pageSize: psRaw === '' ? prevSize : Math.max(0, Math.floor(Number(psRaw) || 0)),
+        ads: {
+          enabled: content.querySelector('#abAdsEnabled') ? content.querySelector('#abAdsEnabled').checked : false,
+          client: val(content, '#abAdsClient').trim(),
+          belowSearch: val(content, '#abAdsBelowSearch'),
+          between: val(content, '#abAdsBetween'),
+          betweenEvery: Math.max(1, Math.floor(Number(everyRaw) || 3)),
+          content: val(content, '#abAdsContent')
+        }
       };
     }
     if (content.querySelector('#abNavVisual')) collectNavFromDom(content);
@@ -4245,6 +4274,15 @@
     if (content.querySelector('#abAnnounceLink')) content.querySelector('#abAnnounceLink').value = site.announceLink || '';
     if (content.querySelector('#abAnnounceLinkText')) content.querySelector('#abAnnounceLinkText').value = site.announceLinkText || '';
     if (content.querySelector('#abAnnounceClosable')) content.querySelector('#abAnnounceClosable').checked = site.announceClosable !== false;
+    var feat = settingsDraft.features || {};
+    var fads = feat.ads || {};
+    if (content.querySelector('#abFeatPageSize')) content.querySelector('#abFeatPageSize').value = (feat.pageSize != null ? feat.pageSize : '');
+    if (content.querySelector('#abAdsEnabled')) content.querySelector('#abAdsEnabled').checked = !!fads.enabled;
+    if (content.querySelector('#abAdsClient')) content.querySelector('#abAdsClient').value = fads.client || '';
+    if (content.querySelector('#abAdsBelowSearch')) content.querySelector('#abAdsBelowSearch').value = fads.belowSearch || '';
+    if (content.querySelector('#abAdsBetween')) content.querySelector('#abAdsBetween').value = fads.between || '';
+    if (content.querySelector('#abAdsBetweenEvery')) content.querySelector('#abAdsBetweenEvery').value = (fads.betweenEvery != null ? fads.betweenEvery : 3);
+    if (content.querySelector('#abAdsContent')) content.querySelector('#abAdsContent').value = fads.content || '';
     if (content.querySelector('#abProfileName')) content.querySelector('#abProfileName').value = prof.name || '';
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
@@ -4271,6 +4309,19 @@
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.announceLinkText') + '</label><input class="ab-input" id="abAnnounceLinkText"></div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAnnounceClosable"> ' + t('admin.settings.announceClosable') + '</label></div>' +
       '</div>';
+    } else if (tab === 'features') {
+      body.innerHTML = '<div class="ab-card" style="max-width:700px">' +
+        '<div class="ab-section-title">' + icon('doc', 15) + ' ' + t('admin.settings.featPaging') + '</div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featPageSize') + '</label><input class="ab-input" id="abFeatPageSize" type="number" min="0" step="1" style="max-width:180px"><label class="ab-hint">' + t('admin.settings.featPageSizeHint') + '</label></div>' +
+        '<div class="ab-section-title" style="margin-top:16px">' + icon('spark', 15) + ' ' + t('admin.settings.featAds') + '</div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAdsEnabled"> ' + t('admin.settings.featAdsEnable') + '</label><label class="ab-hint">' + t('admin.settings.featAdsEnableHint') + '</label></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsClient') + '</label><input class="ab-input" id="abAdsClient" placeholder="ca-pub-xxxxxxxxxxxxxxxx"></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsBelow') + '</label><textarea class="ab-textarea" id="abAdsBelowSearch" style="min-height:80px"></textarea></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsBetween') + '</label><textarea class="ab-textarea" id="abAdsBetween" style="min-height:80px"></textarea></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsBetweenEvery') + '</label><input class="ab-input" id="abAdsBetweenEvery" type="number" min="1" step="1" style="max-width:180px"></div>' +
+        '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsContent') + '</label><textarea class="ab-textarea" id="abAdsContent" style="min-height:80px"></textarea></div>' +
+        '<label class="ab-hint">' + t('admin.settings.featAdsCodeHint') + '</label>' +
+        '</div>';
     } else if (tab === 'profile') {
       body.innerHTML = '<div class="ab-card" style="max-width:620px">' +
         '<div class="ab-avatar-edit"><img class="ab-avatar-prev" id="abProfPrev" src=""><div><div class="ab-label" style="margin:0">' + t('admin.settings.profileAvatar') + '</div><div class="ab-hint">' + t('admin.settings.avatarUrl') + '</div></div></div>' +
@@ -4361,6 +4412,10 @@
       friend_links: JSON.stringify(Array.isArray(settingsDraft.links) ? settingsDraft.links : []),
       moderate_comments: site.moderate ? '1' : '0',
       comment_blocklist: String(settingsDraft.blocklist || ''),
+      features: JSON.stringify({
+        pageSize: (settingsDraft.features && settingsDraft.features.pageSize != null) ? settingsDraft.features.pageSize : 8,
+        ads: (settingsDraft.features && settingsDraft.features.ads) || {}
+      })
     };
     try {
       await api('api/settings', { method: 'PUT', body: JSON.stringify(payload) });
@@ -4368,7 +4423,7 @@
       settingsCache = Object.assign({}, settingsCache, {
         site_info: JSON.stringify(payload.site_info), profile: JSON.stringify(payload.profile),
         nav_menu: payload.nav_menu, footer_nav: payload.footer_nav, friend_links: payload.friend_links,
-        moderate_comments: payload.moderate_comments
+        moderate_comments: payload.moderate_comments, features: payload.features
       });
       // 同步到前台全局变量，使站点名称/导航/页脚/友链等设置立即生效（无需刷新整页）
       window._siteSettings = settingsCache;

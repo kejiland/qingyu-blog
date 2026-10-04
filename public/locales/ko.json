@@ -890,5 +890,18 @@
   "admin.subscribers.broadcastQueued": "발송 대기열에 추가됨: {n}명",
   "admin.subscribers.broadcastEmpty": "조건에 맞는 확인된 구독자가 없습니다",
   "admin.subscribers.broadcastFail": "단체 메일 실패: ",
-  "admin.subscribers.broadcastMailDisabled": "메일 서비스가 설정되지 않아 발송할 수 없습니다"
+  "admin.subscribers.broadcastMailDisabled": "메일 서비스가 설정되지 않아 발송할 수 없습니다",
+  "admin.settings.features": "기능 스위치",
+  "admin.settings.featPaging": "홈 페이지 나누기",
+  "admin.settings.featPageSize": "페이지당 글 수",
+  "admin.settings.featPageSizeHint": "0으로 설정하면 페이지 나누기 없이 모두 표시",
+  "admin.settings.featAds": "광고 슬롯",
+  "admin.settings.featAdsEnable": "광고 사용",
+  "admin.settings.featAdsEnableHint": "끄면 광고 코드가 전혀 출력되지 않습니다",
+  "admin.settings.featAdsClient": "AdSense 클라이언트 ID",
+  "admin.settings.featAdsBelow": "홈 목록 상단 코드",
+  "admin.settings.featAdsBetween": "홈 목록 사이 코드",
+  "admin.settings.featAdsBetweenEvery": "삽입 간격(글 수)",
+  "admin.settings.featAdsContent": "글 하단 코드",
+  "admin.settings.featAdsCodeHint": "원시 HTML/스크립트가 그대로 삽입됩니다. 안전성을 직접 확인하세요"
 }

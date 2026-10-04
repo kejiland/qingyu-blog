@@ -890,5 +890,18 @@
   "admin.subscribers.broadcastQueued": "送信キューに追加しました：{n} 名",
   "admin.subscribers.broadcastEmpty": "条件に合う確認済み購読者がいません",
   "admin.subscribers.broadcastFail": "一斉配信に失敗しました：",
-  "admin.subscribers.broadcastMailDisabled": "メールサービスが未設定のため一斉配信できません"
+  "admin.subscribers.broadcastMailDisabled": "メールサービスが未設定のため一斉配信できません",
+  "admin.settings.features": "機能スイッチ",
+  "admin.settings.featPaging": "ホームのページング",
+  "admin.settings.featPageSize": "1ページの記事数",
+  "admin.settings.featPageSizeHint": "0 にするとページングせず全件表示",
+  "admin.settings.featAds": "広告枠",
+  "admin.settings.featAdsEnable": "広告を有効化",
+  "admin.settings.featAdsEnableHint": "オフにすると広告コードを一切出力しません",
+  "admin.settings.featAdsClient": "AdSense クライアント ID",
+  "admin.settings.featAdsBelow": "ホーム一覧上部のコード",
+  "admin.settings.featAdsBetween": "ホーム一覧の間に挿入するコード",
+  "admin.settings.featAdsBetweenEvery": "挿入間隔（記事数）",
+  "admin.settings.featAdsContent": "記事下部のコード",
+  "admin.settings.featAdsCodeHint": "生の HTML/スクリプトをそのまま挿入します。安全性はご自身で確認してください"
 }

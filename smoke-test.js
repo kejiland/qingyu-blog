@@ -1714,6 +1714,37 @@ tests.push(['广告位：默认关闭不输出；配置后出现在首页与详�
   assert.ok(detail.html.includes('END'), '详情底部广告');
 }]);
 
+/* 后台「功能开关」：site_settings.features 覆盖 config.js 的 pageSize / 广告位 */
+tests.push(['功能开关（后台）：features 覆盖 pageSize / 广告位并可即时关闭', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static', siteUrl: 'https://blog.example', pageSize: 5, ads: { enabled: false, betweenEvery: 3, content: '<p>CFG</p>' } } });
+  b.ctx._siteSettings = {
+    features: JSON.stringify({ pageSize: 3, ads: { enabled: true, client: 'ca-pub-test', belowSearch: '<p>SITEAD</p>', between: '<p>MID</p>', betweenEvery: 1 } })
+  };
+  const config = b.ctx.getConfig();
+  assert.strictEqual(config.pageSize, 3, '后台覆盖首页每页文章数');
+  assert.strictEqual(config.ads.enabled, true, '后台开启广告位');
+  assert.strictEqual(config.ads.client, 'ca-pub-test', '后台写入 AdSense 客户端 ID');
+  assert.strictEqual(config.ads.content, '<p>CFG</p>', '未覆盖的广告位保留 config.js 默认（深合并）');
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.indexOf('SITEAD') >= 0 && html.indexOf('MID') >= 0, '后台开启后首页输出广告位');
+  b.ctx._siteSettings = { features: JSON.stringify({ pageSize: 3, ads: { enabled: false } }) };
+  await b.ctx.route();
+  const html2 = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html2.indexOf('SITEAD') < 0, '后台关闭后不再输出广告');
+}]);
+
+/* 后台设置页：功能开关标签与控件已接入 */
+tests.push(['后台设置：新增「功能开关」标签页（分页 / 广告位）', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.indexOf('data-tab="features"') >= 0, '功能开关标签');
+  assert.ok(src.indexOf('id="abFeatPageSize"') >= 0, '每页文章数输入');
+  assert.ok(src.indexOf('id="abAdsEnabled"') >= 0, '广告总开关');
+  assert.ok(src.indexOf('id="abAdsClient"') >= 0, 'AdSense 客户端 ID');
+  assert.ok(src.indexOf('features: JSON.stringify({') >= 0, '保存 features 配置');
+  assert.ok(src.indexOf('syncFeaturesDraft') >= 0, '载入 features 草稿');
+}]);
+
 tests.push(['API：评论 POST / GET / 校验 / 删除（需令牌）', async () => {
   const core = await import('./functions/_lib/api-core.js');
   const env = mockEnv();
