@@ -35,9 +35,9 @@
 
 这些行为来自：
 
-- [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
-- [functions/_lib/music.js](functions/_lib/music.js)
-- [functions/_lib/media.js](functions/_lib/media.js)
+- [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
+- [functions/_lib/music.js](../functions/_lib/music.js)
+- [functions/_lib/media.js](../functions/_lib/media.js)
 
 ## 3. 在 GitHub 中添加入口
 

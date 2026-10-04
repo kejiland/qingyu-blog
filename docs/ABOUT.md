@@ -88,7 +88,7 @@ worker.js         → Workers 入口
 
 ## 许可证
 
-[MIT License](LICENSE) — 自由使用、修改、分发。
+[MIT License](../LICENSE) — 自由使用、修改、分发。
 
 ---
 

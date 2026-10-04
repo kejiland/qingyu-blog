@@ -88,7 +88,7 @@ worker.js         → Workers entry point
 
 ## License
 
-[MIT License](LICENSE) — free to use, modify and distribute.
+[MIT License](../LICENSE) — free to use, modify and distribute.
 
 ---
 

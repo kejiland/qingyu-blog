@@ -35,9 +35,9 @@ The easiest things to confuse are the Cloudflare API Token and the R2 S3 credent
 
 These behaviours come from:
 
-- [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
-- [functions/_lib/music.js](functions/_lib/music.js)
-- [functions/_lib/media.js](functions/_lib/media.js)
+- [.github/workflows/deploy.yml](../.github/workflows/deploy.yml)
+- [functions/_lib/music.js](../functions/_lib/music.js)
+- [functions/_lib/media.js](../functions/_lib/media.js)
 
 ## 3. Adding Entries in GitHub
 

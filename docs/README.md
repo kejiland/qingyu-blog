@@ -1,7 +1,7 @@
 > 🌐 **中文** · [English](README_EN.md)
 
 <p align="center">
-  <img src="screenshots/home.png" alt="Qingyu'Blog" width="100%" />
+  <img src="../screenshots/home.png" alt="Qingyu'Blog" width="100%" />
 </p>
 
 <h1 align="center">Qingyu'Blog</h1>
@@ -342,39 +342,39 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 
 | 首页（浅色 · 含标签筛选、置顶徽章、封面缩略图） | 文章详情（TOC、表格、代码块） | 站内搜索（关键字高亮 + 句子上下文） |
 | --- | --- | --- |
-| ![首页](screenshots/home.png) | ![文章详情](screenshots/detail.png) | ![搜索](screenshots/search.png) |
+| ![首页](../screenshots/home.png) | ![文章详情](../screenshots/detail.png) | ![搜索](../screenshots/search.png) |
 
 | 标签云 | 归档（按年月分组） | 留言板 |
 | --- | --- | --- |
-| ![标签](screenshots/tags.png) | ![归档](screenshots/archive.png) | ![留言板](screenshots/guestbook.png) |
+| ![标签](../screenshots/tags.png) | ![归档](../screenshots/archive.png) | ![留言板](../screenshots/guestbook.png) |
 
 | 首页（深色） | 文章（深色） | 移动端 |
 | --- | --- | --- |
-| ![首页深色](screenshots/home-dark.png) | ![文章深色](screenshots/detail-dark.png) | ![移动端](screenshots/mobile.png) |
+| ![首页深色](../screenshots/home-dark.png) | ![文章深色](../screenshots/detail-dark.png) | ![移动端](../screenshots/mobile.png) |
 
 | 全站音乐播放器（点击右下角按钮弹出的面板） |
 | --- |
-| ![音乐播放器](screenshots/music-player.png) |
+| ![音乐播放器](../screenshots/music-player.png) |
 
 ### 管理后台
 
 | 登录门禁（首次部署可用安装密钥初始化） | 仪表盘（6 张统计卡 + 30 天趋势图） | 深色模式 |
 | --- | --- | --- |
-| ![登录](screenshots/admin-gate.png) | ![仪表盘](screenshots/admin.png) | ![后台深色](screenshots/admin-dark.png) |
+| ![登录](../screenshots/admin-gate.png) | ![仪表盘](../screenshots/admin.png) | ![后台深色](../screenshots/admin-dark.png) |
 
 | 文章管理 | 编辑器（Markdown 实时预览 + AI 写作助手） | 评论管理 |
 | --- | --- | --- |
-| ![文章管理](screenshots/admin-posts.png) | ![编辑器](screenshots/write.png) | ![评论管理](screenshots/admin-list.png) |
+| ![文章管理](../screenshots/admin-posts.png) | ![编辑器](../screenshots/write.png) | ![评论管理](../screenshots/admin-list.png) |
 
 | 媒体资源库 | 音乐管理（行内试听 + 表头吸顶） | 博客设置 | 标签管理 |
 | --- | --- | --- | --- |
-| ![媒体资源](screenshots/admin-media.png) | ![音乐管理](screenshots/music-admin.png) | ![博客设置](screenshots/admin-settings.png) | ![标签管理](screenshots/admin-tags.png) |
+| ![媒体资源](../screenshots/admin-media.png) | ![音乐管理](../screenshots/music-admin.png) | ![博客设置](../screenshots/admin-settings.png) | ![标签管理](../screenshots/admin-tags.png) |
 
 ### 衬线排版预览
 
 | 首页（浅色） | 文章（浅色） | 文章（深色） |
 | --- | --- | --- |
-| ![首页浅色](screenshots/font-preview/home-light.png) | ![文章浅色](screenshots/font-preview/article-light.png) | ![文章深色](screenshots/font-preview/article-dark.png) |
+| ![首页浅色](../screenshots/font-preview/home-light.png) | ![文章浅色](../screenshots/font-preview/article-light.png) | ![文章深色](../screenshots/font-preview/article-dark.png) |
 
 > 🔧 截图由 `scripts/screenshots/capture.mjs` 用无头 Chrome 打开本地演示服务器（内置示例文章 / 评论 / 音乐数据）自动生成，**界面是 `public/` 的真实代码**，数据为演示内容。
 > 重新生成：`npm i -D puppeteer-core && node scripts/screenshots/capture.mjs`
@@ -502,17 +502,18 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── smoke-test.js                      # 冒烟测试（158 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
 ├── search-verify.js                   # 搜索专项验证（25 例）
-├── README.md                          # 中文说明（本文件）
-├── README_EN.md                       # 英文说明
-├── CLOUDFLARE_SETUP_GUIDE.md          # Cloudflare 配置完全指南（新手版·中文）
-├── CLOUDFLARE_SETUP_GUIDE_EN.md       # 同上 · 英文
-├── DEPLOYMENT_SECRETS_GUIDE.md        # GitHub Secrets 与 R2 令牌详解·中文
-├── DEPLOYMENT_SECRETS_GUIDE_EN.md     # 同上 · 英文
-├── SECURITY.md / SECURITY_EN.md       # 安全策略（中 / 英）
-├── CODE_OF_CONDUCT.md                 # 行为准则 · 中文
-├── CODE_OF_CONDUCT_EN.md              # 行为准则 · 英文
-├── ABOUT.md / ABOUT_EN.md             # 项目简介（中 / 英）
-├── CONTRIBUTING.md                    # 贡献指南（单文件内中英对照）
+├── docs/                              # 项目说明文档（中英双语）
+│   ├── README.md                      # 中文说明（本文件）
+│   ├── README_EN.md                   # 英文说明
+│   ├── CLOUDFLARE_SETUP_GUIDE.md      # Cloudflare 配置完全指南（新手版·中文）
+│   ├── CLOUDFLARE_SETUP_GUIDE_EN.md   # 同上 · 英文
+│   ├── DEPLOYMENT_SECRETS_GUIDE.md    # GitHub Secrets 与 R2 令牌详解·中文
+│   ├── DEPLOYMENT_SECRETS_GUIDE_EN.md # 同上 · 英文
+│   ├── SECURITY.md / SECURITY_EN.md   # 安全策略（中 / 英）
+│   ├── CODE_OF_CONDUCT.md             # 行为准则 · 中文
+│   ├── CODE_OF_CONDUCT_EN.md          # 行为准则 · 英文
+│   ├── ABOUT.md / ABOUT_EN.md         # 项目简介（中 / 英）
+│   └── CONTRIBUTING.md                # 贡献指南（单文件内中英对照）
 └── LICENSE
 ```
 
@@ -811,7 +812,7 @@ node scripts/minify.mjs     # 需要 npx terser / clean-css-cli
 
 ## 📄 许可证
 
-[MIT](LICENSE)
+[MIT](../LICENSE)
 
 ---
 
