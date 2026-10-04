@@ -1777,6 +1777,64 @@ export async function handleTags(request, env) {
 }
 
 /** GET /api/admin/stats/sources?days=30（需登录）：来源 Top + 设备占比 */
+const ERROR_LOG_KEEP = 300;
+const ERROR_CAPS = { message: 500, source: 300, stack: 4000, url: 500, ua: 300 };
+/** 稳定指纹：同一错误（kind+message+source）聚合计数，避免刷爆表 */
+function errorFingerprint(kind, message, source) {
+  const str = String(kind || '') + '|' + String(message || '') + '|' + String(source || '');
+  let h = 5381;
+  for (let i = 0; i < str.length; i++) h = ((h * 33) ^ str.charCodeAt(i)) >>> 0;
+  return h.toString(16) + '-' + str.length;
+}
+export async function handleErrorReport(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  const ip = clientIp(request);
+  if (env.BLOG) {
+    const win = Math.floor(Date.now() / 60000);
+    const rk = 'rate:err:' + ip + ':' + win;
+    let cnt = 0;
+    try { cnt = Number(await env.BLOG.get(rk)) || 0; } catch (e) {}
+    if (cnt >= 20) return json({ ok: false }, 429, request, env);
+    try { await env.BLOG.put(rk, String(cnt + 1), { expirationTtl: 120 }); } catch (e) {}
+  }
+  const body = await request.json().catch(() => null);
+  const message = sanitizeText(String((body && body.message) || '').trim()).slice(0, ERROR_CAPS.message);
+  if (!message) return json({ error: '缺少 message' }, 400, request, env);
+  const kind = String((body && body.kind) || 'error').slice(0, 20);
+  const source = String((body && body.source) || '').slice(0, ERROR_CAPS.source);
+  const stack = String((body && body.stack) || '').slice(0, ERROR_CAPS.stack);
+  const url = String((body && body.url) || '').slice(0, ERROR_CAPS.url);
+  const ua = String(request.headers.get('User-Agent') || '').slice(0, ERROR_CAPS.ua);
+  const fp = errorFingerprint(kind, message, source);
+  const now = Date.now();
+  await dbRun(env.DB,
+    'INSERT INTO error_logs (fingerprint,kind,message,source,stack,url,ua,hits,created_at,last_at) VALUES (?,?,?,?,?,?,?,1,?,?) ' +
+    'ON CONFLICT(fingerprint) DO UPDATE SET hits = hits + 1, last_at = excluded.last_at, url = excluded.url, ua = excluded.ua, stack = excluded.stack',
+    fp, kind, message, source, stack, url, ua, now, now);
+  await dbRun(env.DB, 'DELETE FROM error_logs WHERE id NOT IN (SELECT id FROM error_logs ORDER BY last_at DESC LIMIT ' + ERROR_LOG_KEEP + ')').catch(() => {});
+  return json({ ok: true }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+/** GET /api/admin/errors（需登录）：错误聚合列表；DELETE：清空 */
+export async function handleErrorsAdmin(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (request.method === 'DELETE') {
+    await dbRun(env.DB, 'DELETE FROM error_logs').catch(() => {});
+    return json({ ok: true }, 200, request, env, { 'Cache-Control': NO_CACHE });
+  }
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const rows = await dbAll(env.DB, 'SELECT * FROM error_logs ORDER BY last_at DESC LIMIT 200').catch(() => []);
+  let total = 0, sumHits = 0;
+  try {
+    const r = await dbFirst(env.DB, 'SELECT COUNT(*) AS n, COALESCE(SUM(hits),0) AS h FROM error_logs');
+    total = Number(r && r.n) || 0; sumHits = Number(r && r.h) || 0;
+  } catch (e) {}
+  return json({ ok: true, total: total, sumHits: sumHits, errors: rows }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+/** GET /api/admin/stats/sources?days=30（需登录）：来源 Top + 设备占比 */
 export async function handleStatsSources(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
   if (request.method === 'OPTIONS') return corsPreflight(request, env);

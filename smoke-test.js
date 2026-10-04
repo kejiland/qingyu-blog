@@ -462,7 +462,7 @@ function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
-    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map()
+    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map(), error_logs: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
 
@@ -729,6 +729,23 @@ function makeD1() {
       });
       return Object.keys(agg).map((k) => agg[k]).sort((a, b) => b.views - a.views);
     }
+    /* error_logs（前端错误日志：按 fingerprint 聚合） */
+    if (/^INSERT INTO error_logs/.test(s)) {
+      const [fingerprint, kind, message, source, stack, url, ua, created_at, last_at] = params;
+      const row = t.error_logs.get(fingerprint);
+      if (row) { row.hits = (Number(row.hits) || 0) + 1; row.last_at = last_at; row.url = url; row.ua = ua; row.stack = stack; }
+      else t.error_logs.set(fingerprint, { id: ++seq, fingerprint, kind, message, source, stack, url, ua, hits: 1, created_at, last_at });
+      return { success: true };
+    }
+    if (/^SELECT \* FROM error_logs ORDER BY last_at DESC LIMIT \d+$/.test(s)) {
+      return [...t.error_logs.values()].sort((a, b) => b.last_at - a.last_at);
+    }
+    if (s === 'SELECT COUNT(*) AS n, COALESCE(SUM(hits),0) AS h FROM error_logs') {
+      const vals = [...t.error_logs.values()];
+      return { n: vals.length, h: vals.reduce((a, r) => a + (Number(r.hits) || 0), 0) };
+    }
+    if (s === 'DELETE FROM error_logs') { t.error_logs.clear(); return { success: true }; }
+    if (/^DELETE FROM error_logs WHERE id NOT IN /.test(s)) return { success: true };
     /* admin_auth */
     if (s === "SELECT * FROM admin_auth WHERE k = ?") return t.admin_auth.get(params[0]) || null;
     if (/^INSERT INTO admin_auth/.test(s)) {
@@ -3599,6 +3616,7 @@ tests.push(['后台（新版 UI）：所有页面挂载无运行时异常', asyn
     if (u.indexOf('/api/admin/backups') >= 0) return ok({ ok: true, configured: false, backups: [] });
     if (u.indexOf('/api/admin/audit') >= 0) return ok({ ok: true, logs: [], total: 0, page: 1, pages: 1 });
     if (u.indexOf('/api/admin/health') >= 0) return ok({ ok: true, items: [] });
+    if (u.indexOf('/api/admin/errors') >= 0) return ok({ ok: true, total: 0, sumHits: 0, errors: [] });
     if (u.indexOf('/api/admin/stats/sources') >= 0) return ok({ ok: true, referrers: [], devices: [], refTotal: 0, devTotal: 0 });
     if (u.indexOf('/api/admin/stats/trend') >= 0) return ok({ ok: true, days: 30, views: [], comments: [] });
     if (u.indexOf('/api/admin/post-analytics') >= 0) return ok({ ok: true, items: [], range: 'all' });
@@ -3606,7 +3624,7 @@ tests.push(['后台（新版 UI）：所有页面挂载无运行时异常', asyn
     if (u.indexOf('/api/ai/') >= 0) return ok({ ok: false });
     return ok({ ok: true });
   };
-  const routes = ['/admin', '/admin/posts', '/admin/posts/new', '/admin/posts/edit-1/edit', '/admin/comments', '/admin/comments/pending', '/admin/tags', '/admin/series', '/admin/media', '/admin/music', '/admin/subscribers', '/admin/audit', '/admin/health', '/admin/backup', '/admin/settings', '/admin/transfer'];
+  const routes = ['/admin', '/admin/posts', '/admin/posts/new', '/admin/posts/edit-1/edit', '/admin/comments', '/admin/comments/pending', '/admin/tags', '/admin/series', '/admin/media', '/admin/music', '/admin/subscribers', '/admin/audit', '/admin/health', '/admin/errors', '/admin/backup', '/admin/settings', '/admin/transfer'];
   try {
     for (const r of routes) {
       const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, r);
@@ -3619,6 +3637,50 @@ tests.push(['后台（新版 UI）：所有页面挂载无运行时异常', asyn
     process.removeListener('unhandledRejection', onRej);
   }
   assert.deepStrictEqual(errors.map((e) => String((e && e.message) || e)), [], '挂载过程中无未捕获异常');
+}]);
+
+/* 前端错误日志：公开上报聚合去重 + 后台列表 / 清空 */
+tests.push(['错误日志：上报聚合去重 + 后台列表 / 清空', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-err';
+  const post = (body) => core.handleErrorReport(new Request('http://t/api/errors', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'TestUA' }, body: JSON.stringify(body) }), env);
+  assert.strictEqual((await post({ kind: 'error', message: 'cmtSel is not defined', source: 'admin.js:3035', url: 'https://x/admin/comments' })).status, 200, '上报成功');
+  await post({ kind: 'error', message: 'cmtSel is not defined', source: 'admin.js:3035', url: 'https://x/admin/comments' });
+  await post({ kind: 'promise', message: 'boom', source: 'app.js:1' });
+  assert.strictEqual((await post({ message: '' })).status, 400, '缺 message 拒绝');
+  const h = { headers: { Authorization: 'Bearer tok-err' } };
+  let d = await (await core.handleErrorsAdmin(new Request('http://t/api/admin/errors', h), env)).json();
+  assert.strictEqual(d.total, 2, '两类错误聚合为 2 条');
+  assert.strictEqual(d.sumHits, 3, '累计出现 3 次');
+  const first = d.errors.filter((x) => x.message === 'cmtSel is not defined')[0];
+  assert.strictEqual(Number(first.hits), 2, '相同错误 hits 累加');
+  assert.strictEqual((await core.handleErrorsAdmin(new Request('http://t/api/admin/errors'), mockEnv())).status, 401, '未登录 401');
+  assert.strictEqual((await core.handleErrorsAdmin(new Request('http://t/api/admin/errors', { method: 'DELETE', headers: h.headers }), env)).status, 200, '清空成功');
+  d = await (await core.handleErrorsAdmin(new Request('http://t/api/admin/errors', h), env)).json();
+  assert.strictEqual(d.total, 0, '已清空');
+}]);
+
+/* 前端错误上报：去重 + 功能开关可关闭 */
+tests.push(['前端错误上报：同一错误只报一次，开关可关闭', async () => {
+  const sent = [];
+  const fn = async (url, opts) => {
+    const u = String(url);
+    if (u.indexOf('/api/errors') >= 0) { sent.push(JSON.parse(opts.body)); return { ok: true, status: 200, json: async () => ({ ok: true }) }; }
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn });
+  b.ctx.reportClientError('error', 'cmtSel is not defined', 'admin.js:1', 'stack');
+  b.ctx.reportClientError('error', 'cmtSel is not defined', 'admin.js:1', 'stack');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(sent.length, 1, '同一会话同一错误只上报一次');
+  assert.strictEqual(sent[0].message, 'cmtSel is not defined', '错误内容上报');
+  b.ctx._siteSettings = { features: JSON.stringify({ errorReport: false }) };
+  b.ctx.reportClientError('error', 'another error', 'x.js:1');
+  await new Promise((r) => setTimeout(r, 20));
+  assert.strictEqual(sent.length, 1, '功能开关关闭后不再上报');
 }]);
 
 /* ---------- 运行 ---------- */

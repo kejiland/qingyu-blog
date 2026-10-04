@@ -675,6 +675,7 @@
         { key: 'subscribers', label: t('admin.sidebar.subscribers'), icon: 'send', href: '/admin/subscribers' },
         { key: 'audit', label: t('admin.sidebar.audit'), icon: 'clock', href: '/admin/audit' },
         { key: 'health', label: t('admin.sidebar.health'), icon: 'gauge', href: '/admin/health' },
+        { key: 'errors', label: t('admin.sidebar.errors'), icon: 'bug', href: '/admin/errors' },
         { key: 'backup', label: t('admin.sidebar.backups'), icon: 'save', href: '/admin/backups' },
         { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
@@ -828,6 +829,7 @@
     if (path === '/admin/subscribers') return { key: 'subscribers', page: 'subscribers' };
     if (path === '/admin/audit') return { key: 'audit', page: 'audit' };
     if (path === '/admin/health') return { key: 'health', page: 'health' };
+    if (path === '/admin/errors') return { key: 'errors', page: 'errors' };
     if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
@@ -1032,6 +1034,7 @@
     if (route.page === 'subscribers') return pageSubscribers(content);
     if (route.page === 'audit') return pageAudit(content);
     if (route.page === 'health') return pageHealth(content);
+    if (route.page === 'errors') return pageErrors(content);
     if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
@@ -3812,6 +3815,59 @@
     } catch (e) { box.innerHTML = '<div class="ab-empty"><p>' + esc(e.message || e) + '</p></div>'; }
   }
 
+  /* ====================== 前端错误日志 ====================== */
+  var errState = { list: [], total: 0, sumHits: 0, kw: '' };
+  async function pageErrors(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.errors.title') + '</h1><p class="ab-page-sub">' + t('admin.errors.desc') + '</p></div>' +
+      '<div class="ab-row" style="gap:8px"><button class="ab-btn danger" id="abErrClear">' + icon('trash', 14) + ' ' + t('admin.errors.clear') + '</button><button class="ab-btn" id="abErrRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div></div>' +
+      '<div class="ab-grid cols-2" id="abErrStats"></div>' +
+      '<div class="ab-toolbar"><div class="ab-search"><input class="ab-input" id="abErrKw" placeholder="' + t('admin.errors.search') + '"></div></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.errors.colTime') + '</th><th>' + t('admin.errors.colKind') + '</th><th>' + t('admin.errors.colMessage') + '</th><th>' + t('admin.errors.colUrl') + '</th><th>' + t('admin.errors.colHits') + '</th></tr></thead><tbody id="abErrBody"></tbody></table></div></div>';
+    var kw = content.querySelector('#abErrKw');
+    kw.value = errState.kw;
+    kw.addEventListener('input', debounce(function () { errState.kw = (kw.value || '').trim().toLowerCase(); renderErrors(content); }, 200));
+    content.querySelector('#abErrRefresh').addEventListener('click', function () { loadErrors(content); });
+    content.querySelector('#abErrClear').addEventListener('click', function () {
+      confirmModal(t('admin.errors.clear'), '<p class="ab-muted">' + t('admin.errors.clearConfirm') + '</p>', async function () {
+        try { await api('api/admin/errors', { method: 'DELETE' }); toast(t('admin.errors.cleared'), 'ok'); loadErrors(content); }
+        catch (e) { toast(t('admin.errors.clearFail') + (e.message || e), 'err'); }
+      }, t('admin.errors.clear'));
+    });
+    loadErrors(content);
+  }
+  async function loadErrors(content) {
+    var body = content.querySelector('#abErrBody');
+    if (!body) return;
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    try {
+      var d = await api('api/admin/errors');
+      errState.list = (d && d.errors) || [];
+      errState.total = Number(d && d.total) || 0;
+      errState.sumHits = Number(d && d.sumHits) || 0;
+      content.querySelector('#abErrStats').innerHTML = [
+        { label: t('admin.errors.statKinds'), value: errState.total, icon: 'bug' },
+        { label: t('admin.errors.statHits'), value: errState.sumHits, icon: 'gauge' }
+      ].map(function (x) { return '<div class="ab-card ab-stat"><div class="ab-stat-label">' + icon(x.icon, 16) + esc(x.label) + '</div><div class="ab-stat-value">' + esc(String(x.value)) + '</div></div>'; }).join('');
+      renderErrors(content);
+    } catch (e) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; }
+  }
+  function renderErrors(content) {
+    var body = content.querySelector('#abErrBody');
+    if (!body) return;
+    var list = errState.list;
+    if (errState.kw) list = list.filter(function (x) { return ((x.message || '') + ' ' + (x.source || '') + ' ' + (x.url || '')).toLowerCase().indexOf(errState.kw) >= 0; });
+    if (!list.length) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.errors.empty') + '</td></tr>'; return; }
+    body.innerHTML = list.map(function (x) {
+      var kind = x.kind === 'promise' ? t('admin.errors.kindPromise') : t('admin.errors.kindError');
+      return '<tr><td style="white-space:nowrap">' + esc(fmtTimestamp(x.last_at)) + '</td>' +
+        '<td><span class="ab-status ' + (x.kind === 'promise' ? 'scheduled' : 'draft') + '">' + esc(kind) + '</span></td>' +
+        '<td style="max-width:420px"><div title="' + esc((x.stack || x.message || '').slice(0, 800)) + '">' + esc((x.message || '').slice(0, 160)) + '</div>' +
+        (x.source ? '<div class="ab-muted" style="font-size:12px">' + esc(x.source) + '</div>' : '') + '</td>' +
+        '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(x.url || '') + '">' + esc(x.url || '—') + '</td>' +
+        '<td style="text-align:center">' + esc(String(Number(x.hits) || 1)) + '</td></tr>';
+    }).join('');
+  }
+
   /* ====================== 博客设置 ====================== */
   /* ====================== 音乐管理（R2 直传 + D1 列表） ====================== */
   var musicState = { list: [], kw: '', page: 1, per: 15 };
@@ -4174,7 +4230,8 @@
     var baseSize = Number(cfgNow.pageSize);
     settingsDraft.features = {
       pageSize: (feat && feat.pageSize != null) ? Number(feat.pageSize) : (isFinite(baseSize) && baseSize >= 0 ? Math.floor(baseSize) : 8),
-      ads: Object.assign({}, baseAds, featAds)
+      ads: Object.assign({}, baseAds, featAds),
+      errorReport: !(feat && feat.errorReport === false)
     };
   }
   function saveTabToDraft(content) {
@@ -4212,7 +4269,8 @@
           between: val(content, '#abAdsBetween'),
           betweenEvery: Math.max(1, Math.floor(Number(everyRaw) || 3)),
           content: val(content, '#abAdsContent')
-        }
+        },
+        errorReport: content.querySelector('#abFeatErrReport') ? content.querySelector('#abFeatErrReport').checked : true
       };
     }
     if (content.querySelector('#abNavVisual')) collectNavFromDom(content);
@@ -4287,6 +4345,7 @@
     if (content.querySelector('#abAdsBetween')) content.querySelector('#abAdsBetween').value = fads.between || '';
     if (content.querySelector('#abAdsBetweenEvery')) content.querySelector('#abAdsBetweenEvery').value = (fads.betweenEvery != null ? fads.betweenEvery : 3);
     if (content.querySelector('#abAdsContent')) content.querySelector('#abAdsContent').value = fads.content || '';
+    if (content.querySelector('#abFeatErrReport')) content.querySelector('#abFeatErrReport').checked = (feat.errorReport !== false);
     if (content.querySelector('#abProfileName')) content.querySelector('#abProfileName').value = prof.name || '';
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
@@ -4317,6 +4376,8 @@
       body.innerHTML = '<div class="ab-card" style="max-width:700px">' +
         '<div class="ab-section-title">' + icon('doc', 15) + ' ' + t('admin.settings.featPaging') + '</div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featPageSize') + '</label><input class="ab-input" id="abFeatPageSize" type="number" min="0" step="1" style="max-width:180px"><label class="ab-hint">' + t('admin.settings.featPageSizeHint') + '</label></div>' +
+        '<div class="ab-section-title" style="margin-top:16px">' + icon('bug', 15) + ' ' + t('admin.settings.featDiag') + '</div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatErrReport"> ' + t('admin.settings.featErrReport') + '</label><label class="ab-hint">' + t('admin.settings.featErrReportHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('spark', 15) + ' ' + t('admin.settings.featAds') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAdsEnabled"> ' + t('admin.settings.featAdsEnable') + '</label><label class="ab-hint">' + t('admin.settings.featAdsEnableHint') + '</label></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsClient') + '</label><input class="ab-input" id="abAdsClient" placeholder="ca-pub-xxxxxxxxxxxxxxxx"></div>' +
@@ -4418,7 +4479,8 @@
       comment_blocklist: String(settingsDraft.blocklist || ''),
       features: JSON.stringify({
         pageSize: (settingsDraft.features && settingsDraft.features.pageSize != null) ? settingsDraft.features.pageSize : 8,
-        ads: (settingsDraft.features && settingsDraft.features.ads) || {}
+        ads: (settingsDraft.features && settingsDraft.features.ads) || {},
+        errorReport: !(settingsDraft.features && settingsDraft.features.errorReport === false)
       })
     };
     try {

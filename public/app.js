@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.47';
+var BLOG_VERSION = '2.10.48';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -214,6 +214,7 @@ function svgIcon(name, size) {
     gauge: '<svg ' + s + ' ' + c + '><path d="M4.5 17.5A8.5 8.5 0 1 1 19.5 17.5"/><path d="M12 14.2 16.8 9.4M3 17.5h18"/></svg>',
     sliders: '<svg ' + s + ' ' + c + '><path d="M4 7h9M17 7h3M4 17h3M11 17h9M13 4.5v5M7 14.5v5"/></svg>',
     clock: '<svg ' + s + ' ' + c + '><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2.2"/></svg>',
+    bug: '<svg ' + s + ' ' + c + '><rect x="7" y="8" width="10" height="12" rx="5"/><path d="M9 6.5a3 3 0 0 1 6 0M3.5 11H7M17 11h3.5M3.5 16H7M17 16h3.5"/></svg>',
     refresh: '<svg ' + s + ' ' + c + '><path d="M20 12a8 8 0 1 1-2.5-5.8"/><path d="M20 4v4.5h-4.5"/></svg>'
   };
   return I[name] || '';
@@ -1013,6 +1014,7 @@ function getConfig() {
     footer: footer,
     site: siteInfo,        // 站点信息（头像/名称/简介）供关于页等使用
     profile: prof,         // 个人信息（头像/昵称/简介/邮箱）供关于页等使用
+    features: features,    // 后台「功能开关」的原始配置（供错误上报等读取）
     ads: ads
   };
 }
@@ -5623,7 +5625,51 @@ function _waitGlobalStyle() {
  * 首屏渲染不等待网络：先用静态/本地数据立即渲染，云端探测（/api/posts）
  * 异步完成后再合并数据并重渲染一次，切换为云端模式 UI。
  * 避免 API 慢（Workers 冷启动 / 弱网）时整页白屏等待。 */
+/* ---------- 前端错误自监控 ----------
+ * 捕获未处理异常 / Promise 拒绝 → 上报后台「错误日志」。默认开启，可在后台
+ * 设置 → 功能开关 关闭；同一会话同一错误只报一次，单页最多 8 条。 */
+var _errSent = {};
+var _errSentCount = 0;
+function _errReportEnabled() {
+  try { var f = getConfig().features || {}; return f.errorReport !== false; } catch (e) { return true; }
+}
+function reportClientError(kind, message, source, stack) {
+  try {
+    if (!_errReportEnabled()) return;
+    if (!_cloudOn()) return;
+    if (_errSentCount >= 8) return;
+    var msg = String(message == null ? '' : message).slice(0, 500);
+    if (!msg) return;
+    var key = kind + '|' + msg + '|' + String(source || '').slice(0, 300);
+    if (_errSent[key]) return;
+    _errSent[key] = 1; _errSentCount++;
+    var payload = {
+      kind: String(kind || 'error').slice(0, 20),
+      message: msg,
+      source: String(source || '').slice(0, 300),
+      stack: String(stack || '').slice(0, 4000),
+      url: (typeof location !== 'undefined' ? String(location.href || '') : '').slice(0, 500)
+    };
+    apiFetch('api/errors', { method: 'POST', body: JSON.stringify(payload) }).catch(function () {});
+  } catch (e) { /* 上报失败绝不能影响页面 */ }
+}
+function initErrorReporting() {
+  try {
+    window.addEventListener('error', function (e) {
+      if (!e || !e.message) return;   // 资源加载失败没有 message，跳过避免噪音
+      reportClientError('error', e.message, (e.filename || '') + (e.lineno ? ':' + e.lineno : ''), e.error && e.error.stack);
+    });
+    window.addEventListener('unhandledrejection', function (e) {
+      var r = e && e.reason;
+      var msg = (r && (r.message || r.reason)) || r || 'Unhandled rejection';
+      reportClientError('promise', String(msg), '', (r && r.stack) || '');
+    });
+  } catch (e) {}
+}
+window.reportClientError = reportClientError;
+
 window.__bootPromise = (async function () {
+  initErrorReporting();
   var cfg = getConfig();
   applyTheme(getTheme());
   applyAccent(getAccent());
