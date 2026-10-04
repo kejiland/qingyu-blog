@@ -160,6 +160,7 @@
     "post.untitled": "(无标题)",
     "post.related": "相关文章",
     "post.backlinks": "引用本文",
+    "post.print": "打印 / PDF",
     "post.lockedTitle": "文章已加密",
     "post.lockedDesc": "本文已加密，请输入访问密码后查看正文。",
     "post.lockedPlaceholder": "访问密码",

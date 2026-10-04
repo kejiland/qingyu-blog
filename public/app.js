@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.54';
+var BLOG_VERSION = '2.10.55';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2849,6 +2849,9 @@ async function renderPost(id) {
   } else {
     html += '<article class="article">' + bodyHtml + '</article>';
   }
+  // 仅打印时显示的页脚：站点名 + 原文链接（便于纸质/PDF 溯源）
+  var printBase = getConfig().siteUrl || (typeof location !== 'undefined' ? location.origin : '');
+  html += '<div class="print-only print-foot">' + esc(getSiteName()) + ' · ' + esc(String(printBase).replace(/\/+$/, '') + postUrl(post.id)) + '</div>';
   if (toc) {
     html += '<button type="button" class="toc-fab" id="tocFab" aria-label="' + t('toc.open') + '">' + svgIcon('list', 18) + '</button>' +
       '<div class="toc-sheet" id="tocSheet" hidden><div class="toc-sheet-head"><span>' + t('toc.title') + '</span>' +
@@ -2875,7 +2878,8 @@ async function renderPost(id) {
     + '<a class="share-item" data-share="telegram" role="menuitem" target="_blank" rel="noopener">' + t('post.shareTelegram') + '</a>'
     + '<a class="share-item" data-share="email" role="menuitem">' + t('post.shareEmail') + '</a>'
     + '</div></div>';
-  html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + shareMenu + '</div></div>';
+  var printBtn = '<button class="btn" id="btnPrint" title="' + esc(t('post.print')) + '">' + svgIcon('file', 14) + ' ' + t('post.print') + '</button>';
+  html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + printBtn + shareMenu + '</div></div>';
   // 双向链接与相关文章（静态模式本地计算，云端异步拉取）
   html += '<div class="relations-slot" id="postRelations"></div>';
 
@@ -2939,6 +2943,8 @@ async function renderPost(id) {
   incView(post.id).then(function (s) {
     var v = document.querySelector('#viewCount'); if (v && s) v.textContent = String(s.views);
   });
+  var printBtnEl = document.querySelector('#btnPrint');
+  if (printBtnEl) printBtnEl.addEventListener('click', function () { try { window.print(); } catch (e) {} });
   var likeBtn = document.querySelector('#likeBtn');
   if (likeBtn) {
     if (wasLiked(post.id)) { likeBtn.classList.add('liked'); likeBtn.disabled = true; }

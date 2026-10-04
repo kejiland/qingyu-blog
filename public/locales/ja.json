@@ -961,5 +961,6 @@
   "admin.staticExport.progress": "アセットを梱包中 {done}/{total}",
   "admin.staticExport.done": "{count} 件の記事を書き出しました（{files} ファイル）",
   "admin.staticExport.fail": "静的サイトの書き出しに失敗：",
-  "admin.staticExport.readme": "Qingyu'Blog · 静的サイト書き出し\n\nこの ZIP はそのまま配備できる静的サイトです：\n· 各ルートに index.html があるため SPA のリライト設定は不要\n· 公開済みの記事のみ（下書き・予約投稿は含まれません）\n· データは posts.min.js、設定は config.min.js（static モード）\n· 管理画面は含まれません\n· 暗号化記事は暗号文のままで、パスワード入力で解除します\n· R2 等のメディア本体は含まれません\n\n使い方：\n1. 空のディレクトリに解凍\n2. そのまま任意の静的ホスティングへアップロード\n3. サブディレクトリに置く場合も構成を保ってください（リンクは相対パス）\n\nサイト：{site}\n公開記事数：{count}"
+  "admin.staticExport.readme": "Qingyu'Blog · 静的サイト書き出し\n\nこの ZIP はそのまま配備できる静的サイトです：\n· 各ルートに index.html があるため SPA のリライト設定は不要\n· 公開済みの記事のみ（下書き・予約投稿は含まれません）\n· データは posts.min.js、設定は config.min.js（static モード）\n· 管理画面は含まれません\n· 暗号化記事は暗号文のままで、パスワード入力で解除します\n· R2 等のメディア本体は含まれません\n\n使い方：\n1. 空のディレクトリに解凍\n2. そのまま任意の静的ホスティングへアップロード\n3. サブディレクトリに置く場合も構成を保ってください（リンクは相対パス）\n\nサイト：{site}\n公開記事数：{count}",
+  "post.print": "印刷 / PDF"
 }

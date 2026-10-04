@@ -3241,3 +3241,25 @@ html[data-theme="dark"] body.scrolled .topbar {
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
 /* 草稿预览提示条 */
 .preview-banner { display:flex; align-items:center; gap:8px; margin:0 0 18px; padding:10px 14px; border:1px dashed var(--accent); border-radius:10px; background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); font-size:13.5px; }
+/* ---------- 打印 / 导出 PDF ---------- */
+.print-only { display: none; }
+@media print {
+  @page { margin: 16mm 14mm; }
+  html, body { background: #fff !important; color: #000 !important; }
+  body { font-size: 12pt; }
+  /* 隐藏一切交互 / 装饰元素，只保留正文 */
+  header.topbar, footer, #backTop, #announceBar, #readingProgress, .reading-progress,
+  .toc-fab, .toc-sheet, .reading-tools, .like-bar, .article-footer, .comments,
+  .relations-slot, .series-nav, .mp-fab-wrap, .mp-panel, #bgSketch,
+  .sidebar-overlay, .mobile-sider, .mobile-sidebar, .share-menu, .hl-panel, .hl-btn,
+  .ad-slot, .preview-banner, .post-lock-row, .smoji-picker, .toast-wrap { display: none !important; }
+  .container, .post-body, .page-fade { max-width: 100% !important; width: auto !important; margin: 0 !important; padding: 0 !important; }
+  .article { font-size: 11.5pt; line-height: 1.7; }
+  .article h1, .article h2, .article h3 { break-after: avoid; page-break-after: avoid; }
+  .article img, .article pre, .article blockquote, .article table, .katex-display, .mermaid { break-inside: avoid; page-break-inside: avoid; }
+  .article img, .mermaid svg { max-width: 100% !important; height: auto !important; }
+  .article a { color: #000 !important; text-decoration: underline; }
+  .article a[href^="http"]::after { content: " (" attr(href) ")"; font-size: 8.5pt; color: #555; word-break: break-all; }
+  .print-only { display: block !important; }
+  .print-foot { margin-top: 18px; padding-top: 8px; border-top: 1px solid #999; font-size: 9pt; color: #555; }
+}

@@ -3869,6 +3869,24 @@ tests.push(['导出静态站：模板生成 / 资源清单 / ZIP 二进制', asy
   assert.ok(admin.indexOf('id="abIeExportStatic"') >= 0 && admin.indexOf('function exportStaticSite') >= 0, '后台导出入口已接入');
 }]);
 
+/* 文章打印 / 导出 PDF：按钮 + 打印样式 + 仅打印页脚 */
+tests.push(['文章打印 / PDF：按钮 + 打印样式 + 仅打印页脚', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  assert.ok(src.indexOf('id="btnPrint"') >= 0, '打印按钮已渲染');
+  assert.ok(src.indexOf('window.print()') >= 0, '按钮触发打印');
+  assert.ok(src.indexOf('print-only print-foot') >= 0, '仅打印页脚');
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  assert.ok(css.indexOf('@media print') >= 0, '打印样式存在');
+  for (const sel of ['header.topbar', '#backTop', '.comments', '.like-bar', '.mp-fab-wrap', '#bgSketch']) {
+    assert.ok(css.indexOf(sel) >= 0, '打印隐藏 ' + sel);
+  }
+  assert.ok(css.indexOf('break-inside: avoid') >= 0 || css.indexOf('page-break-inside: avoid') >= 0, '避免跨页断行');
+  assert.ok(css.indexOf('.print-only') >= 0, '仅打印元素样式');
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
+  assert.ok(b.html.indexOf('id="btnPrint"') >= 0, '详情页含打印按钮');
+  assert.ok(b.html.indexOf('print-foot') >= 0, '详情页含仅打印页脚');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

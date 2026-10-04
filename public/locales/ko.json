@@ -961,5 +961,6 @@
   "admin.staticExport.progress": "자산 압축 중 {done}/{total}",
   "admin.staticExport.done": "{count}개 글을 내보냈습니다({files}개 파일)",
   "admin.staticExport.fail": "정적 사이트 내보내기 실패: ",
-  "admin.staticExport.readme": "Qingyu'Blog · 정적 사이트 내보내기\n\n이 ZIP 은 바로 배포 가능한 정적 사이트입니다:\n- 모든 경로에 index.html 이 있어 SPA 리라이트 규칙이 필요 없습니다\n- 공개된 글만 포함됩니다(초안/예약 글 제외)\n- 데이터는 posts.min.js, 설정은 config.min.js(static 모드)\n- 관리자 기능은 포함되지 않습니다\n- 암호화 글은 암호문 그대로이며 비밀번호로 해제합니다\n- R2 등에 있는 미디어 파일은 포함되지 않습니다\n\n사용 방법:\n1. 빈 디렉터리에 압축 해제\n2. 그대로 임의의 정적 호스팅에 업로드\n3. 하위 경로에 배포해도 구조를 유지하세요(링크는 상대 경로)\n\n사이트: {site}\n공개 글 수: {count}"
+  "admin.staticExport.readme": "Qingyu'Blog · 정적 사이트 내보내기\n\n이 ZIP 은 바로 배포 가능한 정적 사이트입니다:\n- 모든 경로에 index.html 이 있어 SPA 리라이트 규칙이 필요 없습니다\n- 공개된 글만 포함됩니다(초안/예약 글 제외)\n- 데이터는 posts.min.js, 설정은 config.min.js(static 모드)\n- 관리자 기능은 포함되지 않습니다\n- 암호화 글은 암호문 그대로이며 비밀번호로 해제합니다\n- R2 등에 있는 미디어 파일은 포함되지 않습니다\n\n사용 방법:\n1. 빈 디렉터리에 압축 해제\n2. 그대로 임의의 정적 호스팅에 업로드\n3. 하위 경로에 배포해도 구조를 유지하세요(링크는 상대 경로)\n\n사이트: {site}\n공개 글 수: {count}",
+  "post.print": "인쇄 / PDF"
 }
