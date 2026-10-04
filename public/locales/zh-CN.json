@@ -939,5 +939,8 @@
   "admin.editor.seoDescPh": "自定义描述（留空自动取摘要）",
   "admin.editor.seoCanonicalPh": "Canonical 链接（留空自动）",
   "admin.editor.seoNoindex": "禁止搜索引擎收录本页",
-  "admin.editor.seoHint": "留空的项会自动生成；适合需要自定义搜索结果 / 分享文案的文章"
+  "admin.editor.seoHint": "留空的项会自动生成；适合需要自定义搜索结果 / 分享文案的文章",
+  "admin.settings.featRich": "内容渲染",
+  "admin.settings.featRichContent": "图表 / 公式渲染",
+  "admin.settings.featRichContentHint": "开启后，正文里的 ```mermaid 代码块会渲染成图表、$…$ / $$…$$ 会渲染成数学公式；仅在页面真的用到时才加载对应库，普通页面零额外请求"
 }

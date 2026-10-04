@@ -939,5 +939,8 @@
   "admin.editor.seoDescPh": "Custom description (auto from excerpt if empty)",
   "admin.editor.seoCanonicalPh": "Canonical URL (auto if empty)",
   "admin.editor.seoNoindex": "Hide this page from search engines",
-  "admin.editor.seoHint": "Empty fields are generated automatically; use these for custom search/share copy"
+  "admin.editor.seoHint": "Empty fields are generated automatically; use these for custom search/share copy",
+  "admin.settings.featRich": "Content rendering",
+  "admin.settings.featRichContent": "Diagrams / math rendering",
+  "admin.settings.featRichContentHint": "When on, ```mermaid fenced blocks render as diagrams and $…$ / $$…$$ render as math. The libraries load only when a page actually uses them, so normal pages make no extra requests"
 }

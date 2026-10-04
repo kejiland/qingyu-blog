@@ -210,9 +210,10 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 | 卡片式列表 | 封面缩略图（自动取 cover 或正文首图）、置顶徽章、标签贴底、加载骨架屏、分页（`?page=`） |
 | **深色 / 浅色主题** | 一键切换，跟随系统偏好，无首屏闪白；顶栏会随滚动加深阴影 |
 | **主题色切换** | **4 种强调色**：赭橙（terra）/ 黛蓝（indigo）/ 竹青（bamboo）/ 凝夜紫（dusk）。桌面为图标按钮 + 色板弹层，手机端为原生下拉；每种配色会连带调整背景与边框色 |
-| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 941 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
+| **多语言界面** | 中文 / English / 日本語 / 한국어 / हिन्दी（各 944 个语言键），自动识别 + 手动切换，桌面为 🌐 弹层 + SVG 国旗，手机端为原生下拉 |
 | **PWA 离线阅读与写作** | 可安装到桌面或手机；首页、核心资源与已访问文章离线可打开；云端编辑断网时先保存到本地队列，网络恢复后自动同步 |
 | **背景动画** | canvas 手绘四季粒子（春日樱花瓣 / 夏日嫩绿叶片 / 秋叶 / 六向分叉雪花），仅首页运行、页面隐藏时暂停；桌面默认开、触屏默认关，顶栏可一键开关，尊重 `prefers-reduced-motion`。预览：`/?season=spring\|summer\|autumn\|winter&bg=1` |
+| **图表 / 公式** | 正文支持 **Mermaid 图表**（```mermaid 代码块）与 **KaTeX 数学公式**（`$…$` / `$$…$$`）；两个库都**本地化**在 `public/libs/`（离线可用、无需放开 CDN），且**只在页面真的用到时才加载**，普通页面零额外请求；可在「功能开关」整体关闭 |
 | **Smoji 表情** | 评论、留言板、编辑器三处都内置表情选择器，按需懒加载，支持正文内联渲染 |
 | **AI 文章摘要** | 文章页一键生成内容摘要（单篇缓存 30 天）；AI 不可用时入口自动隐藏 |
 | **全站音乐播放器** | 右下角悬浮音符按钮，平时**缩进窗口外只露出一点圆弧**、悬停 / 点击滑出；面板含曲目信息 · 可拖动进度条 · 上一首 / 播放暂停 / 下一首 · 音量 · 播放列表（当前项高亮 + 均衡动画）。自动连播、**记忆上次曲目与进度**、音量持久化，刷新后恢复但**不自动出声**；无音乐时完全隐藏，后台路由自动收起；样式与脚本不在首屏关键路径上 |
@@ -327,9 +328,11 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── bg-anim.js / bg-anim.min.js    # 四季 canvas 背景动画
 │   ├── i18n.js / i18n.min.js          # 国际化模块（中/英/日/韩/印地，内置中文兜底）
 │   ├── posts.js / posts.min.js        # 静态模式文章数据（由「导出 posts.js」生成）
-│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 941 键）
+│   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 944 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
+│   ├── libs/katex/                    # KaTeX 数学公式（本地化，按需加载）
+│   ├── libs/mermaid/                  # Mermaid 图表（本地化，按需加载）
 │   ├── robots.txt                     # 爬虫规则（禁止抓取后台，声明 Sitemap）
 │   ├── llms.txt                       # 面向 LLM / 代理的站点说明
 │   ├── ads.txt                        # 广告声明（可选，配合 config.js ads）
@@ -458,7 +461,7 @@ CF_ZONE_ID = "{env.CF_ZONE_ID}"
 
 | 资源 | Cache-Control |
 | --- | --- |
-| 带 `?v=` 版本号，或 `/fonts/`、`/flags/`、`/libs/smoji/` 下的文件 | `public, max-age=31536000, immutable` |
+| 带 `?v=` 版本号，或 `/fonts/`、`/flags/`、`/libs/` 下的文件 | `public, max-age=31536000, immutable` |
 | 其他带扩展名的静态文件 | `public, max-age=3600, stale-while-revalidate=86400` |
 | 无扩展名的 HTML 入口 | `no-cache`（靠 ETag 命中 304） |
 
@@ -593,7 +596,7 @@ window.BLOG_CONFIG = {
 
 ### 多语言（i18n）
 
-`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **941 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
+`i18n.js` 内置 5 种语言（中文 / English / 日本語 / 한국어 / हिन्दी），每种 **944 个语言键**。默认按 `localStorage('blog.locale')` → `navigator.language` 的顺序识别，并提供手动切换。语言包放在 `public/locales/<lang>.json`，中文同时内嵌兜底（确保 `file://` 本地预览时核心文字始终可读）。
 
 ---
 

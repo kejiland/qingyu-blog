@@ -939,5 +939,8 @@
   "admin.editor.seoDescPh": "설명 (비우면 요약에서 자동)",
   "admin.editor.seoCanonicalPh": "Canonical URL (비우면 자동)",
   "admin.editor.seoNoindex": "이 페이지를 검색엔진에서 제외",
-  "admin.editor.seoHint": "비운 항목은 자동 생성됩니다. 검색 결과/공유 문구를 직접 지정할 때 사용하세요"
+  "admin.editor.seoHint": "비운 항목은 자동 생성됩니다. 검색 결과/공유 문구를 직접 지정할 때 사용하세요",
+  "admin.settings.featRich": "콘텐츠 렌더링",
+  "admin.settings.featRichContent": "다이어그램 / 수식 렌더링",
+  "admin.settings.featRichContentHint": "켜면 ```mermaid 코드 블록이 다이어그램으로, $…$ / $$…$$ 가 수식으로 렌더링됩니다. 실제로 사용하는 페이지에서만 라이브러리를 불러오므로 일반 페이지에는 추가 요청이 없습니다"
 }

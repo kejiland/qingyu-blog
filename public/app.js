@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.51';
+var BLOG_VERSION = '2.10.52';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2927,6 +2927,7 @@ async function renderPost(id) {
   html += '</div></main>' + renderFooter();
   app().innerHTML = html;
   stampHeadingNumbers(tocHeadings);
+  enhanceRichContent(document.querySelector('.article'));
 
   // stats load
   loadStats(post.id).then(function (s) {
@@ -3386,7 +3387,98 @@ async function renderPost(id) {
   loadPostRelations(post.id);
 }
 
-/* 正文加载失败（网络/超时）时渲染的静态失败页：保留标题，提供手动重试，不再自动循环拉取 */
+/* ============================================================================
+ * 富内容按需渲染：Mermaid 图表 + KaTeX 数学公式
+ * ----------------------------------------------------------------------------
+ * 只有页面里真的出现 ```mermaid 代码块 / $…$ 公式时才加载对应库（本地 libs/ 自托管），
+ * 普通页面零额外请求；可用后台「功能开关 → 图表 / 公式渲染」关闭。
+ * ============================================================================ */
+var _katexPromise = null, _mermaidPromise = null;
+function _loadScriptOnce(src) {
+  return new Promise(function (resolve, reject) {
+    var s = document.createElement('script');
+    s.src = src; s.async = true;
+    s.onload = function () { resolve(true); };
+    s.onerror = function () { reject(new Error('load failed: ' + src)); };
+    document.head.appendChild(s);
+  });
+}
+function _richContentOff() {
+  try { var f = getConfig().features || {}; return f.richContent === false; } catch (e) { return false; }
+}
+function ensureKatex() {
+  if (window.katex && window.renderMathInElement) return Promise.resolve(true);
+  if (_katexPromise) return _katexPromise;
+  _katexPromise = new Promise(function (resolve) {
+    try {
+      if (!document.querySelector('link[data-katex-css]')) {
+        var l = document.createElement('link');
+        l.rel = 'stylesheet'; l.href = appRoot() + 'libs/katex/katex.min.css'; l.setAttribute('data-katex-css', '1');
+        document.head.appendChild(l);
+      }
+    } catch (e) {}
+    _loadScriptOnce(appRoot() + 'libs/katex/katex.min.js')
+      .then(function () { return _loadScriptOnce(appRoot() + 'libs/katex/contrib/auto-render.min.js'); })
+      .then(function () { resolve(!!window.renderMathInElement); })
+      .catch(function () { _katexPromise = null; resolve(false); });
+  });
+  return _katexPromise;
+}
+function ensureMermaid() {
+  if (window.mermaid) return Promise.resolve(window.mermaid);
+  if (_mermaidPromise) return _mermaidPromise;
+  _mermaidPromise = _loadScriptOnce(appRoot() + 'libs/mermaid/mermaid.min.js').then(function () {
+    if (!window.mermaid) throw new Error('mermaid missing');
+    try {
+      window.mermaid.initialize({ startOnLoad: false, securityLevel: 'strict', theme: (getTheme() === 'dark' ? 'dark' : 'default') });
+    } catch (e) {}
+    return window.mermaid;
+  }).catch(function (e) { _mermaidPromise = null; throw e; });
+  return _mermaidPromise;
+}
+/** 在给定容器内按需渲染 Mermaid / KaTeX（root 通常是 .article 或编辑器预览） */
+function enhanceRichContent(root) {
+  try {
+    if (!root || _richContentOff()) return;
+    // —— Mermaid ——
+    var codes = root.querySelectorAll('code.lang-mermaid, code.language-mermaid');
+    if (codes.length) {
+      var nodes = [];
+      Array.prototype.forEach.call(codes, function (code) {
+        var pre = code.parentNode;
+        var box = document.createElement('div');
+        box.className = 'mermaid';
+        box.textContent = code.textContent || '';
+        if (pre && pre.parentNode) pre.parentNode.replaceChild(box, pre);
+        nodes.push(box);
+      });
+      ensureMermaid().then(function (mm) {
+        try { return mm.run({ nodes: nodes }); } catch (e) { return null; }
+      }).catch(function () {
+        Array.prototype.forEach.call(nodes, function (n) { n.classList.add('mermaid-failed'); });
+      });
+    }
+    // —— KaTeX 数学公式 ——
+    var txt = root.textContent || '';
+    if (/\$\$[\s\S]+?\$\$/.test(txt) || /(^|[^\\$])\$(?!\s)[^$\n]{1,400}?\$/.test(txt)) {
+      ensureKatex().then(function (ok) {
+        if (!ok || !window.renderMathInElement) return;
+        try {
+          window.renderMathInElement(root, {
+            delimiters: [
+              { left: '$$', right: '$$', display: true },
+              { left: '\\[', right: '\\]', display: true },
+              { left: '$', right: '$', display: false },
+              { left: '\\(', right: '\\)', display: false }
+            ],
+            throwOnError: false
+          });
+        } catch (e) {}
+      });
+    }
+  } catch (e) { /* 富内容渲染失败不影响正文 */ }
+}
+
 function renderPostFail(post) {
   var html = renderNav(currentRoute().path);
   html += '<main class="container page-fade"><div class="post-body"><div class="post-header"><h1>' + esc(post.title || t('post.untitled')) + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span></div></div>';

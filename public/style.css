@@ -3234,3 +3234,8 @@ html[data-theme="dark"] body.scrolled .topbar {
 .post-lock-err { min-height: 18px; margin: 10px 0 0; font-size: 13px; color: var(--danger, #d3544a); }
 /* 评论 / 留言反机器人蜜罐：视觉隐藏但仍在 DOM 中（不用 display:none，避免被脚本识别） */
 .hp-field { position: absolute !important; left: -9999px !important; top: auto !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; }
+/* 富内容：Mermaid 图表 / KaTeX 数学公式（按需加载） */
+.mermaid { margin: 1.2em 0; text-align: center; overflow-x: auto; }
+.mermaid svg { max-width: 100%; height: auto; }
+.mermaid-failed { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; color: var(--muted); font-size: 13px; text-align: left; white-space: pre-wrap; }
+.katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }

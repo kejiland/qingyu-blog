@@ -3784,6 +3784,28 @@ tests.push(['文章 SEO 覆盖：字段往返（含清洗）+ 前端标题/描�
   assert.strictEqual(seen['meta[property="og:title"]'].content, '前端 SEO 标题', 'og:title 覆盖');
 }]);
 
+/* 富内容：Mermaid / KaTeX 本地化 + 按需加载 + 功能开关 */
+tests.push(['富内容：Mermaid / KaTeX 本地化并按需加载', async () => {
+  for (const rel of ['libs/katex/katex.min.js', 'libs/katex/katex.min.css', 'libs/katex/contrib/auto-render.min.js', 'libs/mermaid/mermaid.min.js']) {
+    assert.ok(fs.existsSync(path.join(PUB, rel)), rel + ' 已本地化');
+  }
+  assert.ok(fs.readdirSync(path.join(PUB, 'libs/katex/fonts')).some((x) => /\.woff2$/.test(x)), 'KaTeX 字体已本地化');
+  const src = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  assert.ok(src.includes('function enhanceRichContent'), '存在富内容渲染函数');
+  assert.ok(src.includes('code.lang-mermaid, code.language-mermaid'), '识别 mermaid 代码块');
+  assert.ok(src.includes('libs/katex/katex.min.js') && src.includes('libs/mermaid/mermaid.min.js'), '按需加载本地库');
+  assert.ok(src.includes('renderMathInElement'), 'KaTeX auto-render 已接入');
+  assert.ok(src.includes("enhanceRichContent(document.querySelector('.article'))"), '详情页已接入');
+  const admin = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(admin.includes('window.enhanceRichContent(pane)'), '编辑器预览已接入');
+  assert.ok(admin.includes('id="abFeatRichContent"'), '功能开关已接入');
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  assert.strictEqual(typeof b.ctx.enhanceRichContent, 'function', '暴露到全局供编辑器预览调用');
+  b.ctx._siteSettings = { features: JSON.stringify({ richContent: false }) };
+  b.ctx.enhanceRichContent(null);
+  assert.strictEqual(b.win.katex, undefined, '关闭开关时不加载 KaTeX');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;
