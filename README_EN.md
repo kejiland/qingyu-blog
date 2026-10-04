@@ -226,7 +226,7 @@ Or trigger the `Migrate KV to D1` workflow manually from the Actions tab (`dry-r
 | Card list | Cover thumbnails (from `cover` or the first image in the body), pin badge, tags pinned to the bottom, loading skeleton, pagination (`?page=`) |
 | **Dark / light theme** | One-click toggle, follows the system preference, no flash of unstyled content; the top bar deepens its shadow as you scroll |
 | **Accent colours** | **4 accents**: Terra (赭橙) / Indigo (黛蓝) / Bamboo (竹青) / Dusk (凝夜紫). Icon button with a swatch popover on desktop, native select on mobile; each accent also retints backgrounds and borders |
-| **Multilingual UI** | Chinese / English / 日本語 / 한국어 / हिन्दी (926 keys each), auto-detect + manual switch (🌐 popover with SVG flags on desktop, native select on mobile) |
+| **Multilingual UI** | Chinese / English / 日本語 / 한국어 / हिन्दी (929 keys each), auto-detect + manual switch (🌐 popover with SVG flags on desktop, native select on mobile) |
 | **PWA offline reading & writing** | Installable on desktop or mobile; the shell, core assets and previously visited articles work offline. Cloud editor changes are queued locally and synced automatically when the connection returns |
 | **Background animation** | Hand-drawn canvas particles for the four seasons (spring petals / summer green leaves / autumn leaves / six-armed branched snowflakes); home page only, pauses when the tab is hidden; on by default on desktop, off on touch devices, toggleable from the top bar, respects `prefers-reduced-motion`. Preview: `/?season=spring\|summer\|autumn\|winter&bg=1` |
 | **Smoji picker** | Emoji picker in the comment box, guestbook and editor, lazily loaded, with inline rendering in content |
@@ -258,6 +258,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | **Post encryption** | One toggle in the editor encrypts the body: **AES-GCM-256 + PBKDF2-SHA256 (100k iterations), fully client-side**. Plaintext never leaves the browser — the server stores only the ciphertext (`enc`). Readers must enter the password on the article page; the server cannot decrypt it. The editor remembers the password in **this browser** so you can reveal it later with "Show" (this device only) |
 | **AI writing assistant** | One click for title suggestions / polish / translation (5 target languages); apply the result to the title, replace the body, append it, or copy it. The whole bar is not rendered when AI is unavailable |
 | **Comment blocklist** | Maintain a blocklist (one word per line) in settings; comments whose nickname or body matches are **rejected** and never stored |
+| **Comment anti-bot** | Hidden honeypot field + form timestamp: a filled honeypot is treated as a bot and **silently dropped** (success response, nothing stored), and submitting under 2s after the form loads is rejected. Invisible to real visitors; can be disabled under Feature switches |
 | **Bulk comment actions** | Select multiple comments (or the whole page) to **approve / mark pending / delete** in one server request, with an audit-log entry |
 | Comment management | Global list (author / content / post / time / status / actions), keyword search, status filter, **approve** (badge updates in place, no table reload), delete (row fades out); the sidebar shows a live pending-count badge |
 | **AI comment tools** | Summarize recent comment threads (1-hour cache) and screen a single comment for spam (red / green verdict with a reason) |
@@ -266,7 +267,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | Media library | Image upload (browser **direct-to-R2** presigned URLs, metadata in D1), grid preview, **click a thumbnail for a full preview (arrow keys / Esc to close)**, **file-name search + pagination (24 per page)**, **multi-select bulk delete**, copy URL or **copy Markdown image syntax**, delete (R2 object first, then the D1 row); static / non-cloud mode shows a hint |
 | **Music management** | Audio upload (direct to R2 with a percentage progress bar, drag-and-drop supported); **filename parsing fills in "song - artist"**; **title / artist search + pagination (15 per page)**; inline per-row preview (play / pause / seek / elapsed and total time), rename, delete (synced with the R2 object); inner-scrolling list card with a sticky table header |
 | **Feature switches** | Admin → Settings → Feature switches moves code-only toggles into the UI: **posts per page** (0 = no paging) and the **ads master switch** + AdSense client ID + three ad slots (above list / between list items + interval / below post). Saved settings take effect immediately — no code change or redeploy |
-| Blog settings | 6 tabs: **Site basics** (name / description / avatar logo / about-page content / footer copyright / footer notice / moderate new comments), **Feature switches** (home paging / ads / front-end error reporting), **Profile** (name / bio / avatar / email), **Navigation menu** (visual editor with add / remove / sub-items / reset), **Footer navigation**, **Friend links** |
+| Blog settings | 6 tabs: **Site basics** (name / description / avatar logo / about-page content / footer copyright / footer notice / moderate new comments), **Feature switches** (home paging / ads / front-end error reporting / comment anti-bot), **Profile** (name / bio / avatar / email), **Navigation menu** (visual editor with add / remove / sub-items / reset), **Footer navigation**, **Friend links** |
 | **Front-end error log** | Captures unhandled exceptions and promise rejections in visitors' browsers and reports them anonymously to `/admin/errors`; identical errors are grouped with a hit count (plus source, page and UA), searchable and clearable. On by default, can be disabled under Feature switches |
 | **Site health check** | `/admin/health` verifies D1 table readability (with row counts), KV read/write, R2 media & backup buckets, and AI / mail (Resend) bindings |
 | **Traffic sources / devices** | Records the referrer host and device type (desktop / mobile / tablet / bot) for every view, aggregated per day; the dashboard shows a 30-day card with top referrers and device share |
@@ -341,7 +342,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 │   ├── bg-anim.js / bg-anim.min.js    # Four-season canvas background animation
 │   ├── i18n.js / i18n.min.js          # i18n module (zh/en/ja/ko/hi, built-in Chinese fallback)
 │   ├── posts.js / posts.min.js        # Static-mode post data (generated by "Export posts.js")
-│   ├── locales/                       # Language packs (zh-CN / en / ja / ko / hi, 926 keys each)
+│   ├── locales/                       # Language packs (zh-CN / en / ja / ko / hi, 929 keys each)
 │   ├── flags/                         # SVG flags for the language switcher (cn / gb / jp / kr / in)
 │   ├── libs/smoji/                    # Smoji emoji picker (lazy-loaded)
 │   ├── robots.txt                     # Crawler rules (blocks admin, declares the sitemap)
@@ -606,7 +607,7 @@ window.BLOG_CONFIG = {
 
 ### Multilingual (i18n)
 
-`i18n.js` ships 5 languages (Chinese / English / 日本語 / 한국어 / हिन्दी) with **926 keys each**. Detection order: `localStorage('blog.locale')` → `navigator.language`, plus a manual switcher. Packs live in `public/locales/<lang>.json`; Chinese is also embedded as a fallback so core text stays readable when previewing via `file://`.
+`i18n.js` ships 5 languages (Chinese / English / 日本語 / 한국어 / हिन्दी) with **929 keys each**. Detection order: `localStorage('blog.locale')` → `navigator.language`, plus a manual switcher. Packs live in `public/locales/<lang>.json`; Chinese is also embedded as a fallback so core text stays readable when previewing via `file://`.
 
 ---
 

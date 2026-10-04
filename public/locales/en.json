@@ -924,5 +924,8 @@
   "admin.errors.empty": "No errors recorded",
   "admin.settings.featDiag": "Diagnostics",
   "admin.settings.featErrReport": "Front-end error reporting",
-  "admin.settings.featErrReportHint": "When on, runtime errors in visitors' browsers are reported anonymously to the Error log so broken features surface quickly (no personal data)"
+  "admin.settings.featErrReportHint": "When on, runtime errors in visitors' browsers are reported anonymously to the Error log so broken features surface quickly (no personal data)",
+  "admin.settings.featAntiSpam": "Comment anti-spam",
+  "admin.settings.featCommentGuard": "Comment anti-bot check",
+  "admin.settings.featCommentGuardHint": "When on: a filled hidden honeypot field is treated as a bot (silently dropped), and submitting less than 2s after the form loads is rejected. Normal visitors notice nothing."
 }

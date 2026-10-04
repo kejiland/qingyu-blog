@@ -924,5 +924,8 @@
   "admin.errors.empty": "오류 기록이 없습니다",
   "admin.settings.featDiag": "진단 및 보고",
   "admin.settings.featErrReport": "프런트엔드 오류 보고",
-  "admin.settings.featErrReportHint": "켜면 방문자 브라우저의 런타임 오류가 익명으로 「오류 로그」에 보고되어 문제를 빠르게 발견할 수 있습니다(개인정보 없음)"
+  "admin.settings.featErrReportHint": "켜면 방문자 브라우저의 런타임 오류가 익명으로 「오류 로그」에 보고되어 문제를 빠르게 발견할 수 있습니다(개인정보 없음)",
+  "admin.settings.featAntiSpam": "댓글 스팸 방지",
+  "admin.settings.featCommentGuard": "댓글 봇 방지 검사",
+  "admin.settings.featCommentGuardHint": "켜면 숨겨진 허니팟 필드가 채워지면 봇으로 간주해 조용히 버리고, 폼 표시 후 2초 이내 제출은 거부합니다. 일반 방문자에게는 영향이 없습니다."
 }

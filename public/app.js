@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.48';
+var BLOG_VERSION = '2.10.49';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1348,7 +1348,7 @@ async function loadComments(postId) {
   return arr;
 }
 
-async function saveComment(postId, author, content, parentId) {
+async function saveComment(postId, author, content, parentId, guard) {
   var id = String(postId || '');
   author = String(author || '').trim().slice(0, 30);
   content = String(content || '').trim().slice(0, 1000);
@@ -1359,7 +1359,12 @@ async function saveComment(postId, author, content, parentId) {
     // 由调用方（文章评论 / 留言板）在状态行展示，用户能明确知道为何未发表成功。
     var data = await apiFetch(commentApi(id), {
       method: 'POST',
-      body: JSON.stringify({ author: author, content: content, parent_id: parentId })
+      // 反机器人：蜜罐字段（正常用户不会填）+ 表单渲染时间戳
+      body: JSON.stringify({
+        author: author, content: content, parent_id: parentId,
+        hp: (guard && guard.hp) || '',
+        ts: (guard && guard.ts) || 0
+      })
     });
     var c = (data && data.comment) || null;
     if (c) { try { delete _commentsCache[id]; } catch (e) {} }
@@ -2909,7 +2914,7 @@ async function renderPost(id) {
     '<div class="comment-sort" id="commentSort" role="tablist"><button type="button" class="cs-btn active" data-sort="hot" role="tab" aria-selected="true">' + t('comment.sortHot') + '</button><button type="button" class="cs-btn" data-sort="new" role="tab" aria-selected="false">' + t('comment.sortNew') + '</button></div></div>';
   html += '<p class="comment-hint">' + t('comment.hint') + '</p>';
   html += '<div class="reply-indicator" id="replyIndicator" style="display:none"><span id="replyTo"></span><button class="reply-cancel" id="replyCancel">✕</button></div>';
-  html += '<div class="comment-form"><input type="text" id="commentAuthor" maxlength="30" placeholder="' + t('comment.authorPlaceholder') + '"><div class="comment-editor-row"><textarea id="commentContent" rows="2" maxlength="1000" placeholder="' + t('comment.contentPlaceholder') + '"></textarea><button type="button" class="comment-emoji-btn" id="commentEmoji" title="' + t('comment.emoji') + '" aria-label="' + t('comment.emoji') + '">😊</button></div><div class="comment-submit-row"><button class="btn btn-primary" id="commentSubmit">' + t('comment.submit') + '</button><span class="c-status" id="commentStatus"></span></div></div>';
+  html += '<div class="comment-form"><input class="hp-field" type="text" id="commentHp" name="hp" tabindex="-1" autocomplete="off" aria-hidden="true">' + '<input type="text" id="commentAuthor" maxlength="30" placeholder="' + t('comment.authorPlaceholder') + '"><div class="comment-editor-row"><textarea id="commentContent" rows="2" maxlength="1000" placeholder="' + t('comment.contentPlaceholder') + '"></textarea><button type="button" class="comment-emoji-btn" id="commentEmoji" title="' + t('comment.emoji') + '" aria-label="' + t('comment.emoji') + '">😊</button></div><div class="comment-submit-row"><button class="btn btn-primary" id="commentSubmit">' + t('comment.submit') + '</button><span class="c-status" id="commentStatus"></span></div></div>';
   html += '<ul class="comment-list" id="commentList"></ul><div class="comment-more" id="commentMore" style="display:none"><button type="button" class="btn" id="commentMoreBtn">' + t('comment.loadMore') + '</button></div></div>';
 
   // 精选文章（评论区下方）
@@ -3352,6 +3357,7 @@ async function renderPost(id) {
   if (commentEmoji && commentContent && window.initSmojiPicker) window.initSmojiPicker(commentEmoji, commentContent);
 
   var submit = document.querySelector('#commentSubmit');
+  var commentFormTs = Date.now();   // 反机器人：表单渲染时间
   if (submit) submit.addEventListener('click', async function () {
     var a = document.querySelector('#commentAuthor');
     var c = document.querySelector('#commentContent');
@@ -3362,7 +3368,8 @@ async function renderPost(id) {
     var parentId = (indicator && indicator.getAttribute('data-reply-id')) || null;
     submit.disabled = true;
     try {
-      await saveComment(post.id, a.value, c.value, parentId);
+      var hpEl = document.querySelector('#commentHp');
+      await saveComment(post.id, a.value, c.value, parentId, { hp: hpEl ? hpEl.value : '', ts: commentFormTs });
       if (st) st.textContent = t('comment.posted');
       if (c) c.value = '';
       if (indicator) { indicator.style.display = 'none'; indicator.removeAttribute('data-reply-id'); }
@@ -3665,7 +3672,7 @@ function renderGuestbook() {
     // 发表表单
     + '<div class="guestbook-form card">'
     + '<div class="gb-form-row">'
-    + '<input type="text" id="gbAuthor" maxlength="30" placeholder="' + t('guestbook.authorPlaceholder') + '" autocomplete="name">'
+    + '<input class="hp-field" type="text" id="gbHp" name="hp" tabindex="-1" autocomplete="off" aria-hidden="true">' + '<input type="text" id="gbAuthor" maxlength="30" placeholder="' + t('guestbook.authorPlaceholder') + '" autocomplete="name">'
     + '<button class="gb-submit" id="gbSubmit" type="button" aria-label="' + t('guestbook.postAnon') + '">' + svgIcon('send', 15) + '</button>'
     + '</div>'
     + '<div class="gb-kind-hint" id="gbKindHint">' + svgIcon('pen', 13) + ' <span></span></div>'
@@ -3745,13 +3752,15 @@ async function bindGuestbook() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); onPost(); }
     });
   }
+  var gbFormTs = Date.now();   // 反机器人：表单渲染时间
   async function onPost() {
     if (!author || !content || !status) return;
     if (!author.value.trim() || !content.value.trim()) { status.textContent = t('guestbook.fillBoth'); return; }
     submit.disabled = true;
     status.textContent = t('guestbook.posting');
     try {
-      var c = await saveComment(guestbookId(kind), author.value, content.value);
+      var gbHpEl = document.querySelector('#gbHp');
+      var c = await saveComment(guestbookId(kind), author.value, content.value, null, { hp: gbHpEl ? gbHpEl.value : '', ts: gbFormTs });
       status.textContent = t('guestbook.posted');
       content.value = '';
       load();

@@ -924,5 +924,8 @@
   "admin.errors.empty": "暂无错误记录",
   "admin.settings.featDiag": "诊断与上报",
   "admin.settings.featErrReport": "前端错误上报",
-  "admin.settings.featErrReportHint": "开启后，访客浏览器里的运行时异常会匿名上报到「错误日志」，便于及时发现功能异常（不含个人隐私）"
+  "admin.settings.featErrReportHint": "开启后，访客浏览器里的运行时异常会匿名上报到「错误日志」，便于及时发现功能异常（不含个人隐私）",
+  "admin.settings.featAntiSpam": "评论反垃圾",
+  "admin.settings.featCommentGuard": "评论反机器人校验",
+  "admin.settings.featCommentGuardHint": "开启后：隐藏蜜罐字段被填写视为机器人（静默丢弃），表单填入不足 2 秒即提交会被拒绝；对正常访客无感"
 }

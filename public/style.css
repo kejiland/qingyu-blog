@@ -3232,3 +3232,5 @@ html[data-theme="dark"] body.scrolled .topbar {
 .post-lock-input { flex: 1 1 auto; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 14px; font-family: inherit; }
 .post-lock-input:focus { outline: none; border-color: var(--accent); }
 .post-lock-err { min-height: 18px; margin: 10px 0 0; font-size: 13px; color: var(--danger, #d3544a); }
+/* 评论 / 留言反机器人蜜罐：视觉隐藏但仍在 DOM 中（不用 display:none，避免被脚本识别） */
+.hp-field { position: absolute !important; left: -9999px !important; top: auto !important; width: 1px !important; height: 1px !important; opacity: 0 !important; pointer-events: none !important; }

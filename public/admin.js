@@ -4231,7 +4231,8 @@
     settingsDraft.features = {
       pageSize: (feat && feat.pageSize != null) ? Number(feat.pageSize) : (isFinite(baseSize) && baseSize >= 0 ? Math.floor(baseSize) : 8),
       ads: Object.assign({}, baseAds, featAds),
-      errorReport: !(feat && feat.errorReport === false)
+      errorReport: !(feat && feat.errorReport === false),
+      commentGuard: !(feat && feat.commentGuard === false)
     };
   }
   function saveTabToDraft(content) {
@@ -4270,7 +4271,8 @@
           betweenEvery: Math.max(1, Math.floor(Number(everyRaw) || 3)),
           content: val(content, '#abAdsContent')
         },
-        errorReport: content.querySelector('#abFeatErrReport') ? content.querySelector('#abFeatErrReport').checked : true
+        errorReport: content.querySelector('#abFeatErrReport') ? content.querySelector('#abFeatErrReport').checked : true,
+        commentGuard: content.querySelector('#abFeatCommentGuard') ? content.querySelector('#abFeatCommentGuard').checked : true
       };
     }
     if (content.querySelector('#abNavVisual')) collectNavFromDom(content);
@@ -4346,6 +4348,7 @@
     if (content.querySelector('#abAdsBetweenEvery')) content.querySelector('#abAdsBetweenEvery').value = (fads.betweenEvery != null ? fads.betweenEvery : 3);
     if (content.querySelector('#abAdsContent')) content.querySelector('#abAdsContent').value = fads.content || '';
     if (content.querySelector('#abFeatErrReport')) content.querySelector('#abFeatErrReport').checked = (feat.errorReport !== false);
+    if (content.querySelector('#abFeatCommentGuard')) content.querySelector('#abFeatCommentGuard').checked = (feat.commentGuard !== false);
     if (content.querySelector('#abProfileName')) content.querySelector('#abProfileName').value = prof.name || '';
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
@@ -4378,6 +4381,8 @@
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featPageSize') + '</label><input class="ab-input" id="abFeatPageSize" type="number" min="0" step="1" style="max-width:180px"><label class="ab-hint">' + t('admin.settings.featPageSizeHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('bug', 15) + ' ' + t('admin.settings.featDiag') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatErrReport"> ' + t('admin.settings.featErrReport') + '</label><label class="ab-hint">' + t('admin.settings.featErrReportHint') + '</label></div>' +
+        '<div class="ab-section-title" style="margin-top:16px">' + icon('quote', 15) + ' ' + t('admin.settings.featAntiSpam') + '</div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatCommentGuard"> ' + t('admin.settings.featCommentGuard') + '</label><label class="ab-hint">' + t('admin.settings.featCommentGuardHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('spark', 15) + ' ' + t('admin.settings.featAds') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAdsEnabled"> ' + t('admin.settings.featAdsEnable') + '</label><label class="ab-hint">' + t('admin.settings.featAdsEnableHint') + '</label></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsClient') + '</label><input class="ab-input" id="abAdsClient" placeholder="ca-pub-xxxxxxxxxxxxxxxx"></div>' +
@@ -4480,7 +4485,8 @@
       features: JSON.stringify({
         pageSize: (settingsDraft.features && settingsDraft.features.pageSize != null) ? settingsDraft.features.pageSize : 8,
         ads: (settingsDraft.features && settingsDraft.features.ads) || {},
-        errorReport: !(settingsDraft.features && settingsDraft.features.errorReport === false)
+        errorReport: !(settingsDraft.features && settingsDraft.features.errorReport === false),
+        commentGuard: !(settingsDraft.features && settingsDraft.features.commentGuard === false)
       })
     };
     try {

@@ -3683,6 +3683,49 @@ tests.push(['前端错误上报：同一错误只报一次，开关可关闭', a
   assert.strictEqual(sent.length, 1, '功能开关关闭后不再上报');
 }]);
 
+/* 评论反机器人：蜜罐静默丢弃 + 提交过快拒绝 + 功能开关可关闭 */
+tests.push(['评论反机器人：蜜罐静默丢弃 + 过快拒绝 + 开关可关闭', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  const post = (body) => core.handleComments(new Request('http://t/api/posts/p1/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env, 'p1');
+  let r = await post({ author: '甲', content: '正常评论', ts: Date.now() - 60000 });
+  assert.strictEqual(r.status, 201, '正常评论可发表');
+  r = await post({ author: 'bot', content: 'spam', hp: 'http://spam.example', ts: Date.now() - 60000 });
+  assert.strictEqual(r.status, 200, '蜜罐命中返回 200（不暴露给机器人）');
+  assert.strictEqual((await r.json()).filtered, true, '标记为已过滤');
+  r = await post({ author: '甲二', content: '太快了', ts: Date.now() });
+  assert.strictEqual(r.status, 429, '提交过快被拒');
+  let list = await (await core.handleComments(new Request('http://t/api/posts/p1/comments'), env, 'p1')).json();
+  assert.strictEqual(list.comments.length, 1, '仅正常评论入库');
+  // 旧客户端不带 ts → 不受时间戳限制（兼容）
+  r = await post({ author: '丙', content: '老客户端' });
+  assert.strictEqual(r.status, 201, '缺少 ts 时按兼容放行');
+  // 后台关闭反机器人 → 蜜罐 / 时间戳都不再拦截
+  env._d1.site_settings.set('features', { k: 'features', v: JSON.stringify({ commentGuard: false }) });
+  r = await post({ author: '丁', content: '关闭后蜜罐也能发', hp: 'x', ts: Date.now() });
+  assert.strictEqual(r.status, 201, '关闭开关后不再拦截');
+}]);
+
+/* 评论表单：提交体带上蜜罐与时间戳字段 */
+tests.push(['评论表单：提交带蜜罐与时间戳字段', async () => {
+  const bodies = [];
+  const fn = async (url, opts) => {
+    const u = String(url);
+    if (u.indexOf('/comments') >= 0 && opts && String(opts.method || '').toUpperCase() === 'POST') {
+      bodies.push(JSON.parse(opts.body));
+      return { ok: true, status: 201, json: async () => ({ ok: true, comment: { id: 'c1', author: '甲', content: '你好' } }) };
+    }
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn });
+  await b.ctx.saveComment('p1', '甲', '你好', null, { hp: '', ts: Date.now() - 5000 });
+  assert.strictEqual(bodies.length, 1, '发表评论调用一次接口');
+  assert.ok('hp' in bodies[0] && 'ts' in bodies[0], '提交体包含蜜罐与时间戳');
+  assert.strictEqual(bodies[0].hp, '', '蜜罐为空');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

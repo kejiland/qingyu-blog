@@ -347,6 +347,16 @@ async function readStaticPosts(env) {
     return Array.isArray(arr) ? arr.map(normalizePost) : [];
   } catch (e) { return []; }
 }
+/** 反机器人开关（后台「功能开关」→ features.commentGuard，默认开） */
+async function commentGuardEnabled(env) {
+  try {
+    const row = await dbFirst(env.DB, 'SELECT v FROM site_settings WHERE k = ?', 'features');
+    if (!row || !row.v) return true;
+    const f = JSON.parse(String(row.v));
+    return !(f && f.commentGuard === false);
+  } catch (e) { return true; }
+}
+const COMMENT_MIN_FILL_MS = 2000;   // 表单渲染到提交的最短间隔（低于此值视为机器人）
 
 /** GET /api/posts（列表） · POST /api/posts（新建） */
 export async function handlePosts(request, env) {
@@ -572,6 +582,17 @@ export async function handleComments(request, env, postId) {
       console.warn('[comments] env.BLOG(KV) 未绑定，评论频率限制已禁用');
     }
     const body = await request.json().catch(() => null);
+    // 反机器人（可在后台「功能开关」关闭）：
+    //   ① 蜜罐字段被填写 → 静默丢弃（返回成功但不入库，机器人无法判断是否命中）；
+    //   ② 表单渲染到提交过快（且客户端上报了 ts）→ 拒绝。旧客户端不带 ts，不受影响。
+    if (await commentGuardEnabled(env)) {
+      const hp = String((body && (body.hp || body.website)) || '').trim();
+      if (hp) return json({ ok: true, comment: null, filtered: true }, 200, request, env);
+      const formTs = Number(body && body.ts) || 0;
+      if (formTs > 0 && Date.now() - formTs < COMMENT_MIN_FILL_MS) {
+        return json({ error: '提交太快了，请确认内容后重试' }, 429, request, env);
+      }
+    }
     const author = sanitizeText(String((body && body.author) || '').trim()).slice(0, COMMENT_CAPS.author);
     const content = sanitizeText(String((body && body.content) || '').trim()).slice(0, COMMENT_CAPS.content);
     if (!author) return json({ error: '请填写昵称' }, 400, request, env);
