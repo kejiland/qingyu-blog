@@ -59,6 +59,10 @@ Qingyu'Blog（轻语博客）是一个**纯原生 JavaScript** 编写的个人�
 
 整个博客本体就在 `public/` 目录：前台 `index.html` + `style.css` + `app.js` + `posts.js` + `music-player.js` + `bg-anim.js`，后台 `admin.js` + `admin.css`，国际化 `i18n.js` + `locales/`。
 
+> 🆕 **当前版本 `v2.10.60`**。除写作 / 评论 / 统计等基础能力外，还内置：**文章加密**（AES-GCM 纯前端）、**文章级 SEO**（标题 / 描述 / canonical / noindex）、**草稿预览分享链接**（HMAC 签名）、**一键导出静态站**、**打印 / 导出 PDF**、**Webmention**、**多作者与作者页**、**Mermaid 图表 + KaTeX 公式**（本地化按需加载）、**订阅分组群发**、**前端错误日志**、**评论反机器人**、**访问国家 / 设备识别**，以及后台「**功能开关**」等。
+
+> 完整变更历史见仓库 [提交记录](https://github.com/kejiland/qingyu-blog/commits/main)。
+
 > 💡 仓库根目录的 `index.html` 只是一个跳转页，会自动打开 `public/index.html`（Workers / Pages 的部署目录）。本地双击 `public/index.html` 同样可用。
 
 > 🆕 **第一次部署 Cloudflare？** 请直接看 **[Cloudflare 配置完全指南（新手版）](CLOUDFLARE_SETUP_GUIDE.md)** —— 从注册账号、创建 D1/KV、申请 API Token，到 R2 桶与 CORS、绑定域名、首次初始化管理员，每一步都写了在控制台的哪个位置点什么。
@@ -71,7 +75,7 @@ Qingyu'Blog（轻语博客）是一个**纯原生 JavaScript** 编写的个人�
 | --- | --- |
 | **零门槛** | 不需要 Node.js、不需要 npm、不需要构建，双击即可运行 |
 | **零成本** | Cloudflare Workers + D1 + KV + R2 的免费额度完全够个人博客使用 |
-| **零依赖** | 不引入任何第三方运行时库，代码量可控，加载极快 |
+| **零依赖** | 核心（前台 / 后台 / i18n）不引入任何第三方运行时库；表情 / 图表 / 公式等重量级库**按需加载**且已本地化在 `public/libs/`，页面用不到就一个字节都不下载 |
 | **零锁定** | 文章是 Markdown 文本，数据在标准 SQLite（D1），随时可以迁走 |
 | **双通道** | 静态导出 + 云端 API，同一份代码两种部署方式 |
 | **响应式** | 前台 + 后台均支持手机 / 平板 / 桌面全适配 |
@@ -79,6 +83,8 @@ Qingyu'Blog（轻语博客）是一个**纯原生 JavaScript** 编写的个人�
 | **书卷美学** | 宋体正文 + 仿宋引用装饰，**零 webfont 下载**；四季背景动画（春樱 / 夏光 / 秋叶 / 冬雪） |
 | **安全** | 密码 PBKDF2-SHA256 加盐哈希（10 万次迭代）、会话令牌鉴权、登录失败限流锁定、CSP 等安全响应头 |
 | **AI 增强** | Workers AI 提供文章摘要 / 写作助手 / 评论汇总 / 垃圾检测；未配置或关闭时自动隐藏入口、对博客零影响 |
+| **内容工具链** | 文章加密、SEO 覆盖、草稿自动保存与崩溃恢复、预览分享链接、静态站导出、打印 / PDF、Webmention 引用、多作者页——写作与分发闭环 |
+| **可观测** | 后台仪表盘（趋势 / 来源 / 国家 / 设备 / 品牌）、站点健康检查、操作审计日志、**前端错误日志**（自动捕获访客端异常并按相同错误聚合） |
 
 ---
 
@@ -156,7 +162,7 @@ npx wrangler kv namespace create BLOG
 推送代码或手动运行 Actions，工作流会自动：
 
 1. ✅ 安装 Wrangler CLI
-2. ✅ 运行三套测试（`smoke-test.js` 85 例 / `gb-verify.js` 18 例 / `search-verify.js` 13 例，失败即中止不部署）
+2. ✅ 运行三套测试（`smoke-test.js` 158 例 / `gb-verify.js` 18 例 / `search-verify.js` 25 例，失败即中止不部署）
 3. ✅ 校验必要 Secrets 与 ID 格式
 4. ✅ 执行 D1 迁移（`schema_migrations` 记账表 + 列预检 + 报错兜底，三层幂等）
 5. ✅ 部署 Worker 到 Cloudflare
@@ -333,6 +339,7 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   ├── bg-anim.js / bg-anim.min.js    # 四季 canvas 背景动画
 │   ├── i18n.js / i18n.min.js          # 国际化模块（中/英/日/韩/印地，内置中文兜底）
 │   ├── posts.js / posts.min.js        # 静态模式文章数据（由「导出 posts.js」生成）
+│   ├── static-export.json             # 「导出静态站」的资源清单（列出需打包的静态文件）
 │   ├── locales/                       # 语言包（zh-CN / en / ja / ko / hi，各 990 键）
 │   ├── flags/                         # 语言切换用的 SVG 国旗（cn / gb / jp / kr / in）
 │   ├── libs/smoji/                    # Smoji 表情选择器（按需加载）
@@ -347,49 +354,77 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 │   # feed.xml / sitemap.xml 由云端动态生成（见 functions/）
 ├── functions/                         # Cloudflare API（Pages Functions / Workers 共用）
 │   ├── api/
-│   │   ├── posts.js                   # 文章列表 / 创建
-│   │   ├── posts/[id].js              # 单篇文章（GET / PUT / DELETE，删除级联清理）
-│   │   ├── posts/[id]/comments.js     # 文章评论（GET / POST，3 层嵌套）
-│   │   ├── posts/[id]/comments/[cid].js  # 单条评论删除
-│   │   ├── posts/[id]/stats.js        # 阅读 / 点赞统计
-│   │   ├── comments.js                # 全局评论列表（后台）
-│   │   ├── comments/[id].js           # 评论审核 / 删除
-│   │   ├── ai/{ping,summary,assist,comments}.js  # AI 探测 / 摘要 / 写作助手 / 评论工具
-│   │   ├── media.js                   # 媒体列表 / 登记元数据（仅 http/https）
-│   │   ├── media/upload-url.js        # 签发 R2 预签名上传 URL（图片直传）
-│   │   ├── media/[id].js              # 媒体删除（先删 R2 对象再删 D1 行）
-│   │   ├── settings.js                # 站点设置
-│   │   ├── stats/trend.js             # 近 N 天（1~90，默认 30）趋势数据
-│   │   ├── site-files/index.js        # 站点产物：列出 / 保存
-│   │   ├── site-files/[name].js       # 站点产物：下载内容
-│   │   ├── admin/{setup,login,logout,password}.js  # 初始化 / 登录 / 登出 / 改密
-│   │   ├── feed.xml.js                # /api/feed.xml 动态 RSS（兼容旧入口）
-│   │   ├── sitemap.xml.js             # /api/sitemap.xml 动态 Sitemap（兼容旧入口）
+│   │   ├── posts.js                   # 文章列表 / 创建（?all=1 含草稿、?full=1 含正文、?page 服务端分页）
+│   │   ├── posts/[id].js              # 单篇文章 GET / PUT / DELETE（删除级联清理评论与统计）
+│   │   ├── posts/[id]/comments.js     # 文章评论 GET / POST（3 层嵌套 + 服务端分页）
+│   │   ├── posts/[id]/comments/[cid].js        # 单条评论删除
+│   │   ├── posts/[id]/stats.js        # 阅读 / 点赞（同时记录来源、国家、设备、系统、品牌）
+│   │   ├── posts/[id]/relations.js    # 双向链接 + 相关文章推荐
+│   │   ├── posts/[id]/revisions*.js   # 文章版本历史：列表 / 单版本 / 恢复
+│   │   ├── comments.js                # 全局评论列表（后台，可按状态过滤）
+│   │   ├── comments/[id].js           # 评论审核（通过 / 待审 / 精选 / 置顶）/ 删除
+│   │   ├── comments/[id]/like.js      # 评论点赞
+│   │   ├── ai/{ping,summary,assist,comments}.js  # AI 探测 / 摘要 / 写作助手 / 评论汇总与垃圾检测
+│   │   ├── media.js · media/upload-url.js · media/[id].js   # 媒体库：列表 / R2 直传签名 / 删除
+│   │   ├── music.js · music/upload-url.js · music/[id].js   # 音乐：列表 / 直传签名 / 重命名 / 删除
+│   │   ├── subscribe.js · subscribe/{confirm,unsubscribe}.js  # 订阅：申请 / 双重确认 / 退订
+│   │   ├── settings.js                # 站点设置 GET / PUT（含「功能开关」features）
+│   │   ├── search.js                  # 全文搜索（FTS5 trigram，短词回退 LIKE）
+│   │   ├── popular.js                 # 热门文章排行（全部 / 近 7 天 / 近 30 天）
+│   │   ├── stats/trend.js             # 近 N 天访问 / 点赞 / 评论趋势
+│   │   ├── errors.js                  # 前端错误上报（公开、限流、按指纹聚合）
+│   │   ├── webmention.js              # Webmention：接收通知 / 查询某篇文章的引用
+│   │   ├── preview.js                 # 草稿预览（凭 HMAC 签名 token 读取未发布文章）
+│   │   ├── site-files/index.js · site-files/[name].js  # 站点产物（feed / sitemap）：列出 / 下载
+│   │   ├── admin/{setup,login,logout,password}.js      # 初始化 / 登录 / 登出 / 改密
+│   │   ├── admin/{health,audit-log,tags,comments/bulk,post-analytics,og-upload-url}.js  # 健康检查 / 审计 / 标签批处理 / 评论批处理 / 文章数据 / 分享图
+│   │   ├── admin/{stats/sources,errors,preview-link,webmentions}.js                     # 来源统计 / 错误日志 / 预览链接 / 引用管理
+│   │   ├── admin/{subscribers,subscribers/[id],subscribers/broadcast}.js                # 订阅者列表 / 分组 / 群发
+│   │   ├── admin/{backups,backups/[id],backups/[id]/restore}.js                         # 备份列表 / 下载删除 / 恢复
+│   │   ├── feed.xml.js · sitemap.xml.js                     # /api/feed.xml · /api/sitemap.xml
 │   │   └── [[path]].js                # /api/* 兜底：未知接口一律返回 JSON 404（绝不回退 HTML）
-│   ├── feed.xml.js                    # 根路径 /feed.xml 动态 RSS
-│   ├── sitemap.xml.js                 # 根路径 /sitemap.xml 动态 Sitemap
+│   ├── feed.xml.js · sitemap.xml.js   # 根路径 /feed.xml · /sitemap.xml
 │   └── _lib/
-│       ├── api-core.js                # API 核心（D1 + 鉴权 + 安全 + 限流 + RSS/Sitemap）
-│       ├── ai.js                      # Workers AI 封装（模型 / 提示词 / 限流 / 缓存 / 降级）
-│       ├── media.js                   # 媒体 R2 直传（签名 / 删除 / 元数据）
-│       └── music.js                   # 音乐 API（R2 预签名直传 / 元数据 CRUD / R2 对象同步删除）
+│       ├── api-core.js                # API 核心：文章 / 评论 / 统计 / 设置 / 鉴权 / 安全头 / 限流 / RSS / Sitemap
+│       ├── search.js · popular.js · relations.js · analytics.js   # 全文搜索 / 热门 / 关联 / 文章数据
+│       ├── subscribe.js               # 邮件订阅、订阅者分组、群发与发件箱投递
+│       ├── backup.js                  # R2 备份与恢复（含预恢复快照）
+│       ├── media.js · music.js · og.js                          # R2 直传 / 音乐元数据 / 分享图生成
+│       └── ai.js                      # Workers AI 封装（模型 / 提示词 / 限流 / 缓存 / 降级）
 ├── worker.js                          # Cloudflare Workers 入口（路由分发 + 静态资源 + SPA 回退 + 缓存头）
 ├── migrations/                        # D1 迁移（CI 自动执行，记账表幂等）
-│   ├── 0001_init.sql                  # 基础表（posts / comments / stats / admin_*）
-│   ├── 0002_site_files.sql            # 站点产物存储
-│   ├── 0003_cover_column.sql          # 封面图字段（老库补列）
-│   ├── 0004_post_meta.sql             # 分类 / 发布状态（老库补列）
-│   ├── 0005_comment_status.sql        # 评论审核状态（老库补列）
-│   ├── 0006_media.sql                 # 媒体资源表
-│   ├── 0007_settings.sql              # 站点设置表
-│   ├── 0008_stats_daily.sql           # 每日统计表
-│   ├── 0009_comment_status_index.sql  # 评论状态索引
-│   ├── 0010_admin_must_change.sql     # 强制改密标记（老库补列）
-│   ├── 0011_comment_reply.sql         # 评论 parent_id 字段（老库补列）
-│   ├── 0012_clear_orphaned_nav.sql    # 清理遗留 nav 配置
-│   ├── 0013_music.sql                 # 音乐播放列表元数据表
-│   ├── 0014_purge_base64_media.sql    # 清理历史 base64 媒体记录
-│   └── 0015_hot_path_indexes.sql      # 热点路径索引（评论 / 音乐 / 媒体 / 会话）
+│   ├── 0001_init.sql                      # 基础表（posts / comments / stats / admin_auth / admin_se…
+│   ├── 0002_site_files.sql                # 站点生成产物（feed.xml / sitemap.xml）：随文章发布/删除一同写入云端，供下载与备份
+│   ├── 0003_cover_column.sql              # 封面图列：为已存在部署的 posts 表补列（新部署已含于 0001_init.sql，此脚本幂等）
+│   ├── 0004_post_meta.sql                 # 文章补充字段：分类(category) 与 发布状态(status)
+│   ├── 0005_comment_status.sql            # 评论补充字段：审核状态(status)
+│   ├── 0006_media.sql                     # 媒体资源库（图片上传库）：后台「媒体库」页面使用
+│   ├── 0007_settings.sql                  # 站点设置（键值对）：后台「博客设置」页面持久化配置
+│   ├── 0008_stats_daily.sql               # 每日阅读/点赞聚合：用于后台「近 N 天访问趋势 / 点赞趋势」图表
+│   ├── 0009_comment_status_index.sql      # 评论审核状态索引（幂等：CREATE INDEX IF NOT EXISTS 可安全重复执行）。
+│   ├── 0010_admin_must_change.sql         # 管理员认证：新增 must_change 字段
+│   ├── 0011_comment_reply.sql             # 评论回复功能：添加 parent_id 字段
+│   ├── 0012_clear_orphaned_nav.sql        # 清理被移除的「导航菜单」配置模块遗留在 site_settings 的 nav 键值。
+│   ├── 0013_music.sql                     # 音乐播放列表（元数据存 D1；音频文件本体在 Cloudflare R2，url 为公开可读地址）
+│   ├── 0014_purge_base64_media.sql        # 清理历史遗留的「图片存 D1」记录：早期媒体库以 data URL（base64）把图片内容直接存进
+│   ├── 0015_hot_path_indexes.sql          # 热点路径索引（评论 / 音乐 / 媒体 / 会话）
+│   ├── 0016_scheduled_publishing.sql      # 定时发布：在 status='scheduled' 时保存预计发布时间（UTC 毫秒时间戳）
+│   ├── 0017_post_revisions.sql            # 文章版本历史：每篇文章最多保留 50 个快照
+│   ├── 0018_backups.sql                   # R2 备份元数据：备份文件本体存私有 R2_BACKUP_BUCKET
+│   ├── 0019_post_series.sql               # 文章系列 / 专栏：一篇文章归属一个系列，series_order 控制系列内顺序
+│   ├── 0020_subscribers.sql               # 邮件订阅与通知发件箱（双重确认 + 异步发送）
+│   ├── 0021_post_og_image.sql             # 自动分享图（OG Image）：R2 公开地址
+│   ├── 0022_media_thumb.sql               # 媒体缩略图：浏览器端压缩上传时同时生成 WebP 缩略图
+│   ├── 0023_post_fts.sql                  # 文章 FTS5 全文索引（trigram，自动同步 posts）
+│   ├── 0024_comment_notifications.sql     # 邮件发件箱：区分文章订阅通知与站长评论通知
+│   ├── 0025_comment_interactions.sql      # 评论互动：点赞、精选、置顶
+│   ├── 0026_audit_log.sql                 # 后台操作审计日志：记录备份/恢复/删除/设置变更等关键操作
+│   ├── 0027_stats_sources.sql             # 访问来源 / 设备统计：按天聚合
+│   ├── 0028_subscriber_groups.sql         # 订阅者分组：单列存 JSON 数组字符串（例如 ["newsletter","vip"]），用于后台分组…
+│   ├── 0029_error_logs.sql                # 前端错误日志（浏览器运行时异常上报，按 fingerprint 聚合去重）
+│   ├── 0030_post_seo.sql                  # 文章级 SEO 覆盖（JSON：{title,desc,canonical,noindex}），空对象表…
+│   ├── 0031_webmentions.sql               # Webmention：外站引用你的文章时，来源页主动通知本端点，校验后展示
+│   ├── 0032_post_author.sql               # 文章作者（可留空，前台回退到站点署名 / 个人昵称）
 ├── scripts/
 │   ├── migrate-kv-to-d1.mjs           # 一次性迁移：KV 数据 → D1
 │   ├── minify.mjs                     # 用 terser / clean-css 生成 public/ 下的 *.min.*
@@ -404,9 +439,9 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── index.html                         # 根跳转页（自动跳 public/index.html）
 ├── wrangler.toml                      # Cloudflare Pages 配置
 ├── wrangler.workers.toml              # Cloudflare Workers 配置（部署使用）
-├── smoke-test.js                      # 冒烟测试（85 例）
+├── smoke-test.js                      # 冒烟测试（158 例）
 ├── gb-verify.js                       # 留言板专项验证（18 例）
-├── search-verify.js                   # 搜索专项验证（13 例）
+├── search-verify.js                   # 搜索专项验证（25 例）
 ├── README.md                          # 中文说明（本文件）
 ├── README_EN.md                       # 英文说明
 ├── CLOUDFLARE_SETUP_GUIDE.md          # Cloudflare 配置完全指南（新手版·中文）
@@ -494,8 +529,8 @@ KV 不是文章存储，而是**限流与去重**设施：
 
 | 表 | 说明 | 关键字段 |
 | --- | --- | --- |
-| `posts` | 文章 | id, title, date, excerpt, content, cover, pinned, protected, enc, tags(JSON), category, status |
-| `comments` | 评论 | id, post_id, author, content, date, status(approved/pending), **parent_id** |
+| `posts` | 文章 | id, title, date, excerpt, content, cover, og_image, pinned, protected, enc, tags(JSON), category, series, series_order, **author**, status, publish_at, **seo(JSON)** |
+| `comments` | 评论 | id, post_id, author, content, date, status(approved/pending), **parent_id**, likes, featured, pinned |
 | `stats` | 阅读 / 点赞 | post_id, likes, views |
 | `stats_daily` | 每日聚合（趋势图） | post_id, date, views, likes（PRIMARY KEY(post_id,date)） |
 | `admin_auth` | 管理员密码 | k, salt, hash, iter, must_change |
@@ -505,10 +540,18 @@ KV 不是文章存储，而是**限流与去重**设施：
 | `site_settings` | 站点设置 | k, v |
 | `site_files` | 站点产物 | name, content, updated_at |
 | `music` | 音乐元数据 | id, title, artist, url, cover, size, duration, sort, created_at |
+| `post_revisions` | 文章版本历史（每篇最多 50 个快照） | id, post_id, title, content, tags, status, reason, created_at |
+| `subscribers` | 邮件订阅者 | id, email, status(pending/active/unsubscribed), token, locale, **groups(JSON)**, confirmed_at |
+| `mail_outbox` | 邮件发件箱（文章通知 / 评论通知 / 群发，由 Cron 异步发送） | post_id, to_email, status, kind, payload, sent_at |
+| `backups` | R2 备份元数据 | id, object_key, size, reason, created_at, counts |
+| `audit_log` | 后台操作审计 | id, action, target, detail, ip, created_at |
+| `stats_sources` | 访问来源聚合（按天） | post_id, date, kind(ref/device/country/platform/vendor), name, views |
+| `error_logs` | 前端错误日志（按 fingerprint 聚合去重） | fingerprint, kind, message, source, stack, url, ua, hits, last_at |
+| `webmentions` | 外站引用（Webmention） | id, source, target, post_id, author_name, title, excerpt, status, created_at |
 | `posts_fts` | D1 FTS5 全文索引（external-content，自动同步 posts） | id, title, excerpt, content, tags |
 | `schema_migrations` | CI 记账表 | name, applied_at |
 
-`0015_hot_path_indexes.sql` 补充了 5 个热点索引：`idx_comments_post_id`、`idx_comments_status_date`、`idx_music_sort`、`idx_media_created_id`、`idx_admin_sessions_exp`。
+迁移按文件名升序由 CI 幂等执行（`schema_migrations` 记账 + 加列类迁移预检，重复执行安全）。`0015_hot_path_indexes.sql` 补充了 5 个热点索引：`idx_comments_post_id`、`idx_comments_status_date`、`idx_music_sort`、`idx_media_created_id`、`idx_admin_sessions_exp`；`0023_post_fts.sql` 建 `posts_fts` 全文索引；`0027`~`0032` 陆续加入来源统计、订阅分组、错误日志、文章 SEO、Webmention 与文章作者字段。
 
 ### R2（对象存储：音乐 + 媒体图片）
 
@@ -589,6 +632,8 @@ window.BLOG_CONFIG = {
 };
 ```
 
+> **提示**：「首页每页文章数」（`pageSize`）与全部广告位（`ads`）都可以在后台 **设置 → 功能开关** 里直接改（写入 D1 `site_settings.features` 覆盖这里的默认值，**无需改代码、无需重新部署**）；同一个页面还可以关闭前端错误上报、评论反机器人、图表 / 公式渲染。
+
 **导航项的优先级**：云端「博客设置 → 导航菜单」（存 D1 `site_settings.nav_menu`）> `app.js` 里的 `NAV` 兜底数组。底部导航与友情链接同理（D1 优先，`config.js` 兜底）。
 
 ### mode 说明
@@ -618,6 +663,11 @@ window.BLOG_CONFIG = {
 | 边缘限流（可选） | 配 `BLOG_RATE_LIMIT_BINDING` 后启用 Workers Rate Limiting binding（`env.LOGIN_LIMITER`），在 Worker 入口按 IP 限流，被拦下的请求不查库不写库；也可用 Cloudflare Access 或 WAF 限流规则把 `/api/admin/login` 挡在边缘，见下方「加固后台登录入口」 |
 | 接口鉴权 | 所有写操作校验 `Authorization: Bearer <token>`；常量时间比较（SHA-256 摘要后异或） |
 | 评论安全 | 输入先做控制字符清洗与 HTML 转义、SQL 全参数化、每 IP 频率限制、Origin 校验、**重复内容拦截**（409）、单篇最多 300 条、最多 3 层嵌套 |
+| 文章加密 | AES-GCM-256 + PBKDF2-SHA256（10 万次迭代、16 字节随机盐）**纯前端**加解密；服务器只存密文 `enc`，明文永不上传；后台可在本机浏览器记住密码（仅本机可见） |
+| 预览分享链接 | HMAC-SHA256 签名（密钥取 `BLOG_PREVIEW_SECRET`，未配置时由管理员密码哈希派生）+ 过期时间；**修改站点密码会让所有已发出的链接立即失效**；预览页 `noindex`、不统计、不加载评论 |
+| 评论反机器人 | 隐藏蜜罐字段（被填写即**静默丢弃**）+ 表单时间戳（提交不足 2 秒判为机器人）；对正常访客无感，可在「功能开关」关闭 |
+| 错误上报限流 | 公开的 `/api/errors` 每 IP 每分钟最多 20 次，字段全部截断，按错误指纹聚合去重，最多保留 300 条 |
+| 依赖本地化 | KaTeX / Mermaid / Smoji 全部自托管在 `public/libs/`，CSP 的 `script-src` 仍限 `'self'`，不引入任何第三方脚本 |
 | 媒体 URL | 仅接受 `http(s)`（R2 公开地址或外链），拒绝 `javascript:` / `data:` 等，杜绝脚本类内容登记 |
 | 接口边界 | 未知 `/api/*` 返回 JSON 404，绝不回退到 `index.html`；非 GET/HEAD 不做 SPA 回退 |
 | 安全响应头 | Worker 侧对 API 与静态响应统一注入：`CSP`、`X-Content-Type-Options: nosniff`、`Referrer-Policy`、`X-Frame-Options`、`Cross-Origin-Opener-Policy`；Pages 纯静态路径由 `public/_headers` 提供同一套 |
@@ -642,12 +692,13 @@ window.BLOG_CONFIG = {
 ## 🧪 测试
 
 ```bash
-node smoke-test.js      # 冒烟测试 85 例（Markdown / TOC / 高亮 / 导入导出 / 门禁 / 评论安全 / 统计 / 搜索 / RSS / Sitemap / 云端 API / 缓存 …）
+node smoke-test.js      # 冒烟测试 158 例
 node gb-verify.js       # 留言板专项验证 18 例
-node search-verify.js   # 搜索专项验证 13 例
+node search-verify.js   # 搜索专项验证 25 例
 ```
 
 三套测试都只用 Node 内置模块（无网络、无凭据依赖），在每次 CI 部署前自动运行，失败即中止不部署。
+覆盖范围包括：Markdown 渲染 / 目录 / 高亮、导入导出与备份、加密文章（加解密往返 + 锁屏 + 兼容回归）、文章级 SEO、多作者、**后台新版 UI 运行时挂载（所有页面逐个挂载，捕获跨作用域变量笔误等运行时报错）**、评论（嵌套 / 分页 / 敏感词 / 反机器人 / 批量操作）、订阅与分组群发、Webmention、错误日志、草稿预览链接、图表 / 公式本地化、静态站导出、打印样式、i18n 完整性（5 语言包与兜底键完全一致、无重复键）、PWA、RSS / Sitemap、云端 API 与缓存策略等。
 
 导入示例文章到已部署的云端实例：
 
@@ -672,6 +723,12 @@ node scripts/minify.mjs     # 需要 npx terser / clean-css-cli
 | 标签改名走服务端批量接口 | 云端为一次请求批量更新（POST /api/admin/tags）；静态模式仍需本地逐篇改写后导出 posts.js |
 | 被限流时要等一小会儿 | 触发登录限流后，即使密码正确也要等 10 秒（全局冷却）/ 60 秒（同一子网）/ 15 分钟（你自己的 IP）才能登录，除非带上安装密钥走应急通道。这是有意取舍：锁定期间照常跑 PBKDF2 会把「登录 DoS」变成「CPU / 额度 DoS」 |
 | 后台列表已服务端化 | 文章列表的搜索 / 状态筛选 / 分页改为服务端查询；其余列表（媒体、音乐、订阅、备份、日志）仍在前端过滤 |
+| 图表 / 公式按需加载 | Mermaid 单文件约 2.7 MB（gzip 后约 900 KB）、KaTeX 约 560 KB（含字体），**只有正文真的用到才下载**并随后被浏览器缓存；不想用可在「功能开关 → 内容渲染」整体关闭 |
+| Webmention 需对方主动通知 | 只有支持 Webmention 的来源站主动发送通知才会被收录；来源页事后撤链不会自动删除已有记录，可在后台「引用管理」手动清理 |
+| 静态导出不含媒体本体 | 「导出静态站」打包的是页面与静态资源；图片 / 音频若存放在 R2 等对象存储，需保证这些对象仍然可公开访问（ZIP 里不含媒体文件） |
+| 预览链接有有效期 | 草稿预览链接默认 **7 天**有效（可生成 1~30 天），且**修改站点密码会让所有已发出的链接立即失效** |
+| 访问统计不存原始 IP | 只记录由 Cloudflare 边缘按 IP 解析出的**两位国家码**，以及 UA 推断出的设备 / 系统 / 品牌；不落原始 IP（隐私优先） |
+| 错误日志有上限 | 按「相同错误」聚合计数，最多保留最近 **300** 条；超过后自动淘汰最旧的记录 |
 | 未知路径返回 404 | 已知前端路由（首页 / 归档 / 标签 / 关于 / 留言板 / 热门 / 订阅 / 系列 / 文章 / 后台）仍 200；其余无扩展名路径返回真实 404 状态并渲染「内容不存在」页 |
 
 ---
