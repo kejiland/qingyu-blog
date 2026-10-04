@@ -933,5 +933,11 @@
   "admin.editor.draftDiscard": "破棄",
   "admin.editor.draftRestored": "下書きを復元しました",
   "admin.editor.draftSavedAt": "{time} に自動保存しました",
-  "admin.editor.draftDiscarded": "下書きを破棄しました"
+  "admin.editor.draftDiscarded": "下書きを破棄しました",
+  "admin.editor.seoLabel": "SEO / 検索対策",
+  "admin.editor.seoTitlePh": "SEO タイトル（空欄なら自動）",
+  "admin.editor.seoDescPh": "説明文（空欄なら抜粋から自動）",
+  "admin.editor.seoCanonicalPh": "Canonical URL（空欄なら自動）",
+  "admin.editor.seoNoindex": "このページを検索エンジンに登録させない",
+  "admin.editor.seoHint": "空欄の項目は自動生成されます。検索結果や共有時の文言をカスタマイズしたい記事に"
 }

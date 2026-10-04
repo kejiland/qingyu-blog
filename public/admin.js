@@ -262,7 +262,7 @@
     for (var i = 0; i < drafts.length; i++) if (drafts[i] && drafts[i].id === post.id) idx = i;
     var item = { id: post.id, title: post.title, date: post.date, tags: post.tags || [], excerpt: post.excerpt || '',
       cover: post.cover || '', ogImage: post.ogImage || '', category: post.category || '', series: post.series || '', seriesOrder: Number(post.seriesOrder) || 0, status: post.status || 'published',
-      pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null,
+      pinned: !!post.pinned, protected: !!post.protected, enc: post.protected ? (post.enc || null) : null, seo: post.seo || {},
       publishAt: post.publishAt || null, content: post.content || '' };
     if (idx >= 0) drafts[idx] = item; else drafts.push(item);
     localStorage.setItem('qingyu.drafts', JSON.stringify(drafts));
@@ -2455,6 +2455,8 @@
       series: val(content, '#abSeries'), seriesOrder: val(content, '#abSeriesOrder'),
       cover: val(content, '#abCover'), date: val(content, '#abDate'),
       pinned: !!(content.querySelector('#abPinned') || {}).checked,
+      seoTitle: val(content, '#abSeoTitle'), seoDesc: val(content, '#abSeoDesc'),
+      seoCanonical: val(content, '#abSeoCanonical'), seoNoindex: !!(content.querySelector('#abSeoNoindex') || {}).checked,
       body: val(content, '#abBody')
     };
   }
@@ -2477,6 +2479,8 @@
     set('#abTitle', data.title); set('#abTags', data.tags); set('#abCategory', data.category);
     set('#abSeries', data.series); set('#abSeriesOrder', data.seriesOrder);
     set('#abCover', data.cover); set('#abDate', data.date); set('#abBody', data.body);
+    set('#abSeoTitle', data.seoTitle); set('#abSeoDesc', data.seoDesc); set('#abSeoCanonical', data.seoCanonical);
+    var ni = content.querySelector('#abSeoNoindex'); if (ni) ni.checked = !!data.seoNoindex;
     var pin = content.querySelector('#abPinned'); if (pin) pin.checked = !!data.pinned;
     try { updatePreview(content); updateEditorStats(content); } catch (e) {}
   }
@@ -2516,6 +2520,11 @@
         '</div>' +
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.coverPlaceholder') + '</label><div class="ab-row"><input class="ab-input" id="abCover" placeholder="https://…"><button class="ab-btn sm" id="abPickCover">' + t('admin.editor.selectMedia') + '</button></div></div>' +
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.ogLabel') + '</label><input type="hidden" id="abOgImage"><div class="ab-row" style="align-items:center;gap:10px;flex-wrap:wrap"><button class="ab-btn sm" id="abOgGenerate">' + icon('image', 13) + ' ' + t('admin.editor.ogGenerate') + '</button><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="abOgAuto" checked> ' + t('admin.editor.ogAuto') + '</label></div><div id="abOgPreview" style="margin-top:8px"></div><label class="ab-hint">' + t('admin.editor.ogHint') + '</label></div>' +
+        '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.seoLabel') + '</label>' +
+          '<div class="ab-row" style="gap:8px;flex-wrap:wrap"><input class="ab-input" id="abSeoTitle" placeholder="' + t('admin.editor.seoTitlePh') + '"><input class="ab-input" id="abSeoCanonical" placeholder="' + t('admin.editor.seoCanonicalPh') + '"></div>' +
+          '<textarea class="ab-textarea" id="abSeoDesc" style="min-height:60px;margin-top:8px" placeholder="' + t('admin.editor.seoDescPh') + '"></textarea>' +
+          '<label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-top:8px"><input type="checkbox" id="abSeoNoindex"> ' + t('admin.editor.seoNoindex') + '</label>' +
+          '<label class="ab-hint">' + t('admin.editor.seoHint') + '</label></div>' +
         '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0">' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="abPinned"> ' + icon('pin', 14) + ' ' + t('admin.editor.pin') + '</label>' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="abProtected"> ' + icon('lock', 14) + ' ' + t('admin.editor.protect') + '</label>' +
@@ -2775,6 +2784,11 @@
     if (scheduleInput && p.publishAt) scheduleInput.value = toDateTimeLocal(p.publishAt);
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
+    var seo = p.seo || {};
+    if (content.querySelector('#abSeoTitle')) content.querySelector('#abSeoTitle').value = seo.title || '';
+    if (content.querySelector('#abSeoDesc')) content.querySelector('#abSeoDesc').value = seo.desc || '';
+    if (content.querySelector('#abSeoCanonical')) content.querySelector('#abSeoCanonical').value = seo.canonical || '';
+    if (content.querySelector('#abSeoNoindex')) content.querySelector('#abSeoNoindex').checked = !!seo.noindex;
     var protBox = content.querySelector('#abProtected');
     var protRow = content.querySelector('#abProtectRow');
     var protUnlock = content.querySelector('#abProtectUnlock');
@@ -2853,6 +2867,12 @@
       seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
       content: contentToSave, cover: content.querySelector('#abCover').value.trim(),
+      seo: {
+        title: val(content, '#abSeoTitle').trim(),
+        desc: val(content, '#abSeoDesc').trim(),
+        canonical: val(content, '#abSeoCanonical').trim(),
+        noindex: !!(content.querySelector('#abSeoNoindex') || {}).checked
+      },
       protected: protectOn, enc: encData,
       pinned: wantPinned, tags: tags, category: categoryValue,
       status: status

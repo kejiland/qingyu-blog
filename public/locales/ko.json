@@ -933,5 +933,11 @@
   "admin.editor.draftDiscard": "버리기",
   "admin.editor.draftRestored": "초안을 복원했습니다",
   "admin.editor.draftSavedAt": "{time}에 자동 저장됨",
-  "admin.editor.draftDiscarded": "초안을 버렸습니다"
+  "admin.editor.draftDiscarded": "초안을 버렸습니다",
+  "admin.editor.seoLabel": "SEO / 검색 최적화",
+  "admin.editor.seoTitlePh": "SEO 제목 (비우면 자동)",
+  "admin.editor.seoDescPh": "설명 (비우면 요약에서 자동)",
+  "admin.editor.seoCanonicalPh": "Canonical URL (비우면 자동)",
+  "admin.editor.seoNoindex": "이 페이지를 검색엔진에서 제외",
+  "admin.editor.seoHint": "비운 항목은 자동 생성됩니다. 검색 결과/공유 문구를 직접 지정할 때 사용하세요"
 }

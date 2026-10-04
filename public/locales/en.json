@@ -933,5 +933,11 @@
   "admin.editor.draftDiscard": "Discard",
   "admin.editor.draftRestored": "Draft restored",
   "admin.editor.draftSavedAt": "Auto-saved {time}",
-  "admin.editor.draftDiscarded": "Draft discarded"
+  "admin.editor.draftDiscarded": "Draft discarded",
+  "admin.editor.seoLabel": "SEO / search",
+  "admin.editor.seoTitlePh": "Custom SEO title (auto if empty)",
+  "admin.editor.seoDescPh": "Custom description (auto from excerpt if empty)",
+  "admin.editor.seoCanonicalPh": "Canonical URL (auto if empty)",
+  "admin.editor.seoNoindex": "Hide this page from search engines",
+  "admin.editor.seoHint": "Empty fields are generated automatically; use these for custom search/share copy"
 }

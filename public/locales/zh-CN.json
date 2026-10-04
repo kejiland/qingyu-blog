@@ -933,5 +933,11 @@
   "admin.editor.draftDiscard": "丢弃草稿",
   "admin.editor.draftRestored": "已恢复自动保存的草稿",
   "admin.editor.draftSavedAt": "已自动保存 {time}",
-  "admin.editor.draftDiscarded": "已丢弃草稿"
+  "admin.editor.draftDiscarded": "已丢弃草稿",
+  "admin.editor.seoLabel": "SEO / 搜索优化",
+  "admin.editor.seoTitlePh": "自定义 SEO 标题（留空自动）",
+  "admin.editor.seoDescPh": "自定义描述（留空自动取摘要）",
+  "admin.editor.seoCanonicalPh": "Canonical 链接（留空自动）",
+  "admin.editor.seoNoindex": "禁止搜索引擎收录本页",
+  "admin.editor.seoHint": "留空的项会自动生成；适合需要自定义搜索结果 / 分享文案的文章"
 }

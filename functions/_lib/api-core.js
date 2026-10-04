@@ -157,6 +157,21 @@ function normalizePublishAt(v) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
 }
+const SEO_CAPS = { title: 120, desc: 300, canonical: 500 };
+/** 文章级 SEO 覆盖：{ title, desc, canonical, noindex }，全部为空时返回 {} */
+export function normalizeSeo(v) {
+  let o = v;
+  if (typeof o === 'string') { try { o = JSON.parse(o); } catch (e) { o = null; } }
+  o = (o && typeof o === 'object') ? o : {};
+  const out = {
+    title: String(o.title || '').trim().slice(0, SEO_CAPS.title),
+    desc: String(o.desc || '').trim().slice(0, SEO_CAPS.desc),
+    canonical: String(o.canonical || '').trim().slice(0, SEO_CAPS.canonical),
+    noindex: !!o.noindex
+  };
+  if (!out.title && !out.desc && !out.canonical && !out.noindex) return {};
+  return out;
+}
 export function normalizePost(p) {
   const out = p || {};
   const protectedPost = !!out.protected && out.enc && typeof out.enc === 'object';
@@ -179,6 +194,7 @@ export function normalizePost(p) {
     seriesOrder: Math.max(0, Math.floor(Number(out.seriesOrder || out.series_order) || 0)),
     status: status,
     publishAt: publishAt,
+    seo: normalizeSeo(out.seo),
     tags: Array.isArray(out.tags)
       ? out.tags.map((t) => String(t).trim()).filter(Boolean)
       : String(out.tags || '').split(/[,，]/).map((t) => t.trim()).filter(Boolean)
@@ -212,6 +228,7 @@ function postFromRow(r) {
     seriesOrder: Number(r.series_order) || 0,
     status: normalizePostStatus(r.status),
     publishAt: normalizePublishAt(r.publish_at),
+    seo: normalizeSeo(r.seo),
     tags: tags
   };
 }
@@ -229,7 +246,8 @@ function postToParams(p) {
     p.series || '',
     p.seriesOrder || 0,
     normalizePostStatus(p.status),
-    p.status === 'scheduled' ? normalizePublishAt(p.publishAt) : null
+    p.status === 'scheduled' ? normalizePublishAt(p.publishAt) : null,
+    JSON.stringify(normalizeSeo(p.seo))
   ];
 }
 
@@ -417,7 +435,7 @@ export async function handlePosts(request, env) {
     const exist = await dbFirst(env.DB, 'SELECT 1 FROM posts WHERE id = ?', p.id);
     if (exist) return json({ error: '已存在相同 id（' + p.id + '），请用 PUT 更新' }, 409, request, env);
     await dbRun(env.DB,
-      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at,seo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ...postToParams(p));
     await recordPostRevision(env, p, 'create').catch(() => {});
     if ((p.status || 'published') === 'published') await queuePostNotifications(env, p).catch(() => {});
@@ -456,8 +474,8 @@ export async function handlePostId(request, env, id) {
     if (!p.title) return json({ error: '缺少 title' }, 400, request, env);
     if (p.status === 'scheduled' && !p.publishAt) return json({ error: '定时发布缺少发布时间' }, 400, request, env);
     await dbRun(env.DB,
-      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
-      'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at',
+      'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at,seo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+      'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at,seo=excluded.seo',
       ...postToParams(p));
     await recordPostRevision(env, p, 'update').catch(() => {});
     const oldStatus = exist ? normalizePostStatus(exist.status) : '';
@@ -829,11 +847,13 @@ export async function handlePostRevisionRestore(request, env, postId, revisionId
     content: revision.content, cover: revision.cover, ogImage: revision.ogImage,
     pinned: revision.pinned, protected: revision.protected, enc: revision.enc, tags: revision.tags,
     category: revision.category, series: revision.series, seriesOrder: revision.seriesOrder,
-    status: revision.status, publishAt: revision.publishAt
+    status: revision.status, publishAt: revision.publishAt,
+    // SEO 属于元数据、不随正文版本回滚，恢复内容时保留当前设置
+    seo: (current && current.seo) || {}
   };
   await dbRun(env.DB,
-    'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
-    'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at',
+    'INSERT INTO posts (id,title,date,excerpt,content,cover,og_image,pinned,protected,enc,tags,category,series,series_order,status,publish_at,seo) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ' +
+    'ON CONFLICT(id) DO UPDATE SET title=excluded.title,date=excluded.date,excerpt=excluded.excerpt,content=excluded.content,cover=excluded.cover,og_image=excluded.og_image,pinned=excluded.pinned,protected=excluded.protected,enc=excluded.enc,tags=excluded.tags,category=excluded.category,series=excluded.series,series_order=excluded.series_order,status=excluded.status,publish_at=excluded.publish_at,seo=excluded.seo',
     ...postToParams(post));
   await recordPostRevision(env, post, 'restore');
   await purgeTags(env, [TAG_POSTS, TAG_FEED, TAG_SITEMAP, 'post:' + postId]);

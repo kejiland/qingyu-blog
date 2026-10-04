@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.50';
+var BLOG_VERSION = '2.10.51';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -1867,6 +1867,7 @@ function buildPostsJs() {
       pinned: !!d.pinned,
       protected: !!d.protected,
       enc: d.protected ? (d.enc || null) : null,
+      seo: d.seo || {},
       content: d.content || ''
     };
     if (idx >= 0) all[idx] = item; else all.push(item);
@@ -4786,6 +4787,8 @@ function updateSEO(path) {
   var pageUrl = base + (path === '/' ? '' : path);
   var pageImage = '';
   var pageType = 'website';
+  var canonicalUrl = pageUrl;
+  var robotsMeta = 'index, follow, max-image-preview:large, max-snippet:-1';
 
   if (path === '/') {
     pageTitle = n + ' · ' + t('site.subtitle');
@@ -4809,12 +4812,16 @@ function updateSEO(path) {
     try { id = decodeURIComponent(path.replace('/posts/', '').replace(/\/.*$/, '')); } catch (e) {}
     var posts = getStaticPosts();
     var post = posts.find(function (p) { return p.id === id; });
+    var seo = (post && post.seo) || {};
     if (post) {
       pageType = 'article';
-      pageTitle = (post.title || t('post.untitled')) + ' · ' + n;
-      pageDesc = post.excerpt || stripMd(post.content || '').slice(0, 200);
+      // 文章级 SEO 覆盖优先；未填写则沿用自动生成
+      pageTitle = seo.title || ((post.title || t('post.untitled')) + ' · ' + n);
+      pageDesc = seo.desc || post.excerpt || stripMd(post.content || '').slice(0, 200) || siteDesc;
       pageImage = post.ogImage || post.cover || '';
       pageUrl = base + '/posts/' + encodeURIComponent(post.id) + '/';
+      canonicalUrl = seo.canonical || pageUrl;
+      if (seo.noindex) robotsMeta = 'noindex, nofollow';
     }
   } else if (path.indexOf('/admin') === 0 || path === '/write') {
     // 后台页面不索引
@@ -4829,7 +4836,7 @@ function updateSEO(path) {
   document.title = pageTitle;
   _setMeta('description', pageDesc);
   _setMeta('author', getSiteAuthor());
-  _setMeta('robots', 'index, follow, max-image-preview:large, max-snippet:-1');
+  _setMeta('robots', robotsMeta);
 
   // Open Graph
   _setOG('og:type', pageType);
@@ -4847,7 +4854,7 @@ function updateSEO(path) {
 
   // Canonical
   var canonical = document.querySelector('link[rel="canonical"]');
-  if (canonical) canonical.setAttribute('href', pageUrl);
+  if (canonical) canonical.setAttribute('href', canonicalUrl);
 
   // Favicon：云端「站点头像 / Logo URL」优先，回退 index.html 中的默认橙色圆
   var siteAvatar = cfg.site && cfg.site.avatar;
@@ -4866,8 +4873,8 @@ function updateSEO(path) {
       var jsonLd = {
         '@context': 'https://schema.org',
         '@type': 'BlogPosting',
-        'headline': p.title || t('post.untitled'),
-        'description': p.excerpt || '',
+        'headline': (p.seo && p.seo.title) || p.title || t('post.untitled'),
+        'description': (p.seo && p.seo.desc) || p.excerpt || '',
         'datePublished': p.date || '',
         'dateModified': p.date || '',
         'author': { '@type': 'Person', 'name': getSiteAuthor() },

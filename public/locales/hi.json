@@ -933,5 +933,11 @@
   "admin.editor.draftDiscard": "हटाएँ",
   "admin.editor.draftRestored": "ड्राफ़्ट बहाल कर दिया",
   "admin.editor.draftSavedAt": "{time} पर स्वतः सहेजा गया",
-  "admin.editor.draftDiscarded": "ड्राफ़्ट हटा दिया"
+  "admin.editor.draftDiscarded": "ड्राफ़्ट हटा दिया",
+  "admin.editor.seoLabel": "SEO / खोज",
+  "admin.editor.seoTitlePh": "कस्टम SEO शीर्षक (खाली छोड़ने पर स्वतः)",
+  "admin.editor.seoDescPh": "कस्टम विवरण (खाली छोड़ने पर सारांश से)",
+  "admin.editor.seoCanonicalPh": "Canonical URL (खाली छोड़ने पर स्वतः)",
+  "admin.editor.seoNoindex": "इस पृष्ठ को खोज इंजन से छिपाएँ",
+  "admin.editor.seoHint": "खाली फ़ील्ड स्वतः बनते हैं; खोज परिणाम/शेयर टेक्स्ट कस्टमाइज़ करने के लिए"
 }

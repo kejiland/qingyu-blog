@@ -464,7 +464,7 @@ function makeD1() {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map(), error_logs: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at', 'seo'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
@@ -3374,6 +3374,8 @@ tests.push(['编辑器：文章加密开关已接入（enc / content / protected
   assert.ok(src.includes('id="abProtectShow"'), '密码显示/隐藏按钮');
   assert.ok(src.includes('rememberPostPwd(') && src.includes('readPostPwd('), '本机记住密码（便于后台查看）');
   assert.ok(src.includes('forgetPostPwd('), '取消加密时清除本机密码');
+  assert.ok(src.includes('id="abSeoTitle"') && src.includes('id="abSeoDesc"') && src.includes('id="abSeoNoindex"'), '编辑器 SEO 字段已接入');
+  assert.ok(src.includes('canonical: val(content, \'#abSeoCanonical\')'), '保存 SEO 字段');
 }]);
 
 /* i18n：五个语言包键数一致，且都含加密相关文案 */
@@ -3745,6 +3747,41 @@ tests.push(['编辑器草稿：本地自动保存读写清除 + 保存后清理'
   assert.ok(src.includes('clearEditorDraft(id)'), '保存成功后清除草稿');
   assert.ok(src.includes('renderDraftBar'), '恢复提示条已接入');
   assert.ok(src.includes('editorDraftEnabled'), '加密文章跳过本地草稿');
+}]);
+
+/* 文章级 SEO 覆盖：服务端字段往返 + 前端 meta 生效 */
+tests.push(['文章 SEO 覆盖：字段往返（含清洗）+ 前端标题/描述/canonical/noindex', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const { env, token } = await authEnv();
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  assert.deepStrictEqual(core.normalizeSeo({ title: '  T  ', desc: '', canonical: '', noindex: false }), { title: 'T', desc: '', canonical: '', noindex: false }, 'normalizeSeo 去空格');
+  assert.deepStrictEqual(core.normalizeSeo('{}'), {}, '空 SEO 归一为空对象');
+  assert.strictEqual(core.normalizeSeo({ noindex: true }).noindex, true, 'noindex 保留');
+  let r = await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'seo1', title: 'T', date: '2026-01-01', content: 'x', seo: { title: 'SEO 标题', desc: 'SEO 描述', canonical: 'https://x/y', noindex: true } }) }), env);
+  assert.strictEqual(r.status, 201, '创建成功');
+  const p = (await (await core.handlePostId(new Request('http://t/api/posts/seo1'), env, 'seo1')).json()).post;
+  assert.strictEqual(p.seo.title, 'SEO 标题', '详情返回 SEO 标题');
+  assert.strictEqual(p.seo.noindex, true, '详情返回 noindex');
+  assert.strictEqual(typeof env._d1.posts.get('seo1').seo, 'string', 'D1 存 JSON 字符串');
+  // PUT 更新 SEO
+  await core.handlePostId(new Request('http://t/api/posts/seo1', { method: 'PUT', headers: auth, body: JSON.stringify({ id: 'seo1', title: 'T', date: '2026-01-01', content: 'x', seo: { desc: '新描述' } }) }), env, 'seo1');
+  const p2 = (await (await core.handlePostId(new Request('http://t/api/posts/seo1'), env, 'seo1')).json()).post;
+  assert.strictEqual(p2.seo.desc, '新描述', 'PUT 更新 SEO');
+  assert.ok(!p2.seo.noindex, 'PUT 未传的 noindex 被清空（整体覆盖）');
+  // 前端 meta
+  const posts = [{ id: 'seo1', title: '原标题', date: '2026-01-01', content: '正文', tags: [], seo: { title: '前端 SEO 标题', desc: '前端描述', canonical: 'https://custom.example/x', noindex: true } }];
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static', siteUrl: 'https://blog.example' }, 'window.BLOG_POSTS': posts }, '/posts/seo1/');
+  assert.strictEqual(b.title, '前端 SEO 标题', 'SEO 标题覆盖 document.title');
+  const seen = {};
+  b.ctx.document.querySelector = function (sel) {
+    if (!seen[sel]) seen[sel] = { setAttribute(k, v) { this[k] = v; }, getAttribute(k) { return this[k]; }, remove() {}, appendChild() {} };
+    return seen[sel];
+  };
+  b.ctx.updateSEO('/posts/seo1/');
+  assert.strictEqual(seen['meta[name="description"]'].content, '前端描述', '描述覆盖');
+  assert.strictEqual(seen['link[rel="canonical"]'].href, 'https://custom.example/x', 'canonical 覆盖');
+  assert.ok(String(seen['meta[name="robots"]'].content).indexOf('noindex') >= 0, 'noindex 生效');
+  assert.strictEqual(seen['meta[property="og:title"]'].content, '前端 SEO 标题', 'og:title 覆盖');
 }]);
 
 /* ---------- 运行 ---------- */
