@@ -974,5 +974,11 @@
   "admin.webmentions.empty": "인용이 없습니다",
   "admin.webmentions.deleted": "삭제되었습니다",
   "admin.webmentions.deleteFail": "삭제 실패: ",
-  "admin.webmentions.deleteConfirm": "이 인용을 삭제할까요?"
+  "admin.webmentions.deleteConfirm": "이 인용을 삭제할까요?",
+  "nav.authors": "작성자",
+  "authors.title": "작성자",
+  "authors.empty": "작성자가 없습니다",
+  "authors.count": "글 {n}개",
+  "admin.editor.author": "작성자",
+  "admin.editor.authorPh": "비우면 사이트 이름 표시"
 }

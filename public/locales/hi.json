@@ -974,5 +974,11 @@
   "admin.webmentions.empty": "कोई उद्धरण नहीं",
   "admin.webmentions.deleted": "हटा दिया",
   "admin.webmentions.deleteFail": "हटाना विफल: ",
-  "admin.webmentions.deleteConfirm": "यह उद्धरण हटाएँ?"
+  "admin.webmentions.deleteConfirm": "यह उद्धरण हटाएँ?",
+  "nav.authors": "लेखक",
+  "authors.title": "लेखक",
+  "authors.empty": "कोई लेखक नहीं",
+  "authors.count": "{n} पोस्ट",
+  "admin.editor.author": "लेखक",
+  "admin.editor.authorPh": "खाली छोड़ने पर साइट नाम दिखेगा"
 }

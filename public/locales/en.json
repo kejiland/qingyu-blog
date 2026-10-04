@@ -974,5 +974,11 @@
   "admin.webmentions.empty": "No mentions yet",
   "admin.webmentions.deleted": "Deleted",
   "admin.webmentions.deleteFail": "Delete failed: ",
-  "admin.webmentions.deleteConfirm": "Delete this mention?"
+  "admin.webmentions.deleteConfirm": "Delete this mention?",
+  "nav.authors": "Authors",
+  "authors.title": "Authors",
+  "authors.empty": "No authors yet",
+  "authors.count": "{n} posts",
+  "admin.editor.author": "Author",
+  "admin.editor.authorPh": "Blank uses the site name"
 }

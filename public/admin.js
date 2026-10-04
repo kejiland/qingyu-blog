@@ -2569,7 +2569,7 @@
   function collectEditorDraft(content) {
     return {
       title: val(content, '#abTitle'), tags: val(content, '#abTags'), category: val(content, '#abCategory'),
-      series: val(content, '#abSeries'), seriesOrder: val(content, '#abSeriesOrder'),
+      series: val(content, '#abSeries'), seriesOrder: val(content, '#abSeriesOrder'), author: val(content, '#abAuthor'),
       cover: val(content, '#abCover'), date: val(content, '#abDate'),
       pinned: !!(content.querySelector('#abPinned') || {}).checked,
       seoTitle: val(content, '#abSeoTitle'), seoDesc: val(content, '#abSeoDesc'),
@@ -2594,7 +2594,7 @@
   function applyEditorDraft(content, data) {
     var set = function (sel, v) { var el = content.querySelector(sel); if (el) el.value = v == null ? '' : v; };
     set('#abTitle', data.title); set('#abTags', data.tags); set('#abCategory', data.category);
-    set('#abSeries', data.series); set('#abSeriesOrder', data.seriesOrder);
+    set('#abSeries', data.series); set('#abSeriesOrder', data.seriesOrder); set('#abAuthor', data.author);
     set('#abCover', data.cover); set('#abDate', data.date); set('#abBody', data.body);
     set('#abSeoTitle', data.seoTitle); set('#abSeoDesc', data.seoDesc); set('#abSeoCanonical', data.seoCanonical);
     var ni = content.querySelector('#abSeoNoindex'); if (ni) ni.checked = !!data.seoNoindex;
@@ -2631,6 +2631,7 @@
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.tagsPlaceholder') + '</label><input class="ab-input" id="abTags" placeholder="' + t('admin.editor.tagsExample') + '" autocomplete="off"></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.category') + '</label><input class="ab-input" id="abCategory" list="abCategoryList" placeholder="' + t('admin.editor.categoryPh') + '" autocomplete="off"><datalist id="abCategoryList"></datalist></div>' +
+          '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.author') + '</label><input class="ab-input" id="abAuthor" list="abAuthorList" placeholder="' + t('admin.editor.authorPh') + '" autocomplete="off"><datalist id="abAuthorList"></datalist></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.seriesLabel') + '</label><div class="ab-row"><input class="ab-input" id="abSeries" placeholder="' + t('admin.editor.seriesPlaceholder') + '" autocomplete="off"><input class="ab-input" id="abSeriesOrder" type="number" min="0" step="1" style="max-width:110px" placeholder="' + t('admin.editor.seriesOrder') + '"></div><label class="ab-hint">' + t('admin.editor.seriesHint') + '</label></div>' +
           '<div class="ab-field" style="margin:0"><label class="ab-label" for="abDate">' + t('admin.editor.dateLabel') + '</label><div class="ab-row"><input class="ab-input" id="abDate" type="datetime-local" step="60"><button class="ab-btn sm" id="abNow">' + t('admin.editor.setNow') + '</button></div><label class="ab-hint">' + t('admin.editor.dateHint') + '</label></div>' +
           (cloudOn() ? '<div class="ab-field" style="margin:0"><label class="ab-label" for="abSchedule">' + t('admin.editor.scheduleLabel') + '</label><input class="ab-input" id="abSchedule" type="datetime-local" step="60"><label class="ab-hint">' + t('admin.editor.scheduleHint') + '</label></div>' : '') +
@@ -2692,6 +2693,7 @@
 
     bindEditor(content, route);
     fillCategoryOptions(content);
+    fillAuthorOptions(content);
     renderDraftBar(content, route);
     if (route.id) loadEditor(content, route.id);
     else {
@@ -2885,6 +2887,18 @@
     posts.forEach(function (x) { if (x && x.category) seen[x.category] = 1; });
     list.innerHTML = Object.keys(seen).sort().map(function (c) { return '<option value="' + esc(c) + '"></option>'; }).join('');
   }
+  /** 作者候选：来自已有文章的作者 + 站点个人资料昵称 */
+  async function fillAuthorOptions(content) {
+    var list = content.querySelector('#abAuthorList');
+    if (!list) return;
+    var posts = [];
+    try { posts = await listPosts(); } catch (e) {}
+    var seen = {};
+    var prof = readAdminProfile ? readAdminProfile() : {};
+    if (prof && prof.name) seen[prof.name] = 1;
+    posts.forEach(function (p) { if (p && p.author) seen[p.author] = 1; });
+    list.innerHTML = Object.keys(seen).sort().map(function (a) { return '<option value="' + esc(a) + '"></option>'; }).join('');
+  }
   async function loadEditor(content, id) {
     var p = await getPost(id);
     if (!p) { toast(t('admin.editor.notFound'), 'err'); return; }
@@ -2894,6 +2908,7 @@
     var catEl = content.querySelector('#abCategory');
     if (catEl) catEl.value = p.category || '';
     content.querySelector('#abSeries').value = p.series || '';
+    if (content.querySelector('#abAuthor')) content.querySelector('#abAuthor').value = p.author || '';
     content.querySelector('#abSeriesOrder').value = p.seriesOrder ? String(p.seriesOrder) : '';
     content.querySelector('#abCover').value = p.cover || '';
     content.querySelector('#abOgImage').value = p.ogImage || '';
@@ -2984,6 +2999,7 @@
     var post = Object.assign({}, content.__editingPost || {}, {
       id: id, title: title, date: dateValue, publishAt: publishAt,
       series: seriesValue,
+      author: val(content, '#abAuthor').trim(),
       ogImage: ogImage,
       seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),

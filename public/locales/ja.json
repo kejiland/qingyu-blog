@@ -974,5 +974,11 @@
   "admin.webmentions.empty": "引用はまだありません",
   "admin.webmentions.deleted": "削除しました",
   "admin.webmentions.deleteFail": "削除に失敗しました：",
-  "admin.webmentions.deleteConfirm": "この引用を削除しますか？"
+  "admin.webmentions.deleteConfirm": "この引用を削除しますか？",
+  "nav.authors": "著者",
+  "authors.title": "著者",
+  "authors.empty": "著者がまだいません",
+  "authors.count": "{n} 件の記事",
+  "admin.editor.author": "著者",
+  "admin.editor.authorPh": "空欄ならサイト名を表示"
 }

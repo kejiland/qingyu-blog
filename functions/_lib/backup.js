@@ -11,7 +11,7 @@ const BACKUP_FORMAT = 'qingyu-blog-backup';
 const BACKUP_VERSION = 2;
 const MAX_BACKUPS = 30;
 const TABLES = {
-  posts: ['id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at','seo'],
+  posts: ['id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','author','series_order','status','publish_at','seo'],
   post_revisions: ['id','post_id','title','date','excerpt','content','cover','og_image','pinned','protected','enc','tags','category','series','series_order','status','publish_at','reason','created_at'],
   comments: ['id','post_id','author','content','date','status','parent_id','likes','featured','pinned'],
   media: ['id','name','url','thumb_url','type','size','created_at'],

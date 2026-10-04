@@ -29,6 +29,7 @@ function isKnownSpaRoute(pathname) {
     /^\/posts\/[^/]+\/edit\/?$/.test(pathname) ||
     /^\/series\/[^/]+\/?$/.test(pathname) ||
     /^\/preview\/[^/]+\/?$/.test(pathname) ||
+    /^\/authors(\/[^/]+)?\/?$/.test(pathname) ||
     pathname.indexOf('/admin') === 0;
 }
 

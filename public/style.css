@@ -3273,3 +3273,12 @@ html[data-theme="dark"] body.scrolled .topbar {
 .wm-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .wm-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
 .wm-excerpt { margin: 6px 0 0; font-size: 13.5px; line-height: 1.6; }
+/* 作者列表 / 作者主页 */
+.author-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; margin-top: 16px; }
+.author-card { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-soft); color: var(--fg); text-decoration: none; transition: border-color .15s, color .15s, transform .15s; }
+.author-card:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+.author-avatar { width: 36px; height: 36px; flex: 0 0 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-soft, rgba(0,0,0,.06)); color: var(--accent); font-weight: 600; }
+.author-info { display: flex; flex-direction: column; min-width: 0; }
+.author-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.author-count { font-size: 12.5px; color: var(--muted); }
+.meta-author { font-weight: 500; }

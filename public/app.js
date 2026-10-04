@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.56';
+var BLOG_VERSION = '2.10.57';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2830,7 +2830,7 @@ async function renderPost(id) {
   var tags = normalizeTags(post).map(function (t) { return '<a href="' + esc(href('/', { tag: t })) + '" data-tag-link>' + esc(t) + '</a>'; }).join('');
   var minutes = Math.max(1, Math.ceil((stripMd(content || '').length / 400)));
   var seriesMeta = post.series ? '<a class="pin" href="' + esc(href(seriesUrl(post.series))) + '">' + svgIcon('list', 13) + ' ' + esc(post.series) + '</a>' : '';
-  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span><span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
+  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.author ? '<span class="meta-dot">·</span><span class="meta-author">' + esc(post.author) + '</span>' : '') + '<span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
   html += '<div class="reading-tools"><span class="rt-label">' + t('post.fontSize') + '</span>' +
     '<button type="button" class="rt-btn" data-rs="-1" aria-label="' + t('post.fontSmaller') + '" title="' + t('post.fontSmaller') + '">A−</button>' +
     '<button type="button" class="rt-btn" data-rs="0" aria-label="' + t('post.fontReset') + '" title="' + t('post.fontReset') + '">A</button>' +
@@ -3552,6 +3552,36 @@ function renderPostFail(post) {
   app().innerHTML = html;
   var retry = document.querySelector('#retryPostBtn');
   if (retry) retry.addEventListener('click', function () { route(); });
+}
+
+/* ---------- 多作者：/authors 列表与 /authors/<name> 作者主页 ---------- */
+function authorsIndex() {
+  var map = {};
+  getPublishedPosts().forEach(function (p) { var a = String(p.author || '').trim(); if (a) map[a] = (map[a] || 0) + 1; });
+  return Object.keys(map).sort(function (x, y) { return x.localeCompare(y); }).map(function (a) { return { name: a, count: map[a] }; });
+}
+function authorPosts(name) {
+  var key = String(name || '').trim();
+  return sortPagePosts(getPublishedPosts().filter(function (p) { return String(p.author || '').trim() === key; }));
+}
+function renderAuthors() {
+  var list = authorsIndex();
+  var html = renderNav('/authors');
+  html += '<main class="container page-fade"><div class="list-head"><h2 class="page-title">' + t('authors.title') + '</h2></div>';
+  if (!list.length) html += '<div class="empty"><div class="big">' + svgIcon('pen', 36) + '</div><p>' + t('authors.empty') + '</p></div>';
+  else html += '<div class="author-grid">' + list.map(function (a) {
+    return '<a class="author-card" href="' + esc(href('/authors/' + encodeURIComponent(a.name))) + '"><span class="author-avatar">' + esc(a.name.slice(0, 1)) + '</span><span class="author-info"><b>' + esc(a.name) + '</b><span class="author-count">' + esc(t('authors.count', { n: a.count })) + '</span></span></a>';
+  }).join('') + '</div>';
+  html += '</main>' + renderFooter();
+  return html;
+}
+function renderAuthorPage(name) {
+  var posts = authorPosts(name);
+  var html = renderNav('/authors');
+  html += '<main class="container page-fade"><div class="list-head"><h2 class="page-title">' + esc(name) + ' <span class="author-count">' + esc(t('authors.count', { n: posts.length })) + '</span></h2></div>';
+  html += posts.length ? '<div id="listContainer" class="list-nopager">' + renderCardList(posts, {}, false) + '</div>' : '<div class="empty"><p>' + esc(t('authors.empty')) + '</p></div>';
+  html += '</main>' + renderFooter();
+  return html;
 }
 
 function renderArchive() {
@@ -4918,6 +4948,12 @@ async function route() {
     } else {
       renderAdmin();
     }
+  }
+  else if (path === '/authors') { app().innerHTML = renderAuthors(); }
+  else if (path.indexOf('/authors/') === 0) {
+    var authorName = '';
+    try { authorName = decodeURIComponent(path.slice('/authors/'.length).replace(/\/.*$/, '')); } catch (e) { authorName = path.slice('/authors/'.length); }
+    app().innerHTML = renderAuthorPage(authorName);
   }
   else if (path === '/archive') { app().innerHTML = renderArchive(); }
   else if (path === '/subscribe') { app().innerHTML = renderSubscribe(); bindSubscribe(); }

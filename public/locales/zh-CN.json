@@ -974,5 +974,11 @@
   "admin.webmentions.empty": "暂无引用",
   "admin.webmentions.deleted": "已删除",
   "admin.webmentions.deleteFail": "删除失败：",
-  "admin.webmentions.deleteConfirm": "确定删除这条引用？"
+  "admin.webmentions.deleteConfirm": "确定删除这条引用？",
+  "nav.authors": "作者",
+  "authors.title": "作者",
+  "authors.empty": "暂无作者信息",
+  "authors.count": "{n} 篇文章",
+  "admin.editor.author": "作者",
+  "admin.editor.authorPh": "留空则显示站点署名"
 }

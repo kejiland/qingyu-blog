@@ -464,7 +464,7 @@ function makeD1() {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
     admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map(), error_logs: new Map(), webmentions: new Map()
   };
-  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at', 'seo'];
+  const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'author', 'series_order', 'status', 'publish_at', 'seo'];
 
   function exec(sql, params) {
     const s = sql.replace(/\s+/g, ' ').trim();
@@ -3945,6 +3945,35 @@ tests.push(['Webmention：校验来源链接后收录 + 列表 / 删除', async 
   assert.ok(appSrc.indexOf('function loadWebmentions') >= 0 && appSrc.indexOf('postWebmentions') >= 0, '前台展示已接入');
   const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
   assert.ok(adminSrc.indexOf('pageWebmentions') >= 0 && adminSrc.indexOf('/admin/webmentions') >= 0, '后台管理页已接入');
+}]);
+
+/* 多作者：字段往返 + /authors 列表 + 作者主页 + 文章页作者署名 */
+tests.push(['多作者：字段往返 + 作者列表 / 作者主页', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const { env, token } = await authEnv();
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'a1', title: '甲的文章', date: '2026-01-01', content: 'x', author: '甲' }) }), env);
+  await core.handlePostId(new Request('http://t/api/posts/a1', { method: 'PUT', headers: auth, body: JSON.stringify({ id: 'a1', title: '甲的文章', date: '2026-01-01', content: 'x', author: '乙' }) }), env, 'a1');
+  const p = (await (await core.handlePostId(new Request('http://t/api/posts/a1'), env, 'a1')).json()).post;
+  assert.strictEqual(p.author, '乙', '作者字段可保存与更新');
+  const posts = [
+    { id: 'p1', title: '甲文', date: '2026-01-02', content: 'x', tags: [], author: '甲' },
+    { id: 'p2', title: '乙文', date: '2026-01-03', content: 'y', tags: [], author: '乙' },
+    { id: 'p3', title: '乙文二', date: '2026-01-04', content: 'z', tags: [], author: '乙' }
+  ];
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/authors');
+  assert.ok(b.html.indexOf('author-card') >= 0, '作者卡片列表渲染');
+  assert.ok(b.html.indexOf('甲') >= 0 && b.html.indexOf('乙') >= 0, '列出两位作者');
+  assert.ok(b.html.indexOf('2 篇') >= 0, '显示该作者文章数');
+  const b2 = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/authors/' + encodeURIComponent('乙'));
+  assert.ok(b2.html.indexOf('乙文') >= 0 && b2.html.indexOf('乙文二') >= 0, '作者主页列出其文章');
+  assert.ok(b2.html.indexOf('甲文') < 0, '不混入其他作者的文章');
+  const b3 = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/posts/p1/');
+  assert.ok(b3.html.indexOf('meta-author') >= 0, '文章页显示作者');
+  const admin = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(admin.indexOf('id="abAuthor"') >= 0 && admin.indexOf('author: val(content') >= 0, '编辑器作者字段已接入');
+  const worker = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
+  assert.ok(worker.indexOf('/authors') >= 0, 'SPA 路由白名单含作者页');
 }]);
 
 /* ---------- 运行 ---------- */
