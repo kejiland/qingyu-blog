@@ -962,5 +962,17 @@
   "admin.staticExport.done": "Exported {count} posts ({files} files)",
   "admin.staticExport.fail": "Static export failed: ",
   "admin.staticExport.readme": "Qingyu'Blog · Static site export\n\nThis ZIP is a ready-to-deploy static site:\n- Every route has its own index.html, so no SPA rewrite rules are needed\n- Only PUBLISHED posts are included (drafts / scheduled posts are skipped)\n- Data lives in posts.min.js, config in config.min.js (already switched to static mode)\n- The admin UI is not included\n- Encrypted posts keep their ciphertext; readers unlock them with the password\n- Media stored on R2/object storage is NOT bundled\n\nHow to use:\n1. Unzip into an empty directory\n2. Upload the whole directory to any static host (Netlify / Vercel / GitHub Pages / object storage / Nginx…)\n3. If deploying to a sub-path keep the folder structure (asset links are relative)\n\nSite: {site}\nPublished posts: {count}",
-  "post.print": "Print / PDF"
+  "post.print": "Print / PDF",
+  "webmention.title": "Mentions ({n})",
+  "admin.sidebar.webmentions": "Webmentions",
+  "admin.webmentions.title": "Webmentions",
+  "admin.webmentions.desc": "Links from other sites to your posts are shown under each post; delete them here",
+  "admin.webmentions.colSource": "Source",
+  "admin.webmentions.colTarget": "Target",
+  "admin.webmentions.colAuthor": "Author",
+  "admin.webmentions.colDate": "Date",
+  "admin.webmentions.empty": "No mentions yet",
+  "admin.webmentions.deleted": "Deleted",
+  "admin.webmentions.deleteFail": "Delete failed: ",
+  "admin.webmentions.deleteConfirm": "Delete this mention?"
 }

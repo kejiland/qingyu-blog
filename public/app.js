@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.55';
+var BLOG_VERSION = '2.10.56';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -2882,6 +2882,7 @@ async function renderPost(id) {
   html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + printBtn + shareMenu + '</div></div>';
   // 双向链接与相关文章（静态模式本地计算，云端异步拉取）
   html += '<div class="relations-slot" id="postRelations"></div>';
+  html += '<div class="webmentions" id="postWebmentions" hidden></div>';
 
   // 系列内上一篇 / 下一篇
   if (post.series) {
@@ -3391,6 +3392,7 @@ async function renderPost(id) {
   });
 
   loadPostRelations(post.id);
+  loadWebmentions(post);
 }
 
 /* ============================================================================
@@ -3485,9 +3487,32 @@ function enhanceRichContent(root) {
   } catch (e) { /* 富内容渲染失败不影响正文 */ }
 }
 
-/* ---------- 草稿预览分享页（/preview/<token>）----------
- * 凭签名令牌读取未发布文章，展示「预览模式」提示条；不索引、不统计、不加载评论。
- */
+/* ---------- Webmention：外站引用展示 ----------
+ * 云端模式下按文章绝对地址查询引用，有数据才显示区块。 */
+function loadWebmentions(post) {
+  try {
+    var box = document.querySelector('#postWebmentions');
+    if (!box || !_cloudOn() || !post) return;
+    var base = String(getConfig().siteUrl || (typeof location !== 'undefined' ? location.origin : '')).replace(/\/+$/, '');
+    var target = base + postUrl(post.id);
+    apiFetch('api/webmention?target=' + encodeURIComponent(target)).then(function (d) {
+      var list = (d && d.mentions) || [];
+      if (!list.length) return;
+      box.hidden = false;
+      box.innerHTML = '<h3 class="wm-title">' + svgIcon('link', 15) + ' ' + esc(t('webmention.title', { n: list.length })) + '</h3>' +
+        '<div class="wm-list">' + list.map(function (m) {
+          var dt = m.created_at ? new Date(Number(m.created_at)).toISOString().slice(0, 10) : '';
+          return '<div class="wm-item">' +
+            '<div class="wm-head"><a href="' + esc(m.source) + '" target="_blank" rel="noopener nofollow">' + esc(m.author_name || m.title || m.source) + '</a><span class="wm-date">' + esc(dt) + '</span></div>' +
+            (m.title ? '<div class="wm-sub">' + esc(m.title) + '</div>' : '') +
+            (m.excerpt ? '<p class="wm-excerpt">' + esc(m.excerpt) + '</p>' : '') +
+            '</div>';
+        }).join('') + '</div>';
+    }).catch(function () {});
+  } catch (e) {}
+}
+
+/* 凭签名令牌读取未发布文章，展示「预览模式」提示条；不索引、不统计、不加载评论。 */
 async function renderPreviewPage(token) {
   app().innerHTML = renderNav('/') + '<main class="container page-fade"><div class="post-body">' +
     '<div class="preview-banner">' + svgIcon('eye', 14) + ' ' + t('preview.banner') + '</div>' +

@@ -1940,6 +1940,137 @@ export async function handlePreviewGet(request, env) {
   if (!row) return json({ error: '文章不存在' }, 404, request, env, { 'Cache-Control': NO_CACHE });
   return json({ ok: true, preview: true, expiresAt: Number(claims.e), post: postFromRow(row) }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
+/* ============================================================
+ * Webmention（W3C）：外站引用本篇文章 → 校验来源页确实链接到本站后收录展示
+ * ============================================================ */
+const WEBMENTION_MAX_BYTES = 200000;
+function wmStripTags(s) {
+  return String(s == null ? '' : s).replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#0?39;/g, "'").replace(/\s+/g, ' ').trim();
+}
+function wmMetaMap(html) {
+  const map = {};
+  const re = /<meta\b[^>]*>/gi;
+  let m;
+  while ((m = re.exec(html))) {
+    const tag = m[0];
+    const key = /(?:name|property)\s*=\s*["']([^"']+)["']/i.exec(tag);
+    const val = /content\s*=\s*["']([^"']*)["']/i.exec(tag);
+    if (key && val) map[String(key[1]).toLowerCase()] = val[1];
+  }
+  return map;
+}
+function wmSameUrl(a, b) {
+  try {
+    const ua = new URL(a), ub = new URL(b);
+    const norm = (u) => (u.origin.replace(/^https?:\/\/www\./, '') + u.pathname.replace(/\/+$/, '') + u.search).toLowerCase();
+    return norm(ua) === norm(ub);
+  } catch (e) { return false; }
+}
+function wmPostIdForTarget(env, target, requestUrl) {
+  try {
+    const t = new URL(target);
+    const selfHosts = [];
+    try { selfHosts.push(new URL(requestUrl).hostname.replace(/^www\./, '')); } catch (e) {}
+    if (env && env.SITE_URL) { try { selfHosts.push(new URL(env.SITE_URL).hostname.replace(/^www\./, '')); } catch (e) {} }
+    const host = t.hostname.replace(/^www\./, '');
+    if (selfHosts.length && selfHosts.indexOf(host) < 0) return null;
+    const m = /^\/posts\/([^/]+)\/?$/.exec(t.pathname);
+    if (!m) return null;
+    return decodeURIComponent(m[1]);
+  } catch (e) { return null; }
+}
+/** POST /api/webmention：接收外站引用通知（公开，频率限制 + 抓取校验） */
+export async function handleWebmention(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  const ip = clientIp(request);
+  if (env.BLOG) {
+    const win = Math.floor(Date.now() / 60000);
+    const rk = 'rate:wm:' + ip + ':' + win;
+    let cnt = 0;
+    try { cnt = Number(await env.BLOG.get(rk)) || 0; } catch (e) {}
+    if (cnt >= 10) return json({ error: '操作太频繁，请稍后再试' }, 429, request, env);
+    try { await env.BLOG.put(rk, String(cnt + 1), { expirationTtl: 120 }); } catch (e) {}
+  }
+  let source = '', target = '';
+  const ctype = String(request.headers.get('Content-Type') || '');
+  if (ctype.indexOf('application/json') >= 0) {
+    const body = await request.json().catch(() => null);
+    source = String((body && body.source) || '').trim();
+    target = String((body && body.target) || '').trim();
+  } else {
+    const text = await request.text().catch(() => '');
+    const params = new URLSearchParams(text);
+    source = String(params.get('source') || '').trim();
+    target = String(params.get('target') || '').trim();
+  }
+  if (!/^https?:\/\//i.test(source) || !/^https?:\/\//i.test(target)) return json({ error: 'source / target 必须是 http(s) URL' }, 400, request, env);
+  if (source.length > 2000 || target.length > 2000) return json({ error: 'URL 过长' }, 400, request, env);
+  const postId = wmPostIdForTarget(env, target, request.url);
+  if (!postId) return json({ error: 'target 不是本站文章地址' }, 400, request, env);
+  const post = await dbFirst(env.DB, 'SELECT * FROM posts WHERE id = ?', postId).catch(() => null);
+  if (!post) return json({ error: '文章不存在' }, 404, request, env);
+  // 抓取来源页并校验其中确实链接到 target
+  let html = '';
+  try {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
+    const res = await fetch(source, { redirect: 'follow', signal: ctrl.signal, headers: { 'User-Agent': 'QingyuBlog-Webmention/1.0 (+webmention)', 'Accept': 'text/html,application/xhtml+xml' } });
+    clearTimeout(timer);
+    if (!res.ok) return json({ error: '来源页无法访问 HTTP ' + res.status }, 400, request, env);
+    const ct = String(res.headers.get('content-type') || '');
+    if (ct && ct.indexOf('text/html') < 0 && ct.indexOf('text/plain') < 0) return json({ error: '来源页不是 HTML' }, 400, request, env);
+    html = (await res.text()).slice(0, WEBMENTION_MAX_BYTES);
+  } catch (e) {
+    return json({ error: '无法抓取来源页' }, 400, request, env);
+  }
+  let links = false;
+  const hrefRe = /href\s*=\s*["']([^"']+)["']/gi;
+  let hm;
+  while ((hm = hrefRe.exec(html))) {
+    let abs = '';
+    try { abs = new URL(hm[1], source).href; } catch (e) { continue; }
+    if (wmSameUrl(abs, target)) { links = true; break; }
+  }
+  if (!links) return json({ error: '来源页没有链接到该文章' }, 400, request, env);
+  const metas = wmMetaMap(html);
+  const titleM = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+  const authorName = wmStripTags(metas['author'] || metas['article:author'] || '').slice(0, 80);
+  const srcHost = (() => { try { return new URL(source).hostname.replace(/^www\./, ''); } catch (e) { return ''; } })();
+  const title = wmStripTags(titleM ? titleM[1] : (metas['og:title'] || '')).slice(0, 160) || srcHost;
+  const excerpt = wmStripTags(metas['og:description'] || metas['description'] || '').slice(0, 300);
+  const now = Date.now();
+  await dbRun(env.DB,
+    'INSERT INTO webmentions (source,target,post_id,author_name,author_url,title,excerpt,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) ' +
+    'ON CONFLICT(source,target) DO UPDATE SET author_name=excluded.author_name, author_url=excluded.author_url, title=excluded.title, excerpt=excluded.excerpt, updated_at=excluded.updated_at',
+    source, target, postId, authorName || srcHost, source, title, excerpt, 'approved', now, now);
+  return json({ ok: true, postId: postId }, 202, request, env, { 'Cache-Control': NO_CACHE });
+}
+/** GET /api/webmention?target=URL：公开读取某篇文章的引用列表 */
+export async function handleWebmentionList(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const target = String(new URL(request.url).searchParams.get('target') || '').trim();
+  if (!target) return json({ ok: true, mentions: [] }, 200, request, env, { 'Cache-Control': NO_CACHE });
+  const rows = await dbAll(env.DB, "SELECT id,source,target,author_name,author_url,title,excerpt,created_at FROM webmentions WHERE target = ? AND status = 'approved' ORDER BY created_at DESC LIMIT 100", target).catch(() => []);
+  return json({ ok: true, mentions: rows }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+/** GET /api/admin/webmentions（需登录）：列表；DELETE 单条 */
+export async function handleWebmentionsAdmin(request, env, id) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (request.method === 'DELETE') {
+    if (!id) return json({ error: '缺少 id' }, 400, request, env);
+    await dbRun(env.DB, 'DELETE FROM webmentions WHERE id = ?', Number(id)).catch(() => {});
+    return json({ ok: true }, 200, request, env, { 'Cache-Control': NO_CACHE });
+  }
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const rows = await dbAll(env.DB, 'SELECT * FROM webmentions ORDER BY created_at DESC LIMIT 200').catch(() => []);
+  return json({ ok: true, total: rows.length, mentions: rows }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
 /** GET /api/admin/errors（需登录）：错误聚合列表；DELETE：清空 */
 export async function handleErrorsAdmin(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);

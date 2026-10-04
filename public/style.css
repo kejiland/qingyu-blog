@@ -3252,7 +3252,7 @@ html[data-theme="dark"] body.scrolled .topbar {
   .toc-fab, .toc-sheet, .reading-tools, .like-bar, .article-footer, .comments,
   .relations-slot, .series-nav, .mp-fab-wrap, .mp-panel, #bgSketch,
   .sidebar-overlay, .mobile-sider, .mobile-sidebar, .share-menu, .hl-panel, .hl-btn,
-  .ad-slot, .preview-banner, .post-lock-row, .smoji-picker, .toast-wrap { display: none !important; }
+  .ad-slot, .preview-banner, .post-lock-row, .smoji-picker, .toast-wrap, .webmentions { display: none !important; }
   .container, .post-body, .page-fade { max-width: 100% !important; width: auto !important; margin: 0 !important; padding: 0 !important; }
   .article { font-size: 11.5pt; line-height: 1.7; }
   .article h1, .article h2, .article h3 { break-after: avoid; page-break-after: avoid; }
@@ -3263,3 +3263,13 @@ html[data-theme="dark"] body.scrolled .topbar {
   .print-only { display: block !important; }
   .print-foot { margin-top: 18px; padding-top: 8px; border-top: 1px solid #999; font-size: 9pt; color: #555; }
 }
+/* Webmention 外站引用 */
+.webmentions { margin-top: 26px; padding-top: 16px; border-top: 1px solid var(--border); }
+.wm-title { display: flex; align-items: center; gap: 6px; font-size: 15px; margin: 0 0 10px; }
+.wm-list { display: flex; flex-direction: column; gap: 10px; }
+.wm-item { padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-soft); }
+.wm-head { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.wm-head a { color: var(--accent); text-decoration: none; }
+.wm-date { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.wm-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.wm-excerpt { margin: 6px 0 0; font-size: 13.5px; line-height: 1.6; }

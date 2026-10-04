@@ -462,7 +462,7 @@ function makeD1() {
   let seq = 0;   // 模拟 SQLite rowid（单调递增，保证插入顺序稳定）
   const t = {
     posts: new Map(), post_revisions: new Map(), backups: new Map(), subscribers: new Map(), mail_outbox: new Map(), comments: new Map(), stats: new Map(), media: new Map(),
-    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map(), error_logs: new Map()
+    admin_auth: new Map(), admin_sessions: new Map(), admin_fails: new Map(), audit_log: new Map(), site_settings: new Map(), stats_sources: new Map(), error_logs: new Map(), webmentions: new Map()
   };
   const POST_COLS = ['id', 'title', 'date', 'excerpt', 'content', 'cover', 'og_image', 'pinned', 'protected', 'enc', 'tags', 'category', 'series', 'series_order', 'status', 'publish_at', 'seo'];
 
@@ -746,6 +746,25 @@ function makeD1() {
     }
     if (s === 'DELETE FROM error_logs') { t.error_logs.clear(); return { success: true }; }
     if (/^DELETE FROM error_logs WHERE id NOT IN /.test(s)) return { success: true };
+    /* webmentions（外站引用） */
+    if (/^INSERT INTO webmentions/.test(s)) {
+      const [source, target, post_id, author_name, author_url, title, excerpt, status, created_at, updated_at] = params;
+      const key = source + '|' + target;
+      const old = t.webmentions.get(key);
+      const row = { id: old ? old.id : ++seq, source, target, post_id, author_name, author_url, title, excerpt, status, created_at: old ? old.created_at : created_at, updated_at };
+      t.webmentions.set(key, row);
+      return { success: true };
+    }
+    if (/^SELECT id,source,target,author_name,author_url,title,excerpt,created_at FROM webmentions WHERE target = \? AND status = 'approved'/.test(s)) {
+      return [...t.webmentions.values()].filter((r) => r.target === params[0] && r.status === 'approved').sort((a, b) => b.created_at - a.created_at);
+    }
+    if (s === 'SELECT * FROM webmentions ORDER BY created_at DESC LIMIT 200') {
+      return [...t.webmentions.values()].sort((a, b) => b.created_at - a.created_at);
+    }
+    if (s === 'DELETE FROM webmentions WHERE id = ?') {
+      for (const [k, r] of [...t.webmentions]) if (r.id === Number(params[0])) t.webmentions.delete(k);
+      return { success: true };
+    }
     /* admin_auth */
     if (s === "SELECT * FROM admin_auth WHERE k = ?") return t.admin_auth.get(params[0]) || null;
     if (/^INSERT INTO admin_auth/.test(s)) {
@@ -3885,6 +3904,47 @@ tests.push(['文章打印 / PDF：按钮 + 打印样式 + 仅打印页脚', asyn
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } }, '/posts/hello-qingyu/');
   assert.ok(b.html.indexOf('id="btnPrint"') >= 0, '详情页含打印按钮');
   assert.ok(b.html.indexOf('print-foot') >= 0, '详情页含仅打印页脚');
+}]);
+
+/* Webmention：接收校验 / 列表 / 删除 + 前端与后台接线 */
+tests.push(['Webmention：校验来源链接后收录 + 列表 / 删除', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const { env, token } = await authEnv();
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'wm1', title: '被引用文章', date: '2026-01-01', content: 'x' }) }), env);
+  const origFetch = global.fetch;
+  const linked = '<html><head><title>别人的文章</title><meta name="description" content="这是摘要"></head><body><p>正文 <a href="http://t/posts/wm1/">引用</a></p></body></html>';
+  const notLinked = '<html><head><title>没有链接</title></head><body><p>什么也没有</p></body></html>';
+  global.fetch = async function (url) {
+    const u = String(url);
+    if (u.indexOf('https://other.example/') === 0) return new Response(linked, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    if (u.indexOf('https://nolink.example/') === 0) return new Response(notLinked, { status: 200, headers: { 'Content-Type': 'text/html' } });
+    return origFetch(url);
+  };
+  try {
+    const form = (source, target) => new Request('http://t/api/webmention', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'source=' + encodeURIComponent(source) + '&target=' + encodeURIComponent(target) });
+    assert.strictEqual((await core.handleWebmention(form('https://other.example/post', 'http://t/posts/wm1/'), env)).status, 202, '合法引用被接收');
+    assert.strictEqual((await core.handleWebmention(form('https://nolink.example/post', 'http://t/posts/wm1/'), env)).status, 400, '未链接则拒绝');
+    assert.strictEqual((await core.handleWebmention(form('https://other.example/post', 'http://t/about/'), env)).status, 400, '非文章地址拒绝');
+    assert.strictEqual((await core.handleWebmention(form('https://other.example/post', 'http://evil.example/posts/wm1/'), env)).status, 400, '站外 target 拒绝');
+    assert.strictEqual((await core.handleWebmention(form('https://other.example/post', 'http://t/posts/nope/'), env)).status, 404, '文章不存在 404');
+  } finally { global.fetch = origFetch; }
+  const list = await (await core.handleWebmentionList(new Request('http://t/api/webmention?target=' + encodeURIComponent('http://t/posts/wm1/')), env)).json();
+  assert.strictEqual(list.mentions.length, 1, '公开列表返回 1 条');
+  assert.strictEqual(list.mentions[0].title, '别人的文章', '解析出来源页标题');
+  assert.ok(list.mentions[0].excerpt.indexOf('摘要') >= 0, '解析出来源摘要');
+  assert.strictEqual((await core.handleWebmentionsAdmin(new Request('http://t/api/admin/webmentions'), env, null)).status, 401, '后台列表需登录');
+  const adminList = await (await core.handleWebmentionsAdmin(new Request('http://t/api/admin/webmentions', { headers: auth }), env, null)).json();
+  assert.strictEqual(adminList.mentions.length, 1, '后台可见');
+  await core.handleWebmentionsAdmin(new Request('http://t/api/admin/webmentions/1', { method: 'DELETE', headers: auth }), env, String(adminList.mentions[0].id));
+  const after = await (await core.handleWebmentionsAdmin(new Request('http://t/api/admin/webmentions', { headers: auth }), env, null)).json();
+  assert.strictEqual(after.mentions.length, 0, '删除后为空');
+  const idxHtml = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
+  assert.ok(idxHtml.indexOf('rel="webmention"') >= 0, '页面声明 Webmention 端点');
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  assert.ok(appSrc.indexOf('function loadWebmentions') >= 0 && appSrc.indexOf('postWebmentions') >= 0, '前台展示已接入');
+  const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(adminSrc.indexOf('pageWebmentions') >= 0 && adminSrc.indexOf('/admin/webmentions') >= 0, '后台管理页已接入');
 }]);
 
 /* ---------- 运行 ---------- */

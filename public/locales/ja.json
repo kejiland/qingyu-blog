@@ -962,5 +962,17 @@
   "admin.staticExport.done": "{count} 件の記事を書き出しました（{files} ファイル）",
   "admin.staticExport.fail": "静的サイトの書き出しに失敗：",
   "admin.staticExport.readme": "Qingyu'Blog · 静的サイト書き出し\n\nこの ZIP はそのまま配備できる静的サイトです：\n· 各ルートに index.html があるため SPA のリライト設定は不要\n· 公開済みの記事のみ（下書き・予約投稿は含まれません）\n· データは posts.min.js、設定は config.min.js（static モード）\n· 管理画面は含まれません\n· 暗号化記事は暗号文のままで、パスワード入力で解除します\n· R2 等のメディア本体は含まれません\n\n使い方：\n1. 空のディレクトリに解凍\n2. そのまま任意の静的ホスティングへアップロード\n3. サブディレクトリに置く場合も構成を保ってください（リンクは相対パス）\n\nサイト：{site}\n公開記事数：{count}",
-  "post.print": "印刷 / PDF"
+  "post.print": "印刷 / PDF",
+  "webmention.title": "引用（{n}）",
+  "admin.sidebar.webmentions": "Webmention",
+  "admin.webmentions.title": "Webmention",
+  "admin.webmentions.desc": "外部サイトから記事へのリンクを記事末尾に表示します。ここで削除できます",
+  "admin.webmentions.colSource": "参照元",
+  "admin.webmentions.colTarget": "参照先",
+  "admin.webmentions.colAuthor": "投稿者",
+  "admin.webmentions.colDate": "日時",
+  "admin.webmentions.empty": "引用はまだありません",
+  "admin.webmentions.deleted": "削除しました",
+  "admin.webmentions.deleteFail": "削除に失敗しました：",
+  "admin.webmentions.deleteConfirm": "この引用を削除しますか？"
 }

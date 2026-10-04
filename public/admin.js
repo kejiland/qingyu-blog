@@ -667,7 +667,8 @@
       ] },
       { group: t('admin.sidebar.commentManage'), items: [
         { key: 'comments', label: t('admin.sidebar.allComments'), icon: 'quote', href: '/admin/comments' },
-        { key: 'comments-pending', label: t('admin.sidebar.pendingComments'), icon: 'clock', href: '/admin/comments/pending', badge: 'pending' }
+        { key: 'comments-pending', label: t('admin.sidebar.pendingComments'), icon: 'clock', href: '/admin/comments/pending', badge: 'pending' },
+        { key: 'webmentions', label: t('admin.sidebar.webmentions'), icon: 'link', href: '/admin/webmentions' }
       ] },
       { group: t('admin.sidebar.contentSettings'), items: [
         { key: 'media', label: t('admin.sidebar.media'), icon: 'image', href: '/admin/media' },
@@ -830,6 +831,7 @@
     if (path === '/admin/audit') return { key: 'audit', page: 'audit' };
     if (path === '/admin/health') return { key: 'health', page: 'health' };
     if (path === '/admin/errors') return { key: 'errors', page: 'errors' };
+    if (path === '/admin/webmentions') return { key: 'webmentions', page: 'webmentions' };
     if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
@@ -1036,6 +1038,7 @@
     if (route.page === 'audit') return pageAudit(content);
     if (route.page === 'health') return pageHealth(content);
     if (route.page === 'errors') return pageErrors(content);
+    if (route.page === 'webmentions') return pageWebmentions(content);
     if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
@@ -4112,6 +4115,39 @@
         '<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + esc(x.url || '') + '">' + esc(x.url || '—') + '</td>' +
         '<td style="text-align:center">' + esc(String(Number(x.hits) || 1)) + '</td></tr>';
     }).join('');
+  }
+
+  /* ====================== Webmention 引用管理 ====================== */
+  async function pageWebmentions(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.webmentions.title') + '</h1><p class="ab-page-sub">' + t('admin.webmentions.desc') + '</p></div>' +
+      '<button class="ab-btn" id="abWmRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div>' +
+      '<div class="ab-card"><div class="ab-table-wrap"><table class="ab-table"><thead><tr><th>' + t('admin.webmentions.colSource') + '</th><th>' + t('admin.webmentions.colTarget') + '</th><th>' + t('admin.webmentions.colAuthor') + '</th><th>' + t('admin.webmentions.colDate') + '</th><th class="col-actions">' + t('admin.postList.colActions') + '</th></tr></thead><tbody id="abWmBody"></tbody></table></div></div>';
+    content.querySelector('#abWmRefresh').addEventListener('click', function () { loadWebmentionsAdmin(content); });
+    loadWebmentionsAdmin(content);
+  }
+  async function loadWebmentionsAdmin(content) {
+    var body = content.querySelector('#abWmBody');
+    body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
+    try {
+      var d = await api('api/admin/webmentions');
+      var list = (d && d.mentions) || [];
+      if (!list.length) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:34px" class="ab-muted">' + t('admin.webmentions.empty') + '</td></tr>'; return; }
+      body.innerHTML = list.map(function (m) {
+        return '<tr><td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><a href="' + esc(m.source) + '" target="_blank" rel="noopener nofollow">' + esc(m.source) + '</a></td>' +
+          '<td><code style="font-size:12px">' + esc(m.post_id || m.target) + '</code></td>' +
+          '<td>' + esc(m.author_name || '—') + '</td>' +
+          '<td>' + esc(fmtTimestamp(m.created_at)) + '</td>' +
+          '<td class="col-actions"><button class="ab-btn sm danger" data-wm-del="' + m.id + '">' + icon('trash', 12) + ' ' + t('admin.comments.delete') + '</button></td></tr>';
+      }).join('');
+      body.querySelectorAll('[data-wm-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          confirmModal(t('admin.comments.delete'), '<p class="ab-muted">' + t('admin.webmentions.deleteConfirm') + '</p>', async function () {
+            try { await api('api/admin/webmentions/' + enc(btn.getAttribute('data-wm-del')), { method: 'DELETE' }); toast(t('admin.webmentions.deleted'), 'ok'); loadWebmentionsAdmin(content); }
+            catch (e) { toast(t('admin.webmentions.deleteFail') + (e.message || e), 'err'); }
+          }, t('admin.comments.delete'));
+        });
+      });
+    } catch (e) { body.innerHTML = '<tr><td colspan="5" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; }
   }
 
   /* ====================== 博客设置 ====================== */
