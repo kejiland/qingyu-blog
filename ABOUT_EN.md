@@ -23,7 +23,7 @@ It runs in two modes:
 |------|------|
 | 🚀 **Zero barrier** | No Node.js, no `npm install` — double-click and it runs |
 | 💰 **Zero cost** | The free tiers of Cloudflare Workers + D1 are more than enough for a personal blog |
-| 📦 **Zero dependency** | Not a single third-party library; a controlled codebase that loads extremely fast |
+| 📦 **Zero dependency** | Zero third-party libraries in the core; heavier extras (emoji / diagrams / math) are **lazy-loaded** and vendored under `public/libs/`, so pages that do not use them download nothing |
 | 🔄 **Zero lock-in** | Posts are Markdown, so you can migrate to any platform at any time |
 | 🌐 **Multilingual** | Chinese / English / 日本語 / 한국어 / हिन्दी built in, with automatic browser-language detection |
 | 🎨 **Responsive** | Fully adapted to phone / tablet / desktop, on both the public site and the admin panel |
@@ -31,6 +31,9 @@ It runs in two modes:
 | ✍️ **Markdown editor** | Live preview, toolbar, word count, automatic draft saving |
 | 💬 **Comment system** | Nested replies, comment moderation, rate limiting |
 | 🌙 **Dark mode** | One-click toggle, serif-typography aesthetics with four accents |
+| 🔐 **Post encryption** | AES-GCM-256 + PBKDF2, fully client-side; the server stores ciphertext only. Signed preview links for drafts |
+| 🔍 **SEO & distribution** | Per-post SEO overrides, RSS / Sitemap, one-click static export, print / PDF, Webmentions |
+| 📊 **Observable** | Dashboard trends plus referrer / country / device stats, health check, audit log and a front-end error log |
 
 ---
 

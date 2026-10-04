@@ -63,6 +63,10 @@ binding = "AI"
 [vars]
 SITE_URL = "{env.SITE_URL}"
 CF_ZONE_ID = "{env.CF_ZONE_ID}"
+# 可选：AI 开关（空值 = 默认开启；0 / false / off 关闭）。部署时由 GitHub Secrets 注入，未配置即留空。
+BLOG_AI_ENABLED = "{env.BLOG_AI_ENABLED}"
+# 可选：设为 0 / false / off 后，匿名访客不能触发生成（只读缓存与 ping 不受影响）
+BLOG_AI_PUBLIC = "{env.BLOG_AI_PUBLIC}"
 # Cron：每 5 分钟检查定时文章；每天 19:00 UTC（北京时间 03:00）自动备份
 [triggers]
 crons = ["*/5 * * * *", "0 19 * * *"]

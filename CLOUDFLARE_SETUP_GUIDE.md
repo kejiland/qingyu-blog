@@ -618,6 +618,15 @@ npx wrangler secret put BLOG_AI_ENABLED     # 输入 0 / false / off 之一
 | `R2_PUBLIC_BASE` | 音乐桶公开域名 | R2 播放地址 |
 | `R2_MEDIA_BUCKET` | 媒体桶名，如 `qingyu-media` | 图片上传 |
 | `R2_MEDIA_PUBLIC_BASE` | 媒体桶公开域名 | 图片访问地址 |
+| `R2_BACKUP_BUCKET` | 私有备份桶名，如 `qingyu-backup` | 开启「备份与恢复」与每日自动备份（**建议设为私有桶**，不要开公开访问） |
+| `RESEND_API_KEY` | [Resend](https://resend.com) 的 API Key | 邮件订阅 / 新文章通知 / 评论通知 / 订阅者群发 |
+| `BLOG_MAIL_FROM` | 如 `blog@yourdomain.com` | 发件人（需在 Resend 验证过该域名） |
+| `BLOG_MAIL_REPLY_TO` | 如 `you@yourdomain.com` | 可选：收件人直接回复的地址 |
+| `BLOG_ADMIN_EMAIL` | 你的邮箱 | 可选：新评论通知收件人；不填回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | 敏感词，换行或逗号分隔 | 可选：环境变量版评论敏感词，优先级高于后台词库 |
+| `BLOG_PREVIEW_SECRET` | 一串随机值 | 可选：草稿预览链接的签名密钥；不填则用管理员密码哈希派生（**改密码即让所有预览链接失效**） |
+| `BLOG_AI_ENABLED` | `0` / `false` / `off` | 可选：整体关闭 AI（不填即有绑定就开启） |
+| `BLOG_AI_PUBLIC` | `0` / `false` / `off` | 可选：禁止匿名生成 AI 摘要（只读缓存与 ping 不受影响） |
 
 ### 10.4 一次性全部填好的示例
 
@@ -638,6 +647,13 @@ R2_BUCKET=qingyu-music
 R2_PUBLIC_BASE=https://music.example.com
 R2_MEDIA_BUCKET=qingyu-media
 R2_MEDIA_PUBLIC_BASE=https://media.example.com
+R2_BACKUP_BUCKET=qingyu-backup
+
+# 邮件订阅 / 通知（可选，三项齐全才启用）
+RESEND_API_KEY=re_xxxxxxxxxxxx
+BLOG_MAIL_FROM=blog@yourdomain.com
+BLOG_MAIL_REPLY_TO=you@yourdomain.com
+BLOG_ADMIN_EMAIL=you@yourdomain.com
 ```
 
 > 生成随机密钥的小技巧：
@@ -793,11 +809,19 @@ DELETE FROM admin_sessions;
 | `R2_PUBLIC_BASE` | Secret | ⭕ | 同上 |
 | `R2_MEDIA_BUCKET` | Secret | ⭕ | 图片上传 503 |
 | `R2_MEDIA_PUBLIC_BASE` | Secret | ⭕ | 同上 |
+| `R2_BACKUP_BUCKET` | Secret | ⭕ | 备份与恢复停用（后台备份页显示未配置） |
+| `RESEND_API_KEY` | Secret | ⭕ | 邮件订阅 / 通知 / 群发停用 |
+| `BLOG_MAIL_FROM` | Secret | ⭕ | 同上 |
+| `BLOG_MAIL_REPLY_TO` | Secret | ⭕ | 不影响发送，仅无 reply-to |
+| `BLOG_ADMIN_EMAIL` | Secret | ⭕ | 评论通知回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | Secret | ⭕ | 只用后台维护的词库 |
+| `BLOG_PREVIEW_SECRET` | Secret | ⭕ | 预览链接密钥由管理员密码哈希派生 |
 
-`BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` **不由工作流写入**，需要你自己在 Worker 上设置：
+`BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` 现在**可以通过 GitHub Secrets 配置**（与其它可选 Secret 一样，工作流会在配置了非空值时才写入）；也可以手动在 Worker 上设置：
 
 ```bash
 npx wrangler secret put BLOG_AI_ENABLED --name kejiland
+npx wrangler secret put BLOG_PREVIEW_SECRET --name kejiland
 ```
 
 ---

@@ -162,7 +162,7 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 
 | Secret | Description |
 | --- | --- |
-| `CF_ZONE_ID` | Zone ID of your custom domain; combined with the *Cache Purge* permission it purges the edge cache on publish |
+| `CF_ZONE_ID` | Zone ID of your custom domain; combined with the *Cache Purge* permission it purges the edge cache on publish (the runtime `CF_API_TOKEN` is written by the workflow) |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3-compatible credentials (audio and images **share** one pair) |
 | `R2_BUCKET` / `R2_PUBLIC_BASE` | **Music bucket**: bucket name + public domain (**must not be empty**, otherwise no R2 config is written at all) |
 | `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **Media bucket**: bucket name + public domain |
@@ -171,6 +171,10 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 | `BLOG_MAIL_REPLY_TO` | Optional reply-to email |
 | `PAGES_PROJECT_NAME` | Misleading name: it actually overrides the **Worker name** (`--name`). Leave empty to keep `kejiland` from `wrangler.workers.toml`. Beginners should not set it. |
 | `BLOG_RATE_LIMIT_BINDING` | Enables in-Worker edge rate limiting for login (a positive integer namespace, e.g. `1001`); switches deploys to wrangler 4.x. Remove it if your account does not support the binding |
+| `BLOG_ADMIN_EMAIL` | Optional: recipient for new-comment notifications; falls back to Profile → email |
+| `COMMENT_BLOCKLIST` | Optional comment blocklist (newlines / commas); takes precedence over the admin list |
+| `BLOG_PREVIEW_SECRET` | Optional signing key for draft preview links; unset = derived from the admin password hash (changing the password invalidates every link) |
+| `BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` | Optional: set to `0` / `false` / `off` to switch AI off / forbid anonymous generation |
 | `BLOG_WRITE_TOKEN` | Legacy write token, not needed for new deployments |
 
 Push to `main` (or run the workflow manually) and GitHub Actions will:

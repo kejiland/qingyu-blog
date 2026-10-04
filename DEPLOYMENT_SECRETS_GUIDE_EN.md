@@ -88,6 +88,14 @@ If you use the broader "Administrator Read & Write" Account API Token that Cloud
 | `PAGES_PROJECT_NAME` | Optional | Its actual meaning is the Worker name. When left empty, the repository default name `kejiland` is used. Renaming it arbitrarily may deploy a different Worker, so beginners are advised to leave it empty |
 | `BLOG_WRITE_TOKEN` | Optional | Legacy write token. New deployments normally do not need to fill it in |
 | `BLOG_RATE_LIMIT_BINDING` | Optional | A positive integer (such as `1001`). Filling it in enables the in-Worker edge login rate limiting and makes the deployment switch to wrangler 4.x (this binding requires ≥ 4.36). If your account does not support the binding, delete this Secret and redeploy to recover |
+| `BLOG_ADMIN_EMAIL` | Optional | Recipient of new-comment notifications; falls back to Profile → email |
+| `COMMENT_BLOCKLIST` | Optional | Comment blocklist words (newline or comma separated). Takes precedence over the admin list |
+| `BLOG_PREVIEW_SECRET` | Optional | Signing key for draft preview links. Unset = derived from the admin password hash, so **changing the password invalidates every issued link** |
+| `BLOG_AI_ENABLED` | Optional | Set to `0` / `false` / `off` to switch AI off entirely; blank/unset = on whenever the binding exists |
+| `BLOG_AI_PUBLIC` | Optional | Set to `0` / `false` / `off` to forbid anonymous AI summary generation |
+| `RESEND_API_KEY` | Optional | Resend API key for subscription confirmation / new-post notices / comment notices / subscriber broadcast |
+| `BLOG_MAIL_FROM` | Optional | Sender address (domain verified in Resend), e.g. `blog@yourdomain.com` |
+| `BLOG_MAIL_REPLY_TO` | Optional | Reply-to address, e.g. `you@yourdomain.com` |
 
 ### 5.1 Three Runtime Variables to Care About After Deployment
 
@@ -96,10 +104,13 @@ These three are **not GitHub Secrets**, but they are easily confused with the ta
 | Variable | Who writes it | Effect | When unset |
 | --- | --- | --- | --- |
 | `CF_API_TOKEN` | **Written automatically by the workflow** (value taken from `CLOUDFLARE_API_TOKEN`) | Calls the Cloudflare Cache Purge API to clear the edge cache after a post is published | No cache purging (functionality is unaffected; new content may just take 1~5 minutes to take effect) |
-| `BLOG_AI_ENABLED` | **You must set it manually** (dashboard → Worker → Settings → Variables and Secrets, or `npx wrangler secret put BLOG_AI_ENABLED --name kejiland`) | Set to `0` / `false` / `off` to switch AI off entirely | Treated as enabled when Workers AI is bound and D1 exists |
-| `BLOG_AI_PUBLIC` | As above, set manually | Set to `0` / `false` / `off` to forbid anonymous visitors from generating AI summaries (still available after logging in) | Anonymous generation is allowed |
+| `BLOG_AI_ENABLED` | **GitHub Secret or set manually** (`npx wrangler secret put BLOG_AI_ENABLED --name kejiland`) | Set to `0` / `false` / `off` to switch AI off entirely | Treated as enabled when Workers AI is bound and D1 exists |
+| `BLOG_AI_PUBLIC` | As above | Set to `0` / `false` / `off` to forbid anonymous visitors from generating AI summaries (still available after logging in) | Anonymous generation is allowed |
+| `BLOG_ADMIN_EMAIL` | **Written by the workflow** when the Secret is set | New-comment notification recipient | Falls back to Profile → email |
+| `COMMENT_BLOCKLIST` | **Written by the workflow** when the Secret is set | Comment blocklist (higher precedence than the admin list) | Only the admin list is used |
+| `BLOG_PREVIEW_SECRET` | **Written by the workflow** when the Secret is set | Preview-link signing key | Derived from the admin password hash |
 
-> Only `CF_API_TOKEN` is written automatically by the workflow. It is fine not to set the other two: as long as the deployment succeeds and `/api/ai/ping` returns `{"ok":true}`, that means AI is available.
+> `CF_API_TOKEN` and the other optional "written only when set" values above are all handled by the workflow. Leaving them blank is fine: as long as the deployment succeeds and `/api/ai/ping` returns `{"ok":true}`, AI is available.
 
 ## 6. R2 Bucket Preparation
 
@@ -140,6 +151,7 @@ If the site uses both `example.com` and `www.example.com`, both origins must be 
 | `R2_PUBLIC_BASE` | Music bucket public read address, e.g. `https://music.example.com` |
 | `R2_MEDIA_BUCKET` | Media bucket name, e.g. `qingyu-media` |
 | `R2_MEDIA_PUBLIC_BASE` | Media bucket public read address, e.g. `https://media.example.com` |
+| `R2_BACKUP_BUCKET` | Private backup bucket name, e.g. `qingyu-backup` (**must stay private**; unset = backup/restore disabled) |
 
 Notes on `R2_ENDPOINT`:
 

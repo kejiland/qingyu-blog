@@ -148,7 +148,7 @@ npx wrangler kv namespace create BLOG
 
 | Secret | 说明 |
 | --- | --- |
-| `CF_ZONE_ID` | 自定义域名的 Zone ID；配合 Token 的 Cache Purge 权限 → 发布即清边缘缓存 |
+| `CF_ZONE_ID` | 自定义域名的 Zone ID；配合 Token 的 Cache Purge 权限 → 发布即清边缘缓存（运行时变量 `CF_API_TOKEN` 由工作流自动写入） |
 | `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3 兼容凭据（音乐与媒体**共用**同一对） |
 | `R2_BUCKET` / `R2_PUBLIC_BASE` | **音乐专用桶**：桶名 + 公开域名（**不能为空**，否则整组 R2 配置不写入） |
 | `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **媒体专用桶**：桶名 + 公开域名 |
@@ -157,6 +157,10 @@ npx wrangler kv namespace create BLOG
 | `BLOG_MAIL_REPLY_TO` | 可选回复邮箱 |
 | `PAGES_PROJECT_NAME` | 名字有误导性：实际作用是覆盖 **Worker 名称**。不填则用 `wrangler.workers.toml` 里的 `kejiland`。新手建议不填 |
 | `BLOG_RATE_LIMIT_BINDING` | 启用 Worker 内的边缘登录限流（值为正整数命名空间，如 `1001`）；会让部署改用 wrangler 4.x。账户不支持时删掉即可 |
+| `BLOG_ADMIN_EMAIL` | 可选：新评论通知收件邮箱；不填回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | 可选：评论敏感词（换行 / 逗号分隔），优先级高于后台词库 |
+| `BLOG_PREVIEW_SECRET` | 可选：草稿预览链接签名密钥；不填则由管理员密码哈希派生（改密码即让链接全部失效） |
+| `BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` | 可选：设为 `0` / `false` / `off` 关闭 AI / 禁止匿名生成摘要 |
 | `BLOG_WRITE_TOKEN` | 旧式写入令牌，新部署不需要 |
 
 推送代码或手动运行 Actions，工作流会自动：

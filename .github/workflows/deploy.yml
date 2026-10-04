@@ -103,6 +103,8 @@ jobs:
           SITE_URL: ${{ secrets.SITE_URL }}
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
           BLOG_RATE_LIMIT_BINDING: ${{ secrets.BLOG_RATE_LIMIT_BINDING }}
+          BLOG_AI_ENABLED: ${{ secrets.BLOG_AI_ENABLED }}
+          BLOG_AI_PUBLIC: ${{ secrets.BLOG_AI_PUBLIC }}
         run: |
           python3 - <<'PY'
           import os
@@ -122,6 +124,9 @@ jobs:
           # 非敏感变量：缺失则替换为空字符串（安全降级，不会留下字面量占位符）
           dst = dst.replace('{env.SITE_URL}', os.environ.get('SITE_URL', '').strip())
           dst = dst.replace('{env.CF_ZONE_ID}', os.environ.get('CF_ZONE_ID', '').strip())
+          # 可选 AI 开关（非敏感）：空值 = 默认开启；设为 0/false/off 可整体关闭或禁止匿名生成
+          dst = dst.replace('{env.BLOG_AI_ENABLED}', os.environ.get('BLOG_AI_ENABLED', '').strip())
+          dst = dst.replace('{env.BLOG_AI_PUBLIC}', os.environ.get('BLOG_AI_PUBLIC', '').strip())
           # 边缘限流绑定（可选）：配置了 BLOG_RATE_LIMIT_BINDING 才注入。
           # 该绑定需要 wrangler >= 4.36，且并非所有账户都支持，因此默认不写入——
           # 未配置时行为与旧版完全一致（代码会回退到 D1 计数）。
@@ -243,6 +248,9 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           BLOG_MAIL_FROM: ${{ secrets.BLOG_MAIL_FROM }}
           BLOG_MAIL_REPLY_TO: ${{ secrets.BLOG_MAIL_REPLY_TO }}
+          BLOG_ADMIN_EMAIL: ${{ secrets.BLOG_ADMIN_EMAIL }}
+          COMMENT_BLOCKLIST: ${{ secrets.COMMENT_BLOCKLIST }}
+          BLOG_PREVIEW_SECRET: ${{ secrets.BLOG_PREVIEW_SECRET }}
           SITE_URL: ${{ secrets.SITE_URL }}
           NAME_ARG: ${{ secrets.PAGES_PROJECT_NAME != '' && format('--name {0}', secrets.PAGES_PROJECT_NAME) || '' }}
         run: |
@@ -255,6 +263,18 @@ jobs:
           # CF_API_TOKEN 同时作为「发布即清缓存」的运行时凭证（purgeTags 需要 Zone·Cache Purge 权限）
           if [ -n "$CLOUDFLARE_API_TOKEN" ]; then
             echo "$CLOUDFLARE_API_TOKEN" | wrangler secret put CF_API_TOKEN --config wrangler.workers.ci.toml $NAME_ARG
+          fi
+          # 评论通知收件人（可选）：未配置时回退到「个人资料 → 邮箱」
+          if [ -n "$BLOG_ADMIN_EMAIL" ]; then
+            echo "$BLOG_ADMIN_EMAIL" | wrangler secret put BLOG_ADMIN_EMAIL --config wrangler.workers.ci.toml $NAME_ARG
+          fi
+          # 评论敏感词（可选）：环境变量优先级高于后台词库；支持换行 / 逗号分隔
+          if [ -n "$COMMENT_BLOCKLIST" ]; then
+            echo "$COMMENT_BLOCKLIST" | wrangler secret put COMMENT_BLOCKLIST --config wrangler.workers.ci.toml $NAME_ARG
+          fi
+          # 预览链接签名密钥（可选）：未配置时由管理员密码哈希派生（改密码即失效）
+          if [ -n "$BLOG_PREVIEW_SECRET" ]; then
+            echo "$BLOG_PREVIEW_SECRET" | wrangler secret put BLOG_PREVIEW_SECRET --config wrangler.workers.ci.toml $NAME_ARG
           fi
           # R2（音乐直传）：配置了才写入；R2 未配置时音乐上传接口自动降级为 503，不影响其余功能
           if [ -n "$R2_ACCESS_KEY_ID" ] && [ -n "$R2_SECRET_ACCESS_KEY" ] && [ -n "$R2_ENDPOINT" ] && [ -n "$R2_BUCKET" ]; then

@@ -1,30 +1,50 @@
 # Qingyu'Blog
 
-> 零后端依赖的轻量博客系统，原生 HTML/CSS/JS + Cloudflare Workers/D1。支持文章、评论、标签、归档、后台写作、Smoji 表情、多语言切换。
-> A lightweight blog system with no framework and no build step — vanilla HTML/CSS/JS plus Cloudflare Workers/D1. Posts, comments, tags, archive, an in-browser editor, Smoji emoji and a multilingual UI.
+> 零框架 / 零构建的轻量博客系统（原生 HTML/CSS/JS + Cloudflare Workers·D1·KV·R2）。当前版本 v2.10.60。
+> A lightweight, framework-free blog system — vanilla HTML/CSS/JS plus Cloudflare Workers/D1/KV/R2. Current version v2.10.60.
 
 ## 关键页面 / Key pages
 
 - [首页 / Home](/)
 - [归档 / Archive](/archive)
 - [标签 / Tags](/tags)
+- [分类 / Categories](/categories)
+- [系列 / Series](/series)
+- [热门 / Popular](/popular)
+- [作者 / Authors](/authors)
+- [阅读历史 / History](/history)
+- [友链 / Links](/links)
+- [留言板 / Guestbook](/guestbook)
+- [订阅 / Subscribe](/subscribe)
 - [关于 / About](/about)
-- [文章 / Posts](/posts/)
 - [后台 / Admin](/admin)
+- [RSS](/feed.xml) · [Sitemap](/sitemap.xml)
 
 ## 功能与说明 / Features
 
-- 文章编辑器内置表情选择器，发表后正文、评论、留言板均可插入 Smoji 表情。 / A Smoji emoji picker is built into the editor; emoji can also be inserted in post bodies, comments and the guestbook.
-- 顶部与底部导航、友情链接可在后台「设置」中维护，改动即时生效。 / Header and footer navigation plus friend links are maintained in the admin settings and take effect immediately.
-- 支持简体中文、English、日本語、한국어、हिन्दी 多语言界面。 / The UI ships in Simplified Chinese, English, 日本語, 한국어 and हिन्दी.
-- 文章列表支持分页与标签筛选；评论与留言板带审核与 AI 辅助能力。 / The post list supports pagination and tag filtering; comments and the guestbook support moderation and optional AI assistance.
-- 本地 `file://` 双击 `public/index.html` 即可离线预览，无需构建。 / Opening `public/index.html` directly from disk (`file://`) works offline — no build step required.
+- 前台：Markdown 渲染（表格 / 任务列表 / 代码高亮）、自动编号目录、阅读进度、图片灯箱、字号调节、深色模式与四套主题色、四季背景动画（纯 canvas）。
+  Frontend: Markdown rendering (tables / task lists / syntax highlighting), auto-numbered TOC, reading progress, image lightbox, font sizing, dark mode with four accent themes, and a four-season canvas background.
+- 支持 **Mermaid 图表**（```mermaid 代码块）与 **KaTeX 数学公式**（$…$ / $$…$$），两个库本地化在 /libs/ 且**仅在页面用到时才加载**。
+  Supports **Mermaid diagrams** (```mermaid fences) and **KaTeX math** ($…$ / $$…$$); both libraries are vendored under /libs/ and load **only when a page actually uses them**.
+- 文章：文章级 SEO 覆盖（标题 / 描述 / canonical / noindex）、可选**文章加密**（AES-GCM 纯前端，服务器只存密文）、**草稿预览分享链接**（HMAC 签名、默认 7 天）、**打印 / 导出 PDF**、**多作者与作者页**、系列 / 专栏、修订历史。
+  Posts: per-post SEO overrides (title / description / canonical / noindex), optional **client-side encryption** (AES-GCM; the server stores ciphertext only), **HMAC-signed draft preview links** (7 days by default), **print / PDF**, **multiple authors with author pages**, series/columns and revision history.
+- 发现与互动：全文搜索（FTS5 trigram）、标签 / 分类筛选、热门排行、**Webmention** 外站引用、评论与留言板（嵌套回复、审核、敏感词、**反机器人蜜罐+时间戳**、点赞 / 精选 / 置顶）。
+  Discovery & interaction: full-text search (FTS5 trigram), tag/category filters, popular ranking, **Webmentions**, comments and guestbook (nested replies, moderation, blocklist, **honeypot + timestamp anti-bot**, likes / featuring / pinning).
+- 订阅与通知：邮箱订阅（双重确认）、后台**订阅者分组与按分组群发**、新文章 / 新评论邮件通知（Resend 可选）。
+  Subscriptions: double opt-in email subscription, **subscriber groups with segmented broadcast**, and new-post / new-comment notifications (Resend, optional).
+- 后台：仪表盘（趋势图、来源 / 国家 / 设备 / 系统 / 品牌）、文章与修订、评论批量操作、媒体与音乐库、标签与系列、订阅者、健康检查、操作审计、**前端错误日志**、备份恢复、导入导出、**一键导出静态站**、站点设置与**功能开关**。
+  Admin: dashboard (trends, referrers / countries / devices / OSes / brands), posts & revisions, bulk comment ops, media & music libraries, tags & series, subscribers, health check, audit log, **front-end error log**, backup & restore, import/export, **one-click static site export**, settings and **feature switches**.
+- 多语言界面：简体中文 / English / 日本語 / 한국어 / हिन्दी（各 990 个语言键），自动识别浏览器语言。
+  UI languages: Simplified Chinese / English / 日本語 / 한국어 / हिन्दी (990 keys each), auto-detected from the browser.
+- 本地 `file://` 双击 `public/index.html` 即可离线预览与写作，无需构建步骤。
+  Opening `public/index.html` directly from disk (`file://`) works offline — no build step required.
 
 ## 技术栈 / Tech stack
 
 - 前端：原生 HTML / CSS / JavaScript（无框架、无构建步骤） / Frontend: vanilla HTML / CSS / JavaScript (no framework, no build step)
-- 后端：Cloudflare Workers / Pages Functions + D1 / KV / Backend: Cloudflare Workers / Pages Functions + D1 / KV
-- 数据：文章、评论、留言、设置均持久化到 Cloudflare D1 / Data: posts, comments, guestbook entries and settings all persist in Cloudflare D1
+- 后端：Cloudflare Workers / Pages Functions + D1 / KV / R2（AI 可选） / Backend: Cloudflare Workers / Pages Functions + D1 / KV / R2 (AI optional)
+- 数据：文章、评论、留言、订阅、设置均持久化到 Cloudflare D1 / Data: posts, comments, guestbook, subscribers and settings all persist in Cloudflare D1
+- 部署：GitHub Actions 自动部署（也可本地 wrangler deploy） / Deploy: GitHub Actions (or local `wrangler deploy`)
 
 ## 链接 / Links
 

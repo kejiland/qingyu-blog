@@ -88,6 +88,14 @@
 | `PAGES_PROJECT_NAME` | 可选 | 实际含义是 Worker 名称。不填时使用仓库默认名称 `kejiland`。随意改名可能部署成另一个 Worker，新手建议不填 |
 | `BLOG_WRITE_TOKEN` | 可选 | 旧式写入令牌。新部署通常不需要填写 |
 | `BLOG_RATE_LIMIT_BINDING` | 可选 | 一个正整数（如 `1001`）。填了会启用 Worker 内的边缘登录限流，并让部署改用 wrangler 4.x（该绑定要求 ≥ 4.36）。账户不支持该绑定时删除此 Secret 重新部署即可恢复 |
+| `BLOG_ADMIN_EMAIL` | 可选 | 新评论通知的收件邮箱；不填回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | 可选 | 评论敏感词（换行或逗号分隔）。环境变量优先级高于后台词库 |
+| `BLOG_PREVIEW_SECRET` | 可选 | 草稿预览分享链接的签名密钥。不填则由管理员密码哈希派生 —— **改密码会让所有已发出的预览链接立即失效** |
+| `BLOG_AI_ENABLED` | 可选 | 填 `0` / `false` / `off` 可整体关闭 AI；留空/不填 = 有绑定就开启 |
+| `BLOG_AI_PUBLIC` | 可选 | 填 `0` / `false` / `off` 禁止匿名访客生成 AI 摘要（登录后仍可用） |
+| `RESEND_API_KEY` | 可选 | Resend 邮件 API Key，用于订阅确认 / 新文章通知 / 评论通知 / 订阅者群发 |
+| `BLOG_MAIL_FROM` | 可选 | 发件人地址（需在 Resend 验证域名），如 `blog@yourdomain.com` |
+| `BLOG_MAIL_REPLY_TO` | 可选 | 回信地址，如 `you@yourdomain.com` |
 
 ### 5.1 部署后需要关心的三个运行时变量
 
@@ -96,10 +104,13 @@
 | 变量 | 谁写入 | 作用 | 不设置时 |
 | --- | --- | --- | --- |
 | `CF_API_TOKEN` | **工作流自动写入**（值取 `CLOUDFLARE_API_TOKEN`） | 发布文章后调 Cloudflare Cache Purge 接口清边缘缓存 | 不做缓存清除（功能不受影响，只是新内容可能延迟 1~5 分钟生效） |
-| `BLOG_AI_ENABLED` | **需要你手动设置**（控制台 → Worker → Settings → Variables and Secrets，或 `npx wrangler secret put BLOG_AI_ENABLED --name kejiland`） | 设为 `0` / `false` / `off` 可整体关闭 AI | 绑定了 Workers AI 且 D1 存在时视为开启 |
-| `BLOG_AI_PUBLIC` | 同上，手动设置 | 设为 `0` / `false` / `off` 可禁止匿名访客生成 AI 摘要（登录后仍可用） | 允许匿名生成 |
+| `BLOG_AI_ENABLED` | **GitHub Secret 或手动设置**（`npx wrangler secret put BLOG_AI_ENABLED --name kejiland`） | 设为 `0` / `false` / `off` 可整体关闭 AI | 绑定了 Workers AI 且 D1 存在时视为开启 |
+| `BLOG_AI_PUBLIC` | 同上 | 设为 `0` / `false` / `off` 可禁止匿名访客生成 AI 摘要（登录后仍可用） | 允许匿名生成 |
+| `BLOG_ADMIN_EMAIL` | **工作流自动写入**（配置了该 Secret 时） | 新评论通知收件人 | 回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | **工作流自动写入**（配置了该 Secret 时） | 评论敏感词（优先级高于后台词库） | 只用后台维护的词库 |
+| `BLOG_PREVIEW_SECRET` | **工作流自动写入**（配置了该 Secret 时） | 预览链接签名密钥 | 由管理员密码哈希派生 |
 
-> 只有 `CF_API_TOKEN` 是工作流自动写的。另外两个不写也没问题：只要部署成功、`/api/ai/ping` 返回 `{"ok":true}`，就说明 AI 已可用。
+> `CF_API_TOKEN` 与上面几个「配置了才写」的可选变量都由工作流自动写入。留空不写也没问题：只要部署成功、`/api/ai/ping` 返回 `{"ok":true}`，就说明 AI 已可用。
 
 ## 6. R2 桶准备
 
@@ -140,6 +151,7 @@
 | `R2_PUBLIC_BASE` | 音乐桶公开读取地址，如 `https://music.example.com` |
 | `R2_MEDIA_BUCKET` | 媒体桶名，如 `qingyu-media` |
 | `R2_MEDIA_PUBLIC_BASE` | 媒体桶公开读取地址，如 `https://media.example.com` |
+| `R2_BACKUP_BUCKET` | 私有备份桶名，如 `qingyu-backup`（**必须是私有桶**；不填则备份/恢复功能停用） |
 
 `R2_ENDPOINT` 的注意事项：
 

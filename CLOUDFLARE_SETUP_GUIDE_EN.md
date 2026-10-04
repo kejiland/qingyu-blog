@@ -618,6 +618,15 @@ Repository → **Settings** → **Secrets and variables** → **Actions** → th
 | `R2_PUBLIC_BASE` | The music bucket's public domain | R2 playback URLs |
 | `R2_MEDIA_BUCKET` | The media bucket name, e.g. `qingyu-media` | Image uploads |
 | `R2_MEDIA_PUBLIC_BASE` | The media bucket's public domain | Image URLs |
+| `R2_BACKUP_BUCKET` | A private backup bucket, e.g. `qingyu-backup` | Enables Backup & restore and the daily automatic backup (**keep this bucket private**) |
+| `RESEND_API_KEY` | Your [Resend](https://resend.com) API key | Email subscription / new-post notices / comment notices / subscriber broadcast |
+| `BLOG_MAIL_FROM` | e.g. `blog@yourdomain.com` | Sender address (domain must be verified in Resend) |
+| `BLOG_MAIL_REPLY_TO` | e.g. `you@yourdomain.com` | Optional reply-to address |
+| `BLOG_ADMIN_EMAIL` | Your inbox | Optional comment-notification recipient; falls back to Profile → email |
+| `COMMENT_BLOCKLIST` | Words separated by newlines or commas | Optional env override for the comment blocklist (takes precedence over the admin list) |
+| `BLOG_PREVIEW_SECRET` | A random string | Optional signing key for draft preview links; otherwise derived from the admin password hash (**changing the password invalidates every link**) |
+| `BLOG_AI_ENABLED` | `0` / `false` / `off` | Optional: switch AI off entirely (unset means "on whenever the binding exists") |
+| `BLOG_AI_PUBLIC` | `0` / `false` / `off` | Optional: forbid anonymous AI summary generation (cached reads and ping keep working) |
 
 ### 10.4 Example with everything filled in at once
 
@@ -638,6 +647,13 @@ R2_BUCKET=qingyu-music
 R2_PUBLIC_BASE=https://music.example.com
 R2_MEDIA_BUCKET=qingyu-media
 R2_MEDIA_PUBLIC_BASE=https://media.example.com
+R2_BACKUP_BUCKET=qingyu-backup
+
+# Email subscription / notifications (optional — all three required to enable)
+RESEND_API_KEY=re_xxxxxxxxxxxx
+BLOG_MAIL_FROM=blog@yourdomain.com
+BLOG_MAIL_REPLY_TO=you@yourdomain.com
+BLOG_ADMIN_EMAIL=you@yourdomain.com
 ```
 
 > A couple of tricks for generating a random key:
@@ -793,8 +809,15 @@ This table lists every variable the **code actually reads**, ordered by default 
 | `R2_PUBLIC_BASE` | Secret | ⭕ | Same as above |
 | `R2_MEDIA_BUCKET` | Secret | ⭕ | Image uploads return 503 |
 | `R2_MEDIA_PUBLIC_BASE` | Secret | ⭕ | Same as above |
+| `R2_BACKUP_BUCKET` | Secret | ⭕ | Backup & restore disabled (the admin page shows "not configured") |
+| `RESEND_API_KEY` | Secret | ⭕ | Email subscription / notices / broadcast disabled |
+| `BLOG_MAIL_FROM` | Secret | ⭕ | Same as above |
+| `BLOG_MAIL_REPLY_TO` | Secret | ⭕ | Sending still works, just no reply-to |
+| `BLOG_ADMIN_EMAIL` | Secret | ⭕ | Comment notices fall back to Profile → email |
+| `COMMENT_BLOCKLIST` | Secret | ⭕ | Only the admin-maintained list is used |
+| `BLOG_PREVIEW_SECRET` | Secret | ⭕ | Preview links are signed with a key derived from the admin password hash |
 
-`BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` **are not written by the workflow**; you have to set them on the Worker yourself:
+`BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` can now be set as **GitHub Secrets** like the other optional values (the workflow only writes them when they are non-empty). You can also set them on the Worker manually:
 
 ```bash
 npx wrangler secret put BLOG_AI_ENABLED --name kejiland
