@@ -1857,6 +1857,89 @@ export async function handleErrorReport(request, env) {
   await dbRun(env.DB, 'DELETE FROM error_logs WHERE id NOT IN (SELECT id FROM error_logs ORDER BY last_at DESC LIMIT ' + ERROR_LOG_KEEP + ')').catch(() => {});
   return json({ ok: true }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
+/* ============================================================
+ * 草稿预览分享链接（HMAC 签名 + 过期，无需登录即可查看未发布文章）
+ * 签名密钥：BLOG_PREVIEW_SECRET 环境变量；未配置时用管理员密码哈希派生，
+ * 因此「修改站点密码」会让所有已发出的预览链接立即失效。
+ * ============================================================ */
+const PREVIEW_MAX_TTL_DAYS = 30;
+function _b64url(bytes) {
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  let str = '';
+  for (let i = 0; i < u8.length; i++) str += String.fromCharCode(u8[i]);
+  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function _b64urlEncodeStr(str) { return _b64url(new TextEncoder().encode(str)); }
+function _b64urlDecodeStr(s) {
+  const b = String(s || '').replace(/-/g, '+').replace(/_/g, '/');
+  const pad = b.length % 4 ? '='.repeat(4 - (b.length % 4)) : '';
+  const bin = atob(b + pad);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+  return new TextDecoder().decode(u8);
+}
+async function previewSecret(env) {
+  if (env && env.BLOG_PREVIEW_SECRET) return String(env.BLOG_PREVIEW_SECRET);
+  try {
+    const r = await dbFirst(env.DB, 'SELECT salt,hash FROM admin_auth WHERE k = ?', ADMIN_AUTH_KEY);
+    if (r && (r.hash || r.salt)) return 'preview:' + String(r.salt || '') + ':' + String(r.hash || '');
+  } catch (e) {}
+  return 'qingyu-preview-fallback';
+}
+async function previewSign(env, payloadStr) {
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(await previewSecret(env)), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return _b64url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(payloadStr)));
+}
+async function previewTokenCreate(env, postId, ttlMs) {
+  const expiresAt = Date.now() + ttlMs;
+  const payloadStr = JSON.stringify({ p: String(postId), e: expiresAt });
+  const payload = _b64urlEncodeStr(payloadStr);
+  return { token: payload + '.' + await previewSign(env, payloadStr), expiresAt: expiresAt };
+}
+async function previewTokenVerify(env, token) {
+  const parts = String(token || '').split('.');
+  if (parts.length !== 2) return null;
+  let payloadStr = '';
+  try { payloadStr = _b64urlDecodeStr(parts[0]); } catch (e) { return null; }
+  const expect = await previewSign(env, payloadStr);
+  if (expect.length !== parts[1].length) return null;
+  let diff = 0;
+  for (let i = 0; i < expect.length; i++) diff |= expect.charCodeAt(i) ^ parts[1].charCodeAt(i);
+  if (diff !== 0) return null;
+  let obj = null;
+  try { obj = JSON.parse(payloadStr); } catch (e) { return null; }
+  if (!obj || !obj.p || !obj.e || Number(obj.e) < Date.now()) return null;
+  return obj;
+}
+/** POST /api/admin/preview-link（需登录）：为指定文章生成带签名的预览链接 */
+export async function handlePreviewLink(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  if (request.method !== 'POST') return json({ error: 'Method not allowed' }, 405, request, env);
+  const body = await request.json().catch(() => null);
+  const postId = String((body && body.postId) || '').trim();
+  if (!postId) return json({ error: '缺少 postId' }, 400, request, env);
+  const exists = await dbFirst(env.DB, 'SELECT * FROM posts WHERE id = ?', postId);
+  if (!exists) return json({ error: '文章不存在，请先保存' }, 404, request, env);
+  const rawDays = Math.floor(Number((body && body.ttlDays)) || 7);
+  const ttlDays = Math.min(PREVIEW_MAX_TTL_DAYS, Math.max(1, rawDays));
+  const made = await previewTokenCreate(env, postId, ttlDays * 86400000);
+  const base = env.SITE_URL ? String(env.SITE_URL).replace(/\/+$/, '') : new URL(request.url).origin;
+  return json({ ok: true, token: made.token, url: base + '/preview/' + encodeURIComponent(made.token), expiresAt: made.expiresAt, ttlDays: ttlDays }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+/** GET /api/preview?token=…（公开，凭签名）：返回未发布文章内容，禁止缓存 */
+export async function handlePreviewGet(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const token = new URL(request.url).searchParams.get('token') || '';
+  const claims = await previewTokenVerify(env, token);
+  if (!claims) return json({ error: '预览链接无效或已过期' }, 403, request, env, { 'Cache-Control': NO_CACHE });
+  const row = await dbFirst(env.DB, 'SELECT * FROM posts WHERE id = ?', claims.p);
+  if (!row) return json({ error: '文章不存在' }, 404, request, env, { 'Cache-Control': NO_CACHE });
+  return json({ ok: true, preview: true, expiresAt: Number(claims.e), post: postFromRow(row) }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
 /** GET /api/admin/errors（需登录）：错误聚合列表；DELETE：清空 */
 export async function handleErrorsAdmin(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);

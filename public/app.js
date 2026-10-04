@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.52';
+var BLOG_VERSION = '2.10.53';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -3479,6 +3479,40 @@ function enhanceRichContent(root) {
   } catch (e) { /* 富内容渲染失败不影响正文 */ }
 }
 
+/* ---------- 草稿预览分享页（/preview/<token>）----------
+ * 凭签名令牌读取未发布文章，展示「预览模式」提示条；不索引、不统计、不加载评论。
+ */
+async function renderPreviewPage(token) {
+  app().innerHTML = renderNav('/') + '<main class="container page-fade"><div class="post-body">' +
+    '<div class="preview-banner">' + svgIcon('eye', 14) + ' ' + t('preview.banner') + '</div>' +
+    '<div class="empty"><div class="big">' + svgIcon('spinner', 26) + '</div><p>' + t('site.loading') + '…</p></div>' +
+    '</div></main>' + renderFooter();
+  try { _setMeta('robots', 'noindex, nofollow'); } catch (e) {}
+  try {
+    var d = await apiFetch('api/preview?token=' + encodeURIComponent(token || ''));
+    var post = d && d.post;
+    if (!post) throw new Error(t('preview.invalid'));
+    var bodyHtml = post.enc ? '' : renderMarkdown(post.content || '');
+    var tocRes = buildToc(bodyHtml);
+    var html = renderNav('/');
+    html += '<main class="container page-fade"><div class="post-body">';
+    html += '<div class="preview-banner">' + svgIcon('eye', 14) + ' ' + t('preview.banner') + ' · ' + esc(post.title || t('post.untitled')) + '</div>';
+    html += '<div class="post-header"><h1>' + esc(post.title || t('post.untitled')) + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.tags && post.tags.length ? '<span class="meta-dot">·</span><span>' + post.tags.map(function (x) { return esc(x); }).join(' / ') + '</span>' : '') + '</div></div>';
+    html += tocRes.html;
+    if (post.enc) {
+      html += '<div class="post-lock"><div class="post-lock-ico">' + svgIcon('lock', 26) + '</div><p class="post-lock-title">' + t('post.lockedTitle') + '</p><p class="post-lock-desc">' + t('post.lockedDesc') + '</p></div>';
+    } else {
+      html += '<article class="article">' + bodyHtml + '</article>';
+    }
+    html += '</div></main>' + renderFooter();
+    app().innerHTML = html;
+    try { _setMeta('robots', 'noindex, nofollow'); document.title = '（预览）' + (post.title || '') + ' · ' + getSiteName(); } catch (e) {}
+    enhanceRichContent(document.querySelector('.article'));
+  } catch (e) {
+    app().innerHTML = renderNav('/') + '<main class="container page-fade"><div class="empty"><div class="big">' + svgIcon('lock', 36) + '</div><p>' + esc((e && e.message) || t('preview.invalid')) + '</p><p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>' + renderFooter();
+  }
+}
+
 function renderPostFail(post) {
   var html = renderNav(currentRoute().path);
   html += '<main class="container page-fade"><div class="post-body"><div class="post-header"><h1>' + esc(post.title || t('post.untitled')) + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span></div></div>';
@@ -4816,6 +4850,12 @@ async function route() {
   var q = r.query;
 
   if (path === '/') { app().innerHTML = renderHome(); fitCardLineClamps(); }
+  else if (path.indexOf('/preview/') === 0) {
+    // 草稿预览分享链接：/preview/<签名 token>
+    var pvToken = path.slice('/preview/'.length).replace(/\/.*$/, '');
+    try { pvToken = decodeURIComponent(pvToken); } catch (e) {}
+    await renderPreviewPage(pvToken);
+  }
   else if (path.indexOf('/posts/') === 0) {
     // /posts/<别名>/  或  /posts/<别名>/edit
     var rest = path.slice('/posts/'.length); // 已去尾斜杠

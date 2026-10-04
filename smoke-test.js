@@ -3806,6 +3806,43 @@ tests.push(['富内容：Mermaid / KaTeX 本地化并按需加载', async () => 
   assert.strictEqual(b.win.katex, undefined, '关闭开关时不加载 KaTeX');
 }]);
 
+/* 草稿预览分享链接：签名生成 / 未登录可读 / 篡改与过期拒绝 / 前端预览页 */
+tests.push(['草稿预览链接：签名生成 + 未登录可读 + 篡改拒绝', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const { env, token } = await authEnv();
+  const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
+  await core.handlePosts(new Request('http://t/api/posts', { method: 'POST', headers: auth, body: JSON.stringify({ id: 'draft1', title: '草稿标题', date: '2026-01-01', content: '草稿正文', status: 'draft' }) }), env);
+  assert.strictEqual((await core.handlePreviewLink(new Request('http://t/api/admin/preview-link', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ postId: 'draft1' }) }), env)).status, 401, '生成链接需登录');
+  assert.strictEqual((await core.handlePreviewLink(new Request('http://t/api/admin/preview-link', { method: 'POST', headers: auth, body: JSON.stringify({ postId: 'nope' }) }), env)).status, 404, '文章不存在 404');
+  const link = await (await core.handlePreviewLink(new Request('http://t/api/admin/preview-link', { method: 'POST', headers: auth, body: JSON.stringify({ postId: 'draft1', ttlDays: 7 }) }), env)).json();
+  assert.ok(link.url && link.url.indexOf('/preview/') >= 0, '返回预览 URL');
+  assert.ok(link.expiresAt > Date.now(), '带过期时间');
+  const pv = await (await core.handlePreviewGet(new Request('http://t/api/preview?token=' + encodeURIComponent(link.token)), env)).json();
+  assert.strictEqual(pv.post.id, 'draft1', '未登录也能读到草稿');
+  assert.strictEqual(pv.post.content, '草稿正文', '返回草稿正文');
+  const bad = link.token.slice(0, -2) + (link.token.slice(-2) === 'aa' ? 'bb' : 'aa');
+  assert.strictEqual((await core.handlePreviewGet(new Request('http://t/api/preview?token=' + encodeURIComponent(bad)), env)).status, 403, '篡改 token 被拒');
+  assert.strictEqual((await core.handlePreviewGet(new Request('http://t/api/preview'), env)).status, 403, '缺 token 被拒');
+}]);
+
+tests.push(['草稿预览页：/preview/<token> 渲染正文与预览提示条', async () => {
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/preview') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, preview: true, expiresAt: Date.now() + 86400000, post: { id: 'd1', title: '草稿标题', date: '2026-01-01', content: '草稿正文 **粗体**', tags: ['随笔'], status: 'draft' } }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/preview/tok123');
+  await new Promise((r) => setTimeout(r, 40));
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.indexOf('草稿正文') >= 0, '预览正文已渲染');
+  assert.ok(html.indexOf('preview-banner') >= 0, '预览提示条已渲染');
+  assert.ok(html.indexOf('尚未发布') >= 0, '提示尚未发布');
+  const admin = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(admin.indexOf('abPreviewLink') >= 0 && admin.indexOf('api/admin/preview-link') >= 0, '后台生成入口已接入');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

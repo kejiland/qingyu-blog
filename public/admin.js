@@ -2568,6 +2568,7 @@
         (cloudOn() ? '' : '<button class="ab-btn" id="abExport">' + t('editor.exportAll') + '</button>') +
         (route.id ? '<button class="ab-btn" id="abHistory">' + icon('refresh', 15) + ' ' + t('admin.revisions.button') + '</button>' : '') +
         (cloudOn() ? '<button class="ab-btn" id="abScheduleBtn">' + icon('clock', 15) + ' ' + t('admin.editor.scheduleButton') + '</button>' : '') +
+        '<button class="ab-btn" id="abPreviewLink">' + icon('eye', 15) + ' ' + t('admin.editor.previewLink') + '</button>' +
         '<button class="ab-btn" id="abSaveDraft">' + t('admin.editor.saveDraft') + '</button>' +
         '<button class="ab-btn primary" id="abPublish">' + icon('check', 15) + ' ' + t('admin.editor.publish') + '</button>' +
       '</div>';
@@ -2627,6 +2628,8 @@
     if (nowBtn && dateInput) nowBtn.addEventListener('click', function () { dateInput.value = localDateTimeValue(new Date()); });
     content.querySelector('#abSaveDraft').addEventListener('click', function () { saveEditor(content, route, 'draft'); });
     content.querySelector('#abPublish').addEventListener('click', function () { saveEditor(content, route, 'published'); });
+    var pvBtn = content.querySelector('#abPreviewLink');
+    if (pvBtn) pvBtn.addEventListener('click', function () { openPreviewLink(content, route); });
     var scheduleBtn = content.querySelector('#abScheduleBtn');
     if (scheduleBtn) scheduleBtn.addEventListener('click', function () { saveEditor(content, route, 'scheduled'); });
     var historyBtn = content.querySelector('#abHistory');
@@ -3578,7 +3581,39 @@
     } catch (e) { toast(t('admin.subscribers.exportFail') + (e.message || e), 'err'); }
   }
 
-  /* 编辑单个订阅者的分组（逗号分隔） */
+  /* 生成草稿预览分享链接（带签名，7 天有效） */
+  async function openPreviewLink(content, route) {
+    if (!route.id) { toast(t('admin.editor.previewNeedSave'), 'err'); return; }
+    try {
+      var r = await api('api/admin/preview-link', { method: 'POST', body: JSON.stringify({ postId: route.id, ttlDays: 7 }) });
+      if (!r || !r.url) throw new Error(t('admin.editor.previewFail'));
+      var mask = document.createElement('div');
+      mask.className = 'ab-modal-mask';
+      mask.innerHTML = '<div class="ab-modal"><h3>' + t('admin.editor.previewTitle') + '</h3>' +
+        '<input class="ab-input" id="abPvUrl" readonly value="' + esc(r.url) + '" style="width:100%">' +
+        '<label class="ab-hint">' + t('admin.editor.previewHint') + '</label>' +
+        '<div class="ab-modal-actions"><button class="ab-btn ghost" data-act="cancel">' + t('confirm.cancel') + '</button>' +
+        '<button class="ab-btn" id="abPvCopy">' + t('admin.editor.previewCopy') + '</button>' +
+        '<button class="ab-btn primary" id="abPvOpen">' + t('admin.editor.previewOpen') + '</button></div></div>';
+      document.body.appendChild(mask);
+      mask.addEventListener('click', function (e) { if (e.target === mask || e.target.getAttribute('data-act') === 'cancel') mask.remove(); });
+      var input = mask.querySelector('#abPvUrl');
+      input.addEventListener('focus', function () { try { input.select(); } catch (e) {} });
+      mask.querySelector('#abPvCopy').addEventListener('click', function () {
+        try { input.select(); } catch (e) {}
+        function done() { toast(t('admin.editor.previewCopied'), 'ok'); }
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(input.value).then(done, function () { try { document.execCommand('copy'); done(); } catch (e) {} });
+            return;
+          }
+        } catch (e) {}
+        try { document.execCommand('copy'); done(); } catch (e) {}
+      });
+      mask.querySelector('#abPvOpen').addEventListener('click', function () { try { window.open(input.value, '_blank'); } catch (e) {} });
+    } catch (e) { toast(t('admin.editor.previewFail') + (e.message || e), 'err'); }
+  }
+
   function editSubscriberGroups(content, sub) {
     var mask = document.createElement('div');
     mask.className = 'ab-modal-mask';

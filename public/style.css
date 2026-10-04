@@ -3239,3 +3239,5 @@ html[data-theme="dark"] body.scrolled .topbar {
 .mermaid svg { max-width: 100%; height: auto; }
 .mermaid-failed { border: 1px dashed var(--border); border-radius: 8px; padding: 12px; color: var(--muted); font-size: 13px; text-align: left; white-space: pre-wrap; }
 .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0; }
+/* 草稿预览提示条 */
+.preview-banner { display:flex; align-items:center; gap:8px; margin:0 0 18px; padding:10px 14px; border:1px dashed var(--accent); border-radius:10px; background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); font-size:13.5px; }

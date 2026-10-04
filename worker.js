@@ -10,7 +10,7 @@ import { handleSearch } from './functions/_lib/search.js';
 import { handlePostRelations } from './functions/_lib/relations.js';
 import { handlePopular } from './functions/_lib/popular.js';
 import { handlePostAnalytics } from './functions/_lib/analytics.js';
-import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleCommentLike, handleMedia, handleMediaId, handleSettings, handleAuditLog, handleTags, handleStatsSources, handleHealth, handleCommentsBulk, handleAdminPassword, handleStatsTrend, handleErrorReport, handleErrorsAdmin, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
+import { handlePosts, handlePostId, handleFeed, handleComments, handleCommentId, handleSitemap, handleSiteFiles, handleStats, handleAdminSetup, handleAdminLogin, handleAdminLogout, getCorsHeaders, securityHeaders, handleCommentsList, handleCommentUpdate, handleCommentDeleteGlobal, handleCommentLike, handleMedia, handleMediaId, handleSettings, handleAuditLog, handleTags, handleStatsSources, handleHealth, handleCommentsBulk, handleAdminPassword, handleStatsTrend, handleErrorReport, handleErrorsAdmin, handlePreviewLink, handlePreviewGet, publishScheduledPosts, handlePostRevisions, handlePostRevision, handlePostRevisionRestore, dbFirst } from './functions/_lib/api-core.js';
 import { onRequest as aiPing } from './functions/api/ai/ping.js';
 import { onRequest as aiSummary } from './functions/api/ai/summary.js';
 import { onRequest as aiAssist } from './functions/api/ai/assist.js';
@@ -28,6 +28,7 @@ function isKnownSpaRoute(pathname) {
     /^\/posts\/[^/]+\/?$/.test(pathname) ||
     /^\/posts\/[^/]+\/edit\/?$/.test(pathname) ||
     /^\/series\/[^/]+\/?$/.test(pathname) ||
+    /^\/preview\/[^/]+\/?$/.test(pathname) ||
     pathname.indexOf('/admin') === 0;
 }
 
@@ -138,6 +139,12 @@ export default {
     }
     if (url.pathname === '/api/errors') {
       return handleErrorReport(request, env);
+    }
+    if (url.pathname === '/api/preview') {
+      return handlePreviewGet(request, env);
+    }
+    if (url.pathname === '/api/admin/preview-link') {
+      return handlePreviewLink(request, env);
     }
     if (url.pathname === '/api/admin/errors') {
       return handleErrorsAdmin(request, env);

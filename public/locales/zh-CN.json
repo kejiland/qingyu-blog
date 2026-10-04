@@ -942,5 +942,15 @@
   "admin.editor.seoHint": "留空的项会自动生成；适合需要自定义搜索结果 / 分享文案的文章",
   "admin.settings.featRich": "内容渲染",
   "admin.settings.featRichContent": "图表 / 公式渲染",
-  "admin.settings.featRichContentHint": "开启后，正文里的 ```mermaid 代码块会渲染成图表、$…$ / $$…$$ 会渲染成数学公式；仅在页面真的用到时才加载对应库，普通页面零额外请求"
+  "admin.settings.featRichContentHint": "开启后，正文里的 ```mermaid 代码块会渲染成图表、$…$ / $$…$$ 会渲染成数学公式；仅在页面真的用到时才加载对应库，普通页面零额外请求",
+  "admin.editor.previewLink": "预览链接",
+  "admin.editor.previewNeedSave": "请先保存文章，再生成预览链接",
+  "admin.editor.previewTitle": "预览分享链接（7 天有效）",
+  "admin.editor.previewHint": "任何拿到链接的人都能查看这篇未发布文章；修改站点密码会让链接立即失效",
+  "admin.editor.previewCopy": "复制链接",
+  "admin.editor.previewOpen": "打开预览",
+  "admin.editor.previewCopied": "已复制链接",
+  "admin.editor.previewFail": "生成预览链接失败：",
+  "preview.banner": "预览模式 · 尚未发布",
+  "preview.invalid": "预览链接无效或已过期"
 }

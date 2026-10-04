@@ -942,5 +942,15 @@
   "admin.editor.seoHint": "Empty fields are generated automatically; use these for custom search/share copy",
   "admin.settings.featRich": "Content rendering",
   "admin.settings.featRichContent": "Diagrams / math rendering",
-  "admin.settings.featRichContentHint": "When on, ```mermaid fenced blocks render as diagrams and $…$ / $$…$$ render as math. The libraries load only when a page actually uses them, so normal pages make no extra requests"
+  "admin.settings.featRichContentHint": "When on, ```mermaid fenced blocks render as diagrams and $…$ / $$…$$ render as math. The libraries load only when a page actually uses them, so normal pages make no extra requests",
+  "admin.editor.previewLink": "Preview link",
+  "admin.editor.previewNeedSave": "Save the post first to create a preview link",
+  "admin.editor.previewTitle": "Preview share link (valid 7 days)",
+  "admin.editor.previewHint": "Anyone with this link can view this unpublished post; changing the site password invalidates it",
+  "admin.editor.previewCopy": "Copy link",
+  "admin.editor.previewOpen": "Open preview",
+  "admin.editor.previewCopied": "Link copied",
+  "admin.editor.previewFail": "Failed to create preview link: ",
+  "preview.banner": "Preview mode · not published",
+  "preview.invalid": "Preview link is invalid or expired"
 }
