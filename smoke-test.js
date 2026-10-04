@@ -2150,7 +2150,7 @@ tests.push(['路由：未知路径返回 404、已知路由仍 200', async () =>
   const src = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
   assert.ok(src.includes('isKnownSpaRoute'), '存在已知路由判定');
   assert.ok(src.includes('spaNotFound ? 404 : res.status'), '未知路径改用 404 状态');
-  assert.ok(src.includes('archive|tags|categories|history|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
+  assert.ok(src.includes('archive|tags|categories|history|links|about|guestbook|popular|subscribe|series|write'), '已知路由白名单');
 }]);
 
 tests.push(['音乐接口：Workers 与 Pages 双形态均可用', async () => {
@@ -2193,6 +2193,18 @@ tests.push(['评论敏感词：命中拒绝、正常放行', async () => {
   assert.ok((await r.json()).error.indexOf('敏感词') >= 0, '错误提示含敏感词');
   r = await post({ author: '路人', content: '正常讨论内容' });
   assert.strictEqual(r.status, 201, '正常评论放行');
+}]);
+
+tests.push(['friend links page', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.ctx._siteSettings = { friend_links: JSON.stringify([{ text: 'Alpha', url: 'https://a.example' }]) };
+  setRoute(b.ctx, '/links');
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.includes('Alpha'), 'friend link rendered');
+  assert.ok(html.includes('friend-grid'), 'grid rendered');
+  const foot = b.ctx.renderFooter();
+  assert.ok(foot.includes('/links'), 'footer entry present');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

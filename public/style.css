@@ -3217,3 +3217,9 @@ html[data-theme="dark"] body.scrolled .topbar {
 .hl-panel-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .hl-panel-note { font-size: 12px; color: var(--muted); }
 .hl-panel-empty { color: var(--muted); }
+
+/* 友情链接页 */
+.friend-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; }
+.friend-card { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-soft); color: var(--fg); text-decoration: none; transition: border-color .15s, color .15s, transform .15s; }
+.friend-card:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
+.friend-name { font-weight: 600; }
