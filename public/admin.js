@@ -1144,6 +1144,19 @@
     loadSourcesOverview(content);
   }
 
+  /** 两位国家码 → 国旗 emoji + 代码（如 CN → 🇨🇳 CN） */
+  function countryLabel(code) {
+    var c = String(code || '').toUpperCase();
+    if (!/^[A-Z]{2}$/.test(c)) return t('admin.dashboard.unknown');
+    try { return String.fromCodePoint(0x1F1E6 + c.charCodeAt(0) - 65) + String.fromCodePoint(0x1F1E6 + c.charCodeAt(1) - 65) + ' ' + c; } catch (e) { return c; }
+  }
+  /** 设备类型 i18n（desktop/mobile/tablet/bot） */
+  function deviceLabel(name) {
+    var n = String(name || '');
+    var key = 'admin.dashboard.dev' + n.charAt(0).toUpperCase() + n.slice(1);
+    var v = t(key);
+    return v === key ? n : v;
+  }
   /** 访问来源 / 设备概览（近 30 天，异步加载） */
   async function loadSourcesOverview(content) {
     var box = content.querySelector('#abSourcesBody');
@@ -1153,12 +1166,28 @@
       var d = await api('api/admin/stats/sources?days=30');
       var refs = (d && d.referrers) || [];
       var devs = (d && d.devices) || [];
+      var countries = (d && d.countries) || [];
+      var platforms = (d && d.platforms) || [];
+      var vendors = (d && d.vendors) || [];
       var refTotal = Number(d && d.refTotal) || 0;
       var devTotal = Number(d && d.devTotal) || 0;
+      var countryTotal = Number(d && d.countryTotal) || 0;
+      var platformTotal = Number(d && d.platformTotal) || 0;
+      var vendorTotal = Number(d && d.vendorTotal) || 0;
       function pct(n, total) { return total > 0 ? Math.round(n / total * 100) + '%' : '0%'; }
-      var refHtml = refs.length ? refs.map(function (r) { return '<div class="ab-row" style="justify-content:space-between"><span>' + esc(r.name) + '</span><b>' + r.views + ' · ' + pct(r.views, refTotal) + '</b></div>'; }).join('') : '<div class="ab-muted">' + t('admin.dashboard.noData') + '</div>';
-      var devHtml = devs.length ? devs.map(function (r) { return '<div class="ab-row" style="justify-content:space-between"><span>' + esc(r.name) + '</span><b>' + r.views + ' · ' + pct(r.views, devTotal) + '</b></div>'; }).join('') : '<div class="ab-muted">' + t('admin.dashboard.noData') + '</div>';
-      box.innerHTML = '<div class="ab-grid cols-2" style="margin:0"><div><div class="ab-label">' + t('admin.dashboard.colRef') + '</div>' + refHtml + '</div><div><div class="ab-label">' + t('admin.dashboard.colDevice') + '</div>' + devHtml + '</div></div>';
+      function rows(items, total, asCountry, asDevice) {
+        return items.length ? items.map(function (r) {
+          var label = asCountry ? countryLabel(r.name) : (asDevice ? deviceLabel(r.name) : r.name);
+          return '<div class="ab-row" style="justify-content:space-between;gap:10px"><span class="co-name">' + esc(label) + '</span><b>' + (Number(r.views) || 0) + ' · ' + pct(r.views, total) + '</b></div>';
+        }).join('') : '<div class="ab-muted">' + t('admin.dashboard.noData') + '</div>';
+      }
+      box.innerHTML = '<div class="ab-grid cols-2" style="margin:0">' +
+        '<div><div class="ab-label">' + t('admin.dashboard.colCountry') + '</div>' + rows(countries, countryTotal, true, false) + '</div>' +
+        '<div><div class="ab-label">' + t('admin.dashboard.colRef') + '</div>' + rows(refs, refTotal, false, false) + '</div>' +
+        '<div><div class="ab-label">' + t('admin.dashboard.colDevice') + '</div>' + rows(devs, devTotal, false, true) + '</div>' +
+        '<div><div class="ab-label">' + t('admin.dashboard.colPlatform') + '</div>' + rows(platforms, platformTotal, false, false) + '</div>' +
+        '<div><div class="ab-label">' + t('admin.dashboard.colVendor') + '</div>' + rows(vendors, vendorTotal, false, false) + '</div>' +
+      '</div>';
     } catch (e) { box.innerHTML = '<div class="ab-empty"><p>' + esc(e.message || e) + '</p></div>'; }
   }
 

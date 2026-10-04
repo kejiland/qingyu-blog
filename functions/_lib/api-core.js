@@ -1090,6 +1090,26 @@ export async function handleStats(request, env, postId) {
       const dev = /(bot|crawler|spider)/i.test(ua) ? 'bot'
         : (/iPad|Tablet|Pad/i.test(ua) ? 'tablet'
         : (/Mobile|Android|iPhone|iPod/i.test(ua) ? 'mobile' : 'desktop'));
+      // 国家/地区：Cloudflare 边缘按访问者 IP 解析（CF-IPCountry / request.cf.country）；
+      // 只存两位国家码，不落原始 IP，兼顾统计与隐私。
+      var country = String(request.headers.get('CF-IPCountry') || (request.cf && request.cf.country) || '').toUpperCase();
+      if (!country || country === 'XX' || country === 'T1') country = 'unknown';
+      // 手机/桌面系统与品牌（从 UA 推断）
+      var platform = /HarmonyOS|HongMeng/i.test(ua) ? 'HarmonyOS'
+        : (/iPhone|iPad|iPod|iOS/i.test(ua) ? 'iOS'
+        : (/Android/i.test(ua) ? 'Android'
+        : (/Windows/i.test(ua) ? 'Windows'
+        : (/Macintosh|Mac OS X/i.test(ua) ? 'macOS'
+        : (/Linux/i.test(ua) ? 'Linux' : 'other')))));
+      var vendor = /iPhone|iPad|iPod|Macintosh/i.test(ua) ? 'Apple'
+        : (/Huawei|HONOR/i.test(ua) ? 'Huawei/HONOR'
+        : (/Xiaomi|Redmi|POCO|Mi\s/i.test(ua) ? 'Xiaomi'
+        : (/Samsung|SM-/i.test(ua) ? 'Samsung'
+        : (/OPPO/i.test(ua) ? 'OPPO'
+        : (/vivo/i.test(ua) ? 'vivo'
+        : (/OnePlus/i.test(ua) ? 'OnePlus'
+        : (/Google|Pixel/i.test(ua) ? 'Google'
+        : (dev === 'bot' ? 'bot' : 'other'))))))));
       let ref = 'direct';
       // 前端会带 document.referrer（fetch 的 Referer 头恒为本站页面，无法反映来路）；
       // 带 ref 字段（含空串）时以它为准：空串=直接访问，避免把直达流量误判成站内；
@@ -1104,9 +1124,13 @@ export async function handleStats(request, env, postId) {
           ref = (h && h !== self) ? h : 'internal';
         } catch (e) { ref = 'direct'; }
       }
+      const SRC_SQL = 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1';
       await dbBatch(env.DB, [
-        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'device', dev] },
-        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'ref', ref] }
+        { sql: SRC_SQL, params: [postId, todayView, 'device', dev] },
+        { sql: SRC_SQL, params: [postId, todayView, 'ref', ref] },
+        { sql: SRC_SQL, params: [postId, todayView, 'country', country] },
+        { sql: SRC_SQL, params: [postId, todayView, 'platform', platform] },
+        { sql: SRC_SQL, params: [postId, todayView, 'vendor', vendor] }
       ]);
     } catch (e) {}
     // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
@@ -2102,14 +2126,21 @@ export async function handleStatsSources(request, env) {
   try { const d = Number(new URL(request.url).searchParams.get('days')); if (d > 0 && d <= 365) days = Math.floor(d); } catch (e) {}
   const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
   const rows = await dbAll(env.DB, 'SELECT kind,name,SUM(views) AS views FROM stats_sources WHERE date >= ? GROUP BY kind,name ORDER BY views DESC', since).catch(() => []);
-  const refs = [], devices = [];
-  let refTotal = 0, devTotal = 0;
+  const refs = [], devices = [], countries = [], platforms = [], vendors = [];
+  let refTotal = 0, devTotal = 0, countryTotal = 0, platformTotal = 0, vendorTotal = 0;
   (rows || []).forEach(function (r) {
     const n = Number(r.views) || 0;
     if (r.kind === 'ref') { refs.push({ name: r.name, views: n }); refTotal += n; }
     else if (r.kind === 'device') { devices.push({ name: r.name, views: n }); devTotal += n; }
+    else if (r.kind === 'country') { countries.push({ name: r.name, views: n }); countryTotal += n; }
+    else if (r.kind === 'platform') { platforms.push({ name: r.name, views: n }); platformTotal += n; }
+    else if (r.kind === 'vendor') { vendors.push({ name: r.name, views: n }); vendorTotal += n; }
   });
-  return json({ ok: true, days: days, since: since, referrers: refs.slice(0, 10), devices: devices, refTotal: refTotal, devTotal: devTotal }, 200, request, env, { 'Cache-Control': NO_CACHE });
+  return json({ ok: true, days: days, since: since,
+    referrers: refs.slice(0, 10), devices: devices,
+    countries: countries.slice(0, 12), platforms: platforms, vendors: vendors,
+    refTotal: refTotal, devTotal: devTotal, countryTotal: countryTotal, platformTotal: platformTotal, vendorTotal: vendorTotal
+  }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
 
 /** GET /api/admin/health（需登录）：站点绑定与数据健康检查 */

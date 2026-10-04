@@ -980,5 +980,13 @@
   "authors.empty": "No authors yet",
   "authors.count": "{n} posts",
   "admin.editor.author": "Author",
-  "admin.editor.authorPh": "Blank uses the site name"
+  "admin.editor.authorPh": "Blank uses the site name",
+  "admin.dashboard.colCountry": "Country / region",
+  "admin.dashboard.colPlatform": "OS",
+  "admin.dashboard.colVendor": "Device brand",
+  "admin.dashboard.unknown": "Unknown",
+  "admin.dashboard.devDesktop": "Desktop",
+  "admin.dashboard.devMobile": "Mobile",
+  "admin.dashboard.devTablet": "Tablet",
+  "admin.dashboard.devBot": "Bot"
 }

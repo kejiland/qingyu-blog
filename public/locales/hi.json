@@ -980,5 +980,13 @@
   "authors.empty": "कोई लेखक नहीं",
   "authors.count": "{n} पोस्ट",
   "admin.editor.author": "लेखक",
-  "admin.editor.authorPh": "खाली छोड़ने पर साइट नाम दिखेगा"
+  "admin.editor.authorPh": "खाली छोड़ने पर साइट नाम दिखेगा",
+  "admin.dashboard.colCountry": "देश/क्षेत्र",
+  "admin.dashboard.colPlatform": "OS",
+  "admin.dashboard.colVendor": "डिवाइस ब्रांड",
+  "admin.dashboard.unknown": "अज्ञात",
+  "admin.dashboard.devDesktop": "डेस्कटॉप",
+  "admin.dashboard.devMobile": "मोबाइल",
+  "admin.dashboard.devTablet": "टैबलेट",
+  "admin.dashboard.devBot": "बॉट"
 }

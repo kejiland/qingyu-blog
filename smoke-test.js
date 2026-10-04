@@ -2506,6 +2506,8 @@ tests.push(['访问来源 / 设备：浏览时按天记录（点赞不记录）'
   await hit('p3', 'Mozilla/5.0 (Windows NT 10.0)', { body: { action: 'views', ref: '' } });
   // 旧客户端：无 ref 字段 → 回退 Referer 头
   await hit('p4', 'Mozilla/5.0 (Linux; Android 13)', { referer: 'https://t.co/abc' });
+  // 国家/地区来自 Cloudflare 边缘 IP 地理（CF-IPCountry）
+  await core.handleStats(new Request('http://blog.example/api/posts/p6/stats', { method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', 'CF-IPCountry': 'CN' }, body: JSON.stringify({ action: 'views', ref: '' }) }), env, 'p6');
   // 点赞不应产生来源 / 设备记录
   await hit('p5', 'Mozilla/5.0', { body: { action: 'like' } });
   const d = await (await core.handleStatsSources(new Request('http://t/api/admin/stats/sources?days=30', { headers: { Authorization: 'Bearer tok-src' } }), env)).json();
@@ -2516,8 +2518,13 @@ tests.push(['访问来源 / 设备：浏览时按天记录（点赞不记录）'
   assert.ok(refs.indexOf('direct') >= 0, '直接访问记为 direct');
   assert.ok(refs.indexOf('t.co') >= 0, '旧客户端回退 Referer 头: ' + refs.join(','));
   assert.ok(devs.indexOf('mobile') >= 0 && devs.indexOf('desktop') >= 0, '设备类型已记录: ' + devs.join(','));
-  assert.strictEqual(d.refTotal, 4, '四次浏览计入四次来源（点赞不计）');
-  assert.strictEqual(d.devTotal, 4, '四次浏览计入四次设备（点赞不计）');
+  assert.strictEqual(d.refTotal, 5, '五次浏览计入五次来源（点赞不计）');
+  assert.strictEqual(d.devTotal, 5, '五次浏览计入五次设备（点赞不计）');
+  // 国家/地区 · 系统 · 品牌
+  assert.ok((d.countries || []).some(function (x) { return x.name === 'CN'; }), '记录国家/地区（CN）');
+  assert.ok((d.platforms || []).some(function (x) { return x.name === 'iOS'; }), '记录手机系统（iOS）');
+  assert.ok((d.platforms || []).some(function (x) { return x.name === 'Windows'; }), '记录桌面系统（Windows）');
+  assert.ok((d.vendors || []).some(function (x) { return x.name === 'Apple'; }), '记录设备品牌（Apple）');
 }]);
 
 tests.push(['统计（静态模式）：本机阅读数/点赞 + 详情页元素', async () => {
@@ -3994,7 +4001,7 @@ tests.push(['仪表盘：统一骨架屏 + 趋势图质感增强', async () => {
     const u = String(url);
     if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
     if (u.indexOf('/api/stats/trend') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, days: 30, trend: [{ date: '2026-01-01', views: 5 }, { date: '2026-01-02', views: 9 }] }) };
-    if (u.indexOf('/api/admin/stats/sources') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, referrers: [], devices: [], refTotal: 0, devTotal: 0 }) };
+    if (u.indexOf('/api/admin/stats/sources') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, referrers: [{ name: 'google.com', views: 2 }], devices: [{ name: 'mobile', views: 2 }], countries: [{ name: 'CN', views: 2 }], platforms: [{ name: 'iOS', views: 2 }], vendors: [{ name: 'Apple', views: 2 }], refTotal: 2, devTotal: 2, countryTotal: 2, platformTotal: 2, vendorTotal: 2 }) };
     if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
     if (u.indexOf('/api/comments') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, comments: [] }) };
     return { ok: true, status: 200, json: async () => ({ ok: true }) };
@@ -4009,6 +4016,11 @@ tests.push(['仪表盘：统一骨架屏 + 趋势图质感增强', async () => {
   assert.ok(trend.indexOf('class="grid"') >= 0, '趋势图含网格线');
   const stats = root.querySelector('#abStats').innerHTML || '';
   assert.ok(stats.indexOf('ab-sk') < 0 && stats.indexOf('ab-stat-value') >= 0, '统计卡已用数据替换骨架屏');
+  const sources = root.querySelector('#abSourcesBody').innerHTML || '';
+  assert.ok(sources.indexOf('国家/地区') >= 0 && sources.indexOf('🇨🇳') >= 0, '国家/地区区块（含国旗）');
+  assert.ok(sources.indexOf('系统') >= 0 && sources.indexOf('iOS') >= 0, '系统区块');
+  assert.ok(sources.indexOf('设备品牌') >= 0 && sources.indexOf('Apple') >= 0, '品牌区块');
+  assert.ok(sources.indexOf('手机') >= 0, '设备类型已本地化');
 }]);
 
 /* ---------- 运行 ---------- */

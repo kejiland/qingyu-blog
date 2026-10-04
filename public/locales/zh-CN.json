@@ -980,5 +980,13 @@
   "authors.empty": "暂无作者信息",
   "authors.count": "{n} 篇文章",
   "admin.editor.author": "作者",
-  "admin.editor.authorPh": "留空则显示站点署名"
+  "admin.editor.authorPh": "留空则显示站点署名",
+  "admin.dashboard.colCountry": "国家/地区",
+  "admin.dashboard.colPlatform": "系统",
+  "admin.dashboard.colVendor": "设备品牌",
+  "admin.dashboard.unknown": "未知",
+  "admin.dashboard.devDesktop": "桌面",
+  "admin.dashboard.devMobile": "手机",
+  "admin.dashboard.devTablet": "平板",
+  "admin.dashboard.devBot": "爬虫"
 }

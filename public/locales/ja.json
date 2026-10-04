@@ -980,5 +980,13 @@
   "authors.empty": "著者がまだいません",
   "authors.count": "{n} 件の記事",
   "admin.editor.author": "著者",
-  "admin.editor.authorPh": "空欄ならサイト名を表示"
+  "admin.editor.authorPh": "空欄ならサイト名を表示",
+  "admin.dashboard.colCountry": "国・地域",
+  "admin.dashboard.colPlatform": "OS",
+  "admin.dashboard.colVendor": "デバイスブランド",
+  "admin.dashboard.unknown": "不明",
+  "admin.dashboard.devDesktop": "デスクトップ",
+  "admin.dashboard.devMobile": "スマホ",
+  "admin.dashboard.devTablet": "タブレット",
+  "admin.dashboard.devBot": "ボット"
 }
