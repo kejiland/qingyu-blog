@@ -3265,6 +3265,9 @@ tests.push(['编辑器：文章加密开关已接入（enc / content / protected
   assert.ok(src.includes('content: contentToSave'), '密文文章明文 content 置空');
   assert.ok(src.includes('protected: protectOn, enc: encData'), '写入 protected / enc 字段');
   assert.ok(src.includes('admin.editor.protect'), '使用 i18n 文案');
+  assert.ok(src.includes('id="abProtectShow"'), '密码显示/隐藏按钮');
+  assert.ok(src.includes('rememberPostPwd(') && src.includes('readPostPwd('), '本机记住密码（便于后台查看）');
+  assert.ok(src.includes('forgetPostPwd('), '取消加密时清除本机密码');
 }]);
 
 /* i18n：五个语言包键数一致，且都含加密相关文案 */
@@ -3273,8 +3276,34 @@ tests.push(['i18n：五个语言包键数一致且含加密文案', async () => 
   const maps = langs.map((l) => JSON.parse(fs.readFileSync(path.join(PUB, 'locales', l + '.json'), 'utf8')));
   const counts = maps.map((m) => Object.keys(m).length);
   assert.ok(counts.every((c) => c === counts[0]), '各语言键数一致: ' + counts.join('/'));
-  const need = ['post.lockedTitle','post.lockedDesc','post.lockedPlaceholder','post.unlock','post.unlocked','post.unlockFail','admin.editor.protect','admin.editor.protectHint','admin.editor.protectPwdPh','admin.editor.protectEncrypted','admin.editor.protectUnlock','admin.editor.protectNeedPwd','admin.editor.protectUnlocked','admin.editor.protectFail','admin.editor.protectNeedUnlock'];
+  const need = ['post.lockedTitle','post.lockedDesc','post.lockedPlaceholder','post.unlock','post.unlocked','post.unlockFail','admin.editor.protect','admin.editor.protectHint','admin.editor.protectPwdPh','admin.editor.protectEncrypted','admin.editor.protectUnlock','admin.editor.protectNeedPwd','admin.editor.protectUnlocked','admin.editor.protectFail','admin.editor.protectNeedUnlock','admin.editor.protectShow','admin.editor.protectHide','admin.editor.protectRemembered'];
   maps.forEach((m, i) => { need.forEach((k) => assert.ok(typeof m[k] === 'string' && m[k], langs[i] + ' 缺 ' + k)); });
+}]);
+
+/* 后台文章列表分页回归：serverTotal 未定义 / 云端重复切片 */
+tests.push(['后台文章列表分页：云端不重复切片、静态本地切片（serverTotal 回归）', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const pg = b.win.QingyuAdmin && b.win.QingyuAdmin._list && b.win.QingyuAdmin._list.paginatePosts;
+  assert.strictEqual(typeof pg, 'function', '暴露 paginatePosts 纯函数');
+  // 云端：接口已返回第 2 页的 10 条，total=25 → 不得再本地切片（否则会变空）
+  const cloudPage2 = Array.from({ length: 10 }, (_, i) => ({ id: 'c' + i }));
+  const c2 = pg(cloudPage2, 2, 10, 25);
+  assert.strictEqual(c2.slice.length, 10, '云端第 2 页仍是 10 条（不重复切片）');
+  assert.strictEqual(c2.totalPages, 3, '云端总页数 3');
+  assert.strictEqual(c2.page, 2, '云端当前页 2');
+  // 静态：完整 25 条本地切片，第 2 页取第 11-20 条
+  const all = Array.from({ length: 25 }, (_, i) => ({ id: 's' + i }));
+  const s2 = pg(all, 2, 10, 0);
+  assert.strictEqual(s2.slice.length, 10, '静态第 2 页 10 条');
+  assert.strictEqual(s2.slice[0].id, 's10', '静态第 2 页从第 11 条开始');
+  assert.strictEqual(s2.totalPages, 3, '静态总页数 3');
+  assert.strictEqual(pg(all, 99, 10, 0).page, 3, '越界页收敛到最后一页');
+  // 源码回归：loadPosts 内必须声明 serverTotal，避免再次 ReferenceError
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  const body = src.slice(src.indexOf('async function loadPosts'), src.indexOf('function enc(s)'));
+  assert.ok(/var serverTotal\s*=\s*0/.test(body), 'loadPosts 内声明 serverTotal');
+  assert.ok(body.indexOf('paginatePosts(') >= 0, 'loadPosts 使用纯分页函数');
 }]);
 
 /* ---------- 运行 ---------- */

@@ -859,12 +859,15 @@
   "post.unlocked": "Unlocked",
   "post.unlockFail": "Wrong password, please try again",
   "admin.editor.protect": "Encrypt post",
-  "admin.editor.protectHint": "When enabled, readers must enter a password to view the content. The password is kept only in the browser — remember it well.",
+  "admin.editor.protectHint": "When enabled, readers must enter a password to view the content. The password is kept only in this browser (so you can view it later); the server cannot decrypt it.",
   "admin.editor.protectPwdPh": "Set access password",
   "admin.editor.protectEncrypted": "This post is encrypted: enter the original password and click \"Unlock content\" to edit, or set a new password to re-encrypt.",
   "admin.editor.protectUnlock": "Unlock content",
   "admin.editor.protectNeedPwd": "Please enter an access password",
   "admin.editor.protectUnlocked": "Content unlocked, you can edit now",
   "admin.editor.protectFail": "Encryption failed, please try again",
-  "admin.editor.protectNeedUnlock": "For an encrypted post, unlock the content with the original password, or type new content"
+  "admin.editor.protectNeedUnlock": "For an encrypted post, unlock the content with the original password, or type new content",
+  "admin.editor.protectShow": "Show",
+  "admin.editor.protectHide": "Hide",
+  "admin.editor.protectRemembered": "This browser remembers the password: click \"Show\" to view it, or \"Unlock content\" to edit directly."
 }

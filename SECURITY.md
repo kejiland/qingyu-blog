@@ -21,7 +21,7 @@
 | 限流 | 同一 IP 连续失败 5 次锁定 15 分钟（仅信任 CF-Connecting-IP，不读可伪造的 X-Forwarded-For） |
 | 管理员初始化 | `BLOG_ADMIN_SETUP_KEY` 可选：配置后用 X-Setup-Key 显式初始化（防抢注），未初始化登录一律 403；未配置回退旧行为——首次登录自动生成随机默认密码（mustChange=true，存在先到先得竞态，全新部署建议配置密钥）。改密前后台 API 一律返回 403 `PASSWORD_CHANGE_REQUIRED`，仅放行改密与登出 |
 | 安全响应头 | 所有 HTTP 响应统一携带 CSP / X-Content-Type-Options / X-Frame-Options / Referrer-Policy / COOP（Workers 部署全量生效；Pages 纯静态资源由托管方直接返回，API 响应始终生效） |
-| 文章加密 | 编辑器可开启正文加密：**AES-GCM-256 + PBKDF2-SHA256（10 万次迭代）纯前端加密**，明文不上传、服务器只存密文 `enc`；读者需输入密码在前端解密，密码不落库、不可找回 |
+| 文章加密 | 编辑器可开启正文加密：**AES-GCM-256 + PBKDF2-SHA256（10 万次迭代）纯前端加密**，明文不上传、服务器只存密文 `enc`；读者需输入密码在前端解密，密码不落库。后台编辑器可将密码记在本机浏览器（localStorage 明文）便于日后查看，公共电脑请勿使用 |
 | 评论安全 | XSS 转义 + SQL 注入参数化 + 频率限制 + 重复发送拦截 |
 
 ---

@@ -1057,7 +1057,6 @@
 
   async function loadDashboard(content) {
     var posts = [];
-    var serverTotal = 0;
     try { posts = await listPosts(); } catch (e) {}
     var total = posts.length;
     var published = posts.filter(function (p) { return (p.status || 'published') === 'published'; }).length;
@@ -1489,17 +1488,28 @@
   }
   function debounce(fn, ms) { var t; return function () { clearTimeout(t); t = setTimeout(fn, ms); }; }
 
+  /* 文章列表分页（纯函数，便于单测）：serverTotal>0 表示云端服务端分页，
+   * posts 已是当前页、不能再切；serverTotal=0 表示静态模式，需对完整列表本地切片。 */
+  function paginatePosts(posts, page, per, serverTotal) {
+    var list = Array.isArray(posts) ? posts : [];
+    var size = Math.max(1, Math.floor(Number(per) || 10));
+    var total = Math.max(0, Math.floor(Number(serverTotal) || 0));
+    var totalPages = total > 0 ? Math.max(1, Math.ceil(total / size)) : Math.max(1, Math.ceil(list.length / size));
+    var current = Math.min(Math.max(1, Math.floor(Number(page) || 1)), totalPages);
+    var slice = total > 0 ? list : list.slice((current - 1) * size, current * size);
+    return { slice: slice, page: current, totalPages: totalPages };
+  }
   async function loadPosts(content, page, silent) {
     var body = content.querySelector('#abPostBody');
     // silent：删除/审核后的静默校准刷新，不打断当前视图（不闪加载行）
     if (!silent) body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px"><span class="ab-spin"></span> ' + t('admin.postList.loading') + '</td></tr>';
     var posts = [];
-    try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
-
+    var serverTotal = 0;   // 云端服务端分页返回的总条数；静态模式保持 0
     var kwRaw = content.querySelector('#abPostKw').value.trim();
     var kw = kwRaw.toLowerCase();
     var st = content.querySelector('#abPostStatus').value;
     if (cloudOn()) {
+      // 云端：直接走服务端分页接口（关键字 / 状态过滤 + 只取当前页），不再先拉全量再本地切片
       try {
         var sd = await api('api/posts?q=' + encodeURIComponent(kwRaw) + '&status=' + encodeURIComponent(st) + '&page=' + page + '&per=10');
         posts = (sd && sd.posts) || [];
@@ -1508,6 +1518,8 @@
         body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>';
         return;
       }
+    } else {
+      try { posts = await listPosts(); } catch (e) { body.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:30px" class="ab-muted">' + t('admin.postList.loadFail') + esc(e.message || e) + '</td></tr>'; return; }
     }
     var filtered = posts.filter(function (p) {
       if (st !== 'all' && (p.status || 'published') !== st) return false;
@@ -1524,9 +1536,10 @@
       content.querySelector('#abPostPage').innerHTML = '';
       return;
     }
-    var per = 10, totalPages = serverTotal ? Math.max(1, Math.ceil(serverTotal / per)) : Math.max(1, Math.ceil(filtered.length / per));
-    page = Math.min(page, totalPages);
-    var slice = filtered.slice((page - 1) * per, page * per);
+    var paged = paginatePosts(filtered, page, 10, serverTotal);
+    page = paged.page;
+    var totalPages = paged.totalPages;
+    var slice = paged.slice;
     body.innerHTML = slice.map(function (p) {
       var id = p.id;
       var statusBadge = '';
@@ -2411,6 +2424,12 @@
   }
 
   /* ====================== 编辑器 ====================== */
+  /* 文章访问密码：仅记在本机浏览器，便于站长日后查看/编辑已加密文章；
+   * 服务器只保存密文，无法解密，也就无法在服务端提供密码。 */
+  var POST_PWD_PREFIX = 'qingyu.postPwd.';
+  function rememberPostPwd(id, pwd) { try { if (id && pwd) localStorage.setItem(POST_PWD_PREFIX + id, String(pwd)); } catch (e) {} }
+  function readPostPwd(id) { try { return localStorage.getItem(POST_PWD_PREFIX + id) || ''; } catch (e) { return ''; } }
+  function forgetPostPwd(id) { try { if (id) localStorage.removeItem(POST_PWD_PREFIX + id); } catch (e) {} }
   function pageEditor(content, route) {
     content.innerHTML =
       '<div class="ab-page-head"><div><h1 class="ab-page-title">' + (route.isNew ? t('admin.editor.newPost') : t('admin.editor.editPost')) + '</h1><p class="ab-page-sub">' + t('editor.markdownHint') + '</p></div></div>' +
@@ -2432,6 +2451,7 @@
         '<div class="ab-field" style="margin:0">' +
           '<div class="ab-row" id="abProtectRow" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">' +
             '<input class="ab-input" id="abProtectPwd" type="password" autocomplete="new-password" maxlength="64" placeholder="' + t('admin.editor.protectPwdPh') + '" style="max-width:280px">' +
+            '<button type="button" class="ab-btn sm" id="abProtectShow">' + t('admin.editor.protectShow') + '</button>' +
             '<button type="button" class="ab-btn sm" id="abProtectUnlock" style="display:none">' + icon('lock', 13) + ' ' + t('admin.editor.protectUnlock') + '</button>' +
           '</div>' +
           '<label class="ab-hint" id="abProtectHint">' + t('admin.editor.protectHint') + '</label>' +
@@ -2528,6 +2548,13 @@
     var protBox = content.querySelector('#abProtected');
     var protRow = content.querySelector('#abProtectRow');
     if (protBox && protRow) protBox.addEventListener('change', function () { protRow.style.display = protBox.checked ? 'flex' : 'none'; });
+    var protShow = content.querySelector('#abProtectShow');
+    var protPwdInput = content.querySelector('#abProtectPwd');
+    if (protShow && protPwdInput) protShow.addEventListener('click', function () {
+      var show = protPwdInput.type === 'password';
+      protPwdInput.type = show ? 'text' : 'password';
+      protShow.textContent = show ? t('admin.editor.protectHide') : t('admin.editor.protectShow');
+    });
     var protUnlock = content.querySelector('#abProtectUnlock');
     if (protUnlock) protUnlock.addEventListener('click', function () {
       var pwdEl = content.querySelector('#abProtectPwd');
@@ -2678,7 +2705,10 @@
       if (protBox) protBox.checked = true;
       if (protRow) protRow.style.display = 'flex';
       if (protUnlock) protUnlock.style.display = '';
-      if (protHint) protHint.textContent = t('admin.editor.protectEncrypted');
+      var savedPwd = readPostPwd(p.id);
+      var pwdInput = content.querySelector('#abProtectPwd');
+      if (savedPwd && pwdInput) pwdInput.value = savedPwd;
+      if (protHint) protHint.textContent = savedPwd ? t('admin.editor.protectRemembered') : t('admin.editor.protectEncrypted');
     } else if (protHint) {
       protHint.textContent = t('admin.editor.protectHint');
     }
@@ -2710,7 +2740,10 @@
       if (hadEnc && !content.__unlockedPlain && !body) { toast(t('admin.editor.protectNeedUnlock'), 'err'); return; }
       try { encData = await window.pfEncrypt(body, protectPwd); }
       catch (e) { toast(t('admin.editor.protectFail'), 'err'); return; }
+      rememberPostPwd(id, protectPwd);   // 本机记住密码，便于后台查看
       contentToSave = '';
+    } else {
+      forgetPostPwd(id);                 // 取消加密时清除本机记录的密码
     }
     var dateInput = content.querySelector('#abDate');
     var rawDate = dateInput ? String(dateInput.value || '').trim().replace('T', ' ') : '';
@@ -4388,6 +4421,7 @@
       zip: transferZipForPosts
     },
     _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
+    _list: { paginatePosts: paginatePosts },
     _editor: {
       toDateTimeLocal: toDateTimeLocal,
       normalizeEditorDate: normalizeEditorDate,

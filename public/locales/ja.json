@@ -859,12 +859,15 @@
   "post.unlocked": "解除しました",
   "post.unlockFail": "パスワードが正しくありません。もう一度お試しください",
   "admin.editor.protect": "記事を暗号化",
-  "admin.editor.protectHint": "有効にすると、読者はパスワードを入力しないと本文を閲覧できません。パスワードはブラウザにのみ保存されるため、必ず覚えておいてください。",
+  "admin.editor.protectHint": "有効にすると、読者はパスワードを入力しないと本文を閲覧できません。パスワードはこのブラウザにのみ保存され（後で確認できます）、サーバーでは復号できません。",
   "admin.editor.protectPwdPh": "アクセスパスワードを設定",
   "admin.editor.protectEncrypted": "この記事は暗号化されています：元のパスワードを入力して「本文を解除」をクリックすると編集できます。新しいパスワードで再暗号化することもできます。",
   "admin.editor.protectUnlock": "本文を解除",
   "admin.editor.protectNeedPwd": "アクセスパスワードを入力してください",
   "admin.editor.protectUnlocked": "本文を解除しました。編集できます",
   "admin.editor.protectFail": "暗号化に失敗しました。もう一度お試しください",
-  "admin.editor.protectNeedUnlock": "暗号化された記事は、まず元のパスワードで本文を解除するか、新しい本文を入力してください"
+  "admin.editor.protectNeedUnlock": "暗号化された記事は、まず元のパスワードで本文を解除するか、新しい本文を入力してください",
+  "admin.editor.protectShow": "表示",
+  "admin.editor.protectHide": "隠す",
+  "admin.editor.protectRemembered": "このブラウザはパスワードを記憶しています。「表示」で確認、「本文を解除」でそのまま編集できます。"
 }
