@@ -54,8 +54,8 @@
 **本地体验（30 秒）：**
 
 ```bash
-git clone https://github.com/kejiland/blog.git
-cd blog
+git clone https://github.com/kejiland/qingyu-blog.git
+cd qingyu-blog
 # 双击 public/index.html 即可
 # 或启动本地服务器
 python -m http.server 8080 -d public
@@ -70,7 +70,7 @@ python -m http.server 8080 -d public
 3. 配置 GitHub Secrets
 4. 推送到 `main` 分支，GitHub Actions 自动部署
 
-详见 [README](README.md) 中的部署指南。
+详见 [README](README.md) 与 [开发文档](DEVELOPMENT.md)。
 
 ---
 
@@ -80,6 +80,7 @@ python -m http.server 8080 -d public
 public/           → 站点本体（前台 + 后台 + 样式 + 国际化）
 functions/        → Cloudflare API（文章/评论/统计/设置）
 migrations/       → D1 数据库迁移脚本
+docs/             → 使用说明与开发文档
 worker.js         → Workers 入口
 .github/          → 自动部署工作流
 ```

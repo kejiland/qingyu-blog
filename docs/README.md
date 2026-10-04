@@ -192,7 +192,9 @@ npx wrangler kv namespace create BLOG
 | `PAGES_PROJECT_NAME` | 名字有误导性：实际作用是覆盖 **Worker 名称**。不填则用 `wrangler.workers.toml` 里的 `kejiland`。新手建议不填 |
 | `BLOG_WRITE_TOKEN` | 旧式写入令牌，新部署不需要 |
 
-**运行时环境变量总表**（代码实际读取的全部变量；标 *自动* 的由上面的 GitHub Secret 自动写入 Worker）：
+### 运行时环境变量总表
+
+代码实际读取的全部变量；标 *自动* 的由上面的 GitHub Secret 自动写入 Worker。
 
 | 变量 | 类型 | 未配置时的行为 |
 | --- | --- | --- |
@@ -505,6 +507,8 @@ node scripts/migrate-kv-to-d1.mjs             # 正式写入 D1
 ├── docs/                              # 项目说明文档（中英双语）
 │   ├── README.md                      # 中文说明（本文件）
 │   ├── README_EN.md                   # 英文说明
+│   ├── DEVELOPMENT.md                 # 开发与架构指南（中文）
+│   ├── DEVELOPMENT_EN.md              # 开发与架构指南（英文）
 │   ├── CLOUDFLARE_SETUP_GUIDE.md      # Cloudflare 配置完全指南（新手版·中文）
 │   ├── CLOUDFLARE_SETUP_GUIDE_EN.md   # 同上 · 英文
 │   ├── DEPLOYMENT_SECRETS_GUIDE.md    # GitHub Secrets 与 R2 令牌详解·中文
@@ -801,6 +805,7 @@ node scripts/minify.mjs     # 需要 npx terser / clean-css-cli
 | 中文 | English | 内容 |
 | --- | --- | --- |
 | [README.md](README.md) | [README_EN.md](README_EN.md) | 项目总览：快速开始、功能、目录结构、Cloudflare 服务、配置、安全、测试 |
+| [DEVELOPMENT.md](DEVELOPMENT.md) | [DEVELOPMENT_EN.md](DEVELOPMENT_EN.md) | 开发与架构：运行时结构、目录职责、API 地图、D1 数据模型、配置、测试、发版与扩展 |
 | [CLOUDFLARE_SETUP_GUIDE.md](CLOUDFLARE_SETUP_GUIDE.md) | [CLOUDFLARE_SETUP_GUIDE_EN.md](CLOUDFLARE_SETUP_GUIDE_EN.md) | **Cloudflare 配置完全指南（新手版）**：账号 / D1 / KV / API Token / R2 / Workers AI / 自定义域名 / Secrets / 部署 / 自检 / 排查 / 免费额度 |
 | [DEPLOYMENT_SECRETS_GUIDE.md](DEPLOYMENT_SECRETS_GUIDE.md) | [DEPLOYMENT_SECRETS_GUIDE_EN.md](DEPLOYMENT_SECRETS_GUIDE_EN.md) | 只聚焦 GitHub Secrets 与 R2 令牌：每个 Secret 从哪来、怎么填、两个桶用一个还是两个 Token |
 | [SECURITY.md](SECURITY.md) | [SECURITY_EN.md](SECURITY_EN.md) | 安全问题反馈方式与内置安全措施 |

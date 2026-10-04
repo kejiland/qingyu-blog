@@ -7,6 +7,7 @@
 >
 > Related documents:
 > - [README_EN.md](README_EN.md) — what the project is and how to use it
+> - [DEVELOPMENT_EN.md](DEVELOPMENT_EN.md) — architecture, API map, D1 model and release workflow
 > - [DEPLOYMENT_SECRETS_GUIDE_EN.md](DEPLOYMENT_SECRETS_GUIDE_EN.md) — covers only GitHub Secrets and R2 tokens (this document is a superset that includes that part too)
 >
 > A note on quoted messages: the Worker's runtime messages and the CI validation messages are hard-coded in Chinese, so this guide quotes them verbatim and adds an English gloss in parentheses — that way you can match what you actually see in your terminal, in the Worker logs or in an API response.

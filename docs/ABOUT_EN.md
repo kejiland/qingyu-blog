@@ -54,8 +54,8 @@ Deploy: GitHub Actions → Cloudflare automatic deployment
 **Try it locally (30 seconds):**
 
 ```bash
-git clone https://github.com/kejiland/blog.git
-cd blog
+git clone https://github.com/kejiland/qingyu-blog.git
+cd qingyu-blog
 # Just double-click public/index.html
 # Or start a local server
 python -m http.server 8080 -d public
@@ -70,7 +70,7 @@ Open `http://localhost:8080/admin`, set a password and start writing.
 3. Configure GitHub Secrets
 4. Push to the `main` branch and GitHub Actions deploys automatically
 
-See the deployment guide in the [README](README.md) for details.
+See the [README](README.md) and [Development Guide](DEVELOPMENT_EN.md) for details.
 
 ---
 
@@ -80,6 +80,7 @@ See the deployment guide in the [README](README.md) for details.
 public/           → the site itself (public site + admin + styles + i18n)
 functions/        → Cloudflare API (posts / comments / stats / settings)
 migrations/       → D1 database migration scripts
+docs/             → user and development documentation
 worker.js         → Workers entry point
 .github/          → automatic deployment workflows
 ```

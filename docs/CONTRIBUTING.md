@@ -10,14 +10,14 @@ Thank you for your interest in Qingyu'Blog! All forms of contribution are welcom
 
 ## 🐛 提交 Bug 报告 / Reporting a Bug
 
-如果你发现了 Bug，请通过 [GitHub Issues](https://github.com/kejiland/blog/issues/new?template=bug_report.md) 提交，并尽量包含：
+如果你发现了 Bug，请通过 [GitHub Issues](https://github.com/kejiland/qingyu-blog/issues/new?template=bug_report.md) 提交，并尽量包含：
 
 - 你的浏览器和操作系统
 - 复现步骤
 - 预期行为 vs 实际行为
 - 截图或控制台报错信息
 
-If you found a bug, please open a [GitHub Issue](https://github.com/kejiland/blog/issues/new?template=bug_report.md) with:
+If you found a bug, please open a [GitHub Issue](https://github.com/kejiland/qingyu-blog/issues/new?template=bug_report.md) with:
 - Your browser and OS
 - Steps to reproduce
 - Expected vs actual behavior
@@ -27,9 +27,9 @@ If you found a bug, please open a [GitHub Issue](https://github.com/kejiland/blo
 
 ## 💡 功能建议 / Feature Requests
 
-有新功能想法？通过 [Feature Request](https://github.com/kejiland/blog/issues/new?template=feature_request.md) 告诉我们。
+有新功能想法？通过 [Feature Request](https://github.com/kejiland/qingyu-blog/issues/new?template=feature_request.md) 告诉我们。
 
-Have a feature idea? Let us know via [Feature Request](https://github.com/kejiland/blog/issues/new?template=feature_request.md).
+Have a feature idea? Let us know via [Feature Request](https://github.com/kejiland/qingyu-blog/issues/new?template=feature_request.md).
 
 ---
 
@@ -38,13 +38,15 @@ Have a feature idea? Let us know via [Feature Request](https://github.com/kejila
 ### 开发环境 / Development Environment
 
 ```bash
-git clone https://github.com/kejiland/blog.git
-cd blog
+git clone https://github.com/kejiland/qingyu-blog.git
+cd qingyu-blog
 ```
 
 双击 `public/index.html` 即可开始开发，无需安装任何依赖。
+架构、API 地图、D1 数据模型、测试与发版流程见 [开发文档](DEVELOPMENT.md)。
 
 Double-click `public/index.html` to start — no dependencies needed.
+See the [Development Guide](DEVELOPMENT_EN.md) for architecture, the API map, the D1 model, testing and release workflow.
 
 ### 提交 PR 流程 / Pull Request Workflow
 
@@ -116,6 +118,6 @@ Translation files live in `public/locales/<lang>.json`.
 
 Thanks to every contributor for your support!
 
-<a href="https://github.com/kejiland/blog/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kejiland/blog" />
+<a href="https://github.com/kejiland/qingyu-blog/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=kejiland/qingyu-blog" />
 </a>

@@ -36,7 +36,7 @@
 
 ## 执行
 
-如发现滥用、骚扰或其他不可接受的行为，请通过 [GitHub Issues](https://github.com/kejiland/blog/issues) 报告。所有投诉都会被审阅和调查，并会得到与具体情况相称的必要回应。违反本行为准则的参与者可能会被永久禁止参与本项目。
+如发现滥用、骚扰或其他不可接受的行为，请通过 [GitHub Issues](https://github.com/kejiland/qingyu-blog/issues) 报告。所有投诉都会被审阅和调查，并会得到与具体情况相称的必要回应。违反本行为准则的参与者可能会被永久禁止参与本项目。
 
 ## 归属
 

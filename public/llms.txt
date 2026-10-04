@@ -50,6 +50,8 @@
 
 - 仓库 / Repository: https://github.com/kejiland/qingyu-blog
 - 文档 / Docs: https://docs.2024921.xyz/
+- 开发文档 / Development guide: https://github.com/kejiland/qingyu-blog/blob/main/docs/DEVELOPMENT.md
+- Development guide (EN): https://github.com/kejiland/qingyu-blog/blob/main/docs/DEVELOPMENT_EN.md
 - ARD 清单 / ARD manifest: https://www.2024921.xyz/.well-known/ard.json
 - AI Catalog（兼容）/ AI Catalog (compatible): https://www.2024921.xyz/.well-known/ai-catalog.json
 - Sitemap: https://www.2024921.xyz/sitemap.xml

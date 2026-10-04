@@ -36,7 +36,7 @@ This Code of Conduct applies within all project spaces, and it also applies when
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported by opening an issue at [GitHub Issues](https://github.com/kejiland/blog/issues). All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances. Participants who violate this Code of Conduct may be permanently banned from taking part in this project.
+Instances of abusive, harassing, or otherwise unacceptable behaviour may be reported by opening an issue at [GitHub Issues](https://github.com/kejiland/qingyu-blog/issues). All complaints will be reviewed and investigated and will result in a response that is deemed necessary and appropriate to the circumstances. Participants who violate this Code of Conduct may be permanently banned from taking part in this project.
 
 ## Attribution
 

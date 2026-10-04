@@ -7,6 +7,7 @@
 >
 > 相关文档：
 > - [README.md](README.md) —— 项目是什么、怎么用
+> - [DEVELOPMENT.md](DEVELOPMENT.md) —— 架构、API 地图、D1 数据模型与发版流程
 > - [DEPLOYMENT_SECRETS_GUIDE.md](DEPLOYMENT_SECRETS_GUIDE.md) —— 只讲 GitHub Secrets 与 R2 令牌（本文的超集里也包含这部分）
 >
 > 关于引用的提示信息：Worker 的运行时提示与 CI 校验信息都是硬编码中文，本文引用时保留原文；英文版会附上英文释义，便于对照你实际看到的内容。

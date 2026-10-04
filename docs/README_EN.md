@@ -206,7 +206,9 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 | `PAGES_PROJECT_NAME` | Misleading name: it actually overrides the **Worker name**. Leave empty to keep `kejiland`. Beginners should not set it |
 | `BLOG_WRITE_TOKEN` | Legacy write token, not needed for new deployments |
 
-**Full table of runtime environment variables** (everything the code reads; entries marked *auto* are written to the Worker from the GitHub Secrets above):
+### Full table of runtime environment variables
+
+Everything the code reads; entries marked *auto* are written to the Worker from the GitHub Secrets above.
 
 | Variable | Type | Behaviour when unset |
 | --- | --- | --- |
@@ -516,6 +518,8 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 ├── docs/                              # Project documentation (bilingual)
 │   ├── README.md                      # 中文说明
 │   ├── README_EN.md                   # English docs (this file)
+│   ├── DEVELOPMENT.md                 # 开发与架构指南（中文）
+│   ├── DEVELOPMENT_EN.md              # 开发与架构指南（英文）
 │   ├── CLOUDFLARE_SETUP_GUIDE.md      # Cloudflare setup guide for beginners (中文)
 │   ├── CLOUDFLARE_SETUP_GUIDE_EN.md   # Cloudflare setup guide for beginners (English)
 │   ├── DEPLOYMENT_SECRETS_GUIDE.md    # GitHub Secrets and R2 tokens (中文)
@@ -815,6 +819,7 @@ Every document ships in both Chinese and English: long documents come as a pair 
 | English | 中文 | Contents |
 | --- | --- | --- |
 | [README_EN.md](README_EN.md) | [README.md](README.md) | Project overview: quick start, features, directory structure, Cloudflare services, configuration, security, tests |
+| [DEVELOPMENT_EN.md](DEVELOPMENT_EN.md) | [DEVELOPMENT.md](DEVELOPMENT.md) | Development and architecture: runtime structure, directory responsibilities, API map, D1 model, configuration, tests, release and extension points |
 | [CLOUDFLARE_SETUP_GUIDE_EN.md](CLOUDFLARE_SETUP_GUIDE_EN.md) | [CLOUDFLARE_SETUP_GUIDE.md](CLOUDFLARE_SETUP_GUIDE.md) | **Cloudflare setup guide for beginners**: account, D1, KV, API tokens, R2, Workers AI, custom domains, secrets, deploy, self-check, troubleshooting, free-tier limits |
 | [DEPLOYMENT_SECRETS_GUIDE_EN.md](DEPLOYMENT_SECRETS_GUIDE_EN.md) | [DEPLOYMENT_SECRETS_GUIDE.md](DEPLOYMENT_SECRETS_GUIDE.md) | Focused on GitHub Secrets and R2 tokens: where each secret comes from, what to put in it, one bucket or two tokens |
 | [SECURITY_EN.md](SECURITY_EN.md) | [SECURITY.md](SECURITY.md) | How to report a vulnerability, plus the built-in security measures |
