@@ -2232,6 +2232,19 @@ tests.push(['comment server paging and sort', async () => {
   assert.strictEqual(d.comments[0].author, 'u11', 'newest first');
 }]);
 
+tests.push(['stats sources api', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-ss';
+  let r = await core.handleStatsSources(new Request('http://t/api/admin/stats/sources', {}), env);
+  assert.strictEqual(r.status, 401, 'auth required');
+  r = await core.handleStatsSources(new Request('http://t/api/admin/stats/sources?days=7', { headers: { Authorization: 'Bearer tok-ss' } }), env);
+  assert.strictEqual(r.status, 200, 'ok');
+  const d = await r.json();
+  assert.strictEqual(d.days, 7, 'days echoed');
+  assert.ok(Array.isArray(d.referrers) && Array.isArray(d.devices), 'arrays');
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');

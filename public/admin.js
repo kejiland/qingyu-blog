@@ -1042,6 +1042,7 @@
         '<div class="ab-card"><div class="ab-section-title">' + icon('eye', 16) + ' ' + t('admin.dashboard.visitTrend') + '</div><div id="abTrendViews"></div></div>' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('quote', 16) + ' ' + t('admin.dashboard.commentTrend') + '</div><div id="abTrendCmt"></div></div>' +
       '</div>' +
+      '<div class="ab-card" id="abSourcesCard"><div class="ab-section-title">' + icon('globe', 16) + ' ' + t('admin.dashboard.sourcesTitle') + '</div><div id="abSourcesBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>' +
       '<div class="ab-card" id="abStorageCard"><div class="ab-section-title">' + icon('cloud', 16) + ' ' + t('admin.dashboard.storageTitle') + '</div><div id="abStorageBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>' +
       '<div class="ab-grid cols-2">' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('doc', 16) + ' ' + t('admin.dashboard.latestPosts') + '</div><div class="ab-feed" id="abRecentPosts"></div></div>' +
@@ -1118,6 +1119,25 @@
     }
 
     loadStorageOverview(content);
+    loadSourcesOverview(content);
+  }
+
+  /** 访问来源 / 设备概览（近 30 天，异步加载） */
+  async function loadSourcesOverview(content) {
+    var box = content.querySelector('#abSourcesBody');
+    if (!box) return;
+    if (!cloudOn()) { box.innerHTML = '<div class="ab-empty"><p>' + t('admin.dashboard.cloudOnly') + '</p></div>'; return; }
+    try {
+      var d = await api('api/admin/stats/sources?days=30');
+      var refs = (d && d.referrers) || [];
+      var devs = (d && d.devices) || [];
+      var refTotal = Number(d && d.refTotal) || 0;
+      var devTotal = Number(d && d.devTotal) || 0;
+      function pct(n, total) { return total > 0 ? Math.round(n / total * 100) + '%' : '0%'; }
+      var refHtml = refs.length ? refs.map(function (r) { return '<div class="ab-row" style="justify-content:space-between"><span>' + esc(r.name) + '</span><b>' + r.views + ' · ' + pct(r.views, refTotal) + '</b></div>'; }).join('') : '<div class="ab-muted">' + t('admin.dashboard.noData') + '</div>';
+      var devHtml = devs.length ? devs.map(function (r) { return '<div class="ab-row" style="justify-content:space-between"><span>' + esc(r.name) + '</span><b>' + r.views + ' · ' + pct(r.views, devTotal) + '</b></div>'; }).join('') : '<div class="ab-muted">' + t('admin.dashboard.noData') + '</div>';
+      box.innerHTML = '<div class="ab-grid cols-2" style="margin:0"><div><div class="ab-label">' + t('admin.dashboard.colRef') + '</div>' + refHtml + '</div><div><div class="ab-label">' + t('admin.dashboard.colDevice') + '</div>' + devHtml + '</div></div>';
+    } catch (e) { box.innerHTML = '<div class="ab-empty"><p>' + esc(e.message || e) + '</p></div>'; }
   }
 
   /** 存储与订阅概览：媒体占用 / 音乐 / 订阅者 / 备份（异步加载，不阻塞首屏） */

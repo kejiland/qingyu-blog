@@ -998,7 +998,28 @@ export async function handleStats(request, env, postId) {
           await env.BLOG.put(dk, '1', { expirationTtl: LIKE_DEDUP_TTL });
         } catch (e) {}
       }
-      // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
+      // 访问来源 / 设备（按天聚合，表可能尚未迁移 → 失败静默）
+    try {
+      const ua = String(request.headers.get('User-Agent') || '');
+      const dev = /(bot|crawler|spider)/i.test(ua) ? 'bot'
+        : (/iPad|Tablet|Pad/i.test(ua) ? 'tablet'
+        : (/Mobile|Android|iPhone|iPod/i.test(ua) ? 'mobile' : 'desktop'));
+      let ref = 'direct';
+      const rawRef = String(request.headers.get('Referer') || '');
+      if (rawRef) {
+        try {
+          const h = new URL(rawRef).hostname.replace(/^www\./, '');
+          let self = '';
+          try { self = new URL(request.url).hostname.replace(/^www\./, ''); } catch (e) {}
+          ref = (h && h !== self) ? h : 'internal';
+        } catch (e) { ref = 'direct'; }
+      }
+      await dbBatch(env.DB, [
+        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'device', dev] },
+        { sql: 'INSERT INTO stats_sources (post_id,date,kind,name,views) VALUES (?,?,?,?,1) ON CONFLICT(post_id,date,kind,name) DO UPDATE SET views = views + 1', params: [postId, todayView, 'ref', ref] }
+      ]);
+    } catch (e) {}
+    // 写后回读最终计数（含并发期间其他请求的增量），响应数字总是真实值
       const afterLike = await dbFirst(env.DB, 'SELECT * FROM stats WHERE post_id = ?', postId) || {};
       const s = { likes: Number(afterLike.likes) || 0, views: Number(afterLike.views) || 0 };
       await purgeTags(env, ['stats:' + postId]);   // 清 stats 缓存，保证点赞数立即生效
@@ -1749,4 +1770,23 @@ export async function handleTags(request, env) {
   if (stmts.length) await dbBatch(env.DB, stmts);
   await recordAudit(env, request, op === 'rename' ? 'tag.rename' : 'tag.delete', from, to);
   return json({ ok: true, updated: stmts.length }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}
+
+/** GET /api/admin/stats/sources?days=30（需登录）：来源 Top + 设备占比 */
+export async function handleStatsSources(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  let days = 30;
+  try { const d = Number(new URL(request.url).searchParams.get('days')); if (d > 0 && d <= 365) days = Math.floor(d); } catch (e) {}
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+  const rows = await dbAll(env.DB, 'SELECT kind,name,SUM(views) AS views FROM stats_sources WHERE date >= ? GROUP BY kind,name ORDER BY views DESC', since).catch(() => []);
+  const refs = [], devices = [];
+  let refTotal = 0, devTotal = 0;
+  (rows || []).forEach(function (r) {
+    const n = Number(r.views) || 0;
+    if (r.kind === 'ref') { refs.push({ name: r.name, views: n }); refTotal += n; }
+    else if (r.kind === 'device') { devices.push({ name: r.name, views: n }); devTotal += n; }
+  });
+  return json({ ok: true, days: days, since: since, referrers: refs.slice(0, 10), devices: devices, refTotal: refTotal, devTotal: devTotal }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
