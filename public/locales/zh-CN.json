@@ -851,5 +851,20 @@
   "comment.unpinComment": "取消置顶",
   "comment.feature": "设为精选",
   "comment.unfeature": "取消精选",
-  "comment.likeFail": "点赞失败，请稍后再试"
+  "comment.likeFail": "点赞失败，请稍后再试",
+  "post.lockedTitle": "文章已加密",
+  "post.lockedDesc": "本文已加密，请输入访问密码后查看正文。",
+  "post.lockedPlaceholder": "访问密码",
+  "post.unlock": "解锁",
+  "post.unlocked": "已解锁",
+  "post.unlockFail": "密码错误，请重试",
+  "admin.editor.protect": "文章加密",
+  "admin.editor.protectHint": "启用后读者需输入密码才能查看正文；密码仅保存在浏览器，请务必牢记。",
+  "admin.editor.protectPwdPh": "设置访问密码",
+  "admin.editor.protectEncrypted": "该文章已加密：输入原密码后点击「解锁正文」即可编辑，或设置新密码重新加密。",
+  "admin.editor.protectUnlock": "解锁正文",
+  "admin.editor.protectNeedPwd": "请输入文章访问密码",
+  "admin.editor.protectUnlocked": "正文已解锁，可编辑",
+  "admin.editor.protectFail": "加密失败，请重试",
+  "admin.editor.protectNeedUnlock": "加密文章需先用原密码解锁正文，或重新输入正文内容"
 }

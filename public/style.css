@@ -3223,3 +3223,12 @@ html[data-theme="dark"] body.scrolled .topbar {
 .friend-card { display: block; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-soft); color: var(--fg); text-decoration: none; transition: border-color .15s, color .15s, transform .15s; }
 .friend-card:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-2px); }
 .friend-name { font-weight: 600; }
+/* 加密文章锁屏 */
+.post-lock { max-width: 460px; margin: 36px auto 8px; padding: 30px 26px; text-align: center; border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); }
+.post-lock-ico { width: 54px; height: 54px; margin: 0 auto 14px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--accent-soft, rgba(0,0,0,.05)); color: var(--accent); }
+.post-lock-title { margin: 0 0 6px; font-size: 17px; font-weight: 600; color: var(--fg); }
+.post-lock-desc { margin: 0 0 18px; font-size: 14px; color: var(--muted); }
+.post-lock-row { display: flex; gap: 8px; justify-content: center; }
+.post-lock-input { flex: 1 1 auto; min-width: 0; padding: 9px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); color: var(--fg); font-size: 14px; font-family: inherit; }
+.post-lock-input:focus { outline: none; border-color: var(--accent); }
+.post-lock-err { min-height: 18px; margin: 10px 0 0; font-size: 13px; color: var(--danger, #d3544a); }

@@ -851,5 +851,20 @@
   "comment.unpinComment": "固定解除",
   "comment.feature": "注目に設定",
   "comment.unfeature": "注目を解除",
-  "comment.likeFail": "いいねに失敗しました。後でもう一度お試しください"
+  "comment.likeFail": "いいねに失敗しました。後でもう一度お試しください",
+  "post.lockedTitle": "保護された記事",
+  "post.lockedDesc": "この記事は暗号化されています。アクセスパスワードを入力して本文を表示してください。",
+  "post.lockedPlaceholder": "アクセスパスワード",
+  "post.unlock": "解除",
+  "post.unlocked": "解除しました",
+  "post.unlockFail": "パスワードが正しくありません。もう一度お試しください",
+  "admin.editor.protect": "記事を暗号化",
+  "admin.editor.protectHint": "有効にすると、読者はパスワードを入力しないと本文を閲覧できません。パスワードはブラウザにのみ保存されるため、必ず覚えておいてください。",
+  "admin.editor.protectPwdPh": "アクセスパスワードを設定",
+  "admin.editor.protectEncrypted": "この記事は暗号化されています：元のパスワードを入力して「本文を解除」をクリックすると編集できます。新しいパスワードで再暗号化することもできます。",
+  "admin.editor.protectUnlock": "本文を解除",
+  "admin.editor.protectNeedPwd": "アクセスパスワードを入力してください",
+  "admin.editor.protectUnlocked": "本文を解除しました。編集できます",
+  "admin.editor.protectFail": "暗号化に失敗しました。もう一度お試しください",
+  "admin.editor.protectNeedUnlock": "暗号化された記事は、まず元のパスワードで本文を解除するか、新しい本文を入力してください"
 }

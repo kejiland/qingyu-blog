@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.40';
+var BLOG_VERSION = '2.10.41';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -830,6 +830,30 @@ function toggleLater(post){
   _lsSet(LATER_KEY,l);
   return !has;
 }
+
+/* ---------- 文章加密（AES-GCM + PBKDF2，纯前端） ---------- */
+var PF_ITER = 100000;
+function _u8ToB64(u8) { var s = ''; for (var i = 0; i < u8.length; i++) { s += String.fromCharCode(u8[i]); } return btoa(s); }
+function _b64ToU8(b64) { var s = atob(b64); var u8 = new Uint8Array(s.length); for (var i = 0; i < s.length; i++) { u8[i] = s.charCodeAt(i); } return u8; }
+async function pfDeriveKey(password, salt, iter) {
+  var base = await crypto.subtle.importKey('raw', new TextEncoder().encode(String(password)), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function pfEncrypt(text, password) {
+  var salt = crypto.getRandomValues(new Uint8Array(16));
+  var iv = crypto.getRandomValues(new Uint8Array(12));
+  var key = await pfDeriveKey(password, salt, PF_ITER);
+  var ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(String(text)));
+  return { v: 1, alg: 'AES-GCM', kdf: 'PBKDF2-SHA256', iter: PF_ITER, salt: _u8ToB64(salt), iv: _u8ToB64(iv), data: _u8ToB64(new Uint8Array(ct)) };
+}
+async function pfDecrypt(encObj, password) {
+  if (!encObj || !encObj.data || !encObj.salt || !encObj.iv) throw new Error('bad-format');
+  var key = await pfDeriveKey(password, _b64ToU8(encObj.salt), Number(encObj.iter) || PF_ITER);
+  var pt = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: _b64ToU8(encObj.iv) }, key, _b64ToU8(encObj.data));
+  return new TextDecoder().decode(pt);
+}
+window.pfEncrypt = pfEncrypt;
+window.pfDecrypt = pfDecrypt;
 
 function updateTocActive() {
   var links = document.querySelectorAll('a[data-toc]');
@@ -2728,13 +2752,14 @@ async function renderPost(id) {
     var fromCache = false;
     if (!hasContent) {
       var cachedPost = readPostCache(post.id);
-      if (cachedPost && cachedPost.content) {
-        post.content = cachedPost.content;
+      if (cachedPost && (cachedPost.content || cachedPost.enc)) {
+        if (cachedPost.content) post.content = cachedPost.content;
+        if (cachedPost.enc) post.enc = cachedPost.enc;
         post._fullLoaded = true;
         fromCache = true;
       }
     }
-    if (!hasContent && !post.content) {
+    if (!hasContent && !post.content && !post.enc) {
       html += '<div class="empty"><div class="big">' + svgIcon('spinner', 26) + '</div><p>' + t('site.loading') + '…</p></div>';
       html += '</div></main>' + renderFooter();
       app().innerHTML = html;
@@ -2747,7 +2772,7 @@ async function renderPost(id) {
       var full = (data && data.post) || null;
       if (!full) {
         post._fullLoaded = true;
-        if (!hasContent && !fromCache) {
+        if (!hasContent && !fromCache && !post.enc) {   // 加密文章已拿到密文即可渲染锁屏，拉取失败不回退错误页
           // 文章已被删除（404/不存在）：从本地列表移除并重渲染 → 显示「内容不存在」，终止无限拉取
           if (err && /404|410|not.?found|不存在|未找到|找不到/i.test(String((err && err.message) || err))) {
             if (Array.isArray(window.BLOG_POSTS)) {
@@ -2761,21 +2786,27 @@ async function renderPost(id) {
         }
         return;
       }
-      var changed = full.content !== undefined && full.content !== post.content;
+      // 受保护文章的明文 content 恒为空、正文存于 enc；列表摘要会删掉 enc，
+      // 必须在详情返回后补回 enc，否则锁屏无法渲染、且会陷入反复重渲染。
+      var changed = (full.content !== undefined && full.content !== post.content) || (!!full.enc !== !!post.enc);
       if (full.content !== undefined) post.content = full.content;
+      if (full.enc !== undefined) post.enc = full.enc;
+      if (full.protected !== undefined) post.protected = full.protected;
       if (full.content) writePostCache(post.id, full);
       post._fullLoaded = true;
-      if (changed || (!hasContent && !fromCache)) route();
+      if (changed) route();
+      else if (!hasContent && !fromCache && !post.enc && !post.content) renderPostFail(post);
     }
     apiFetch('api/posts/' + encodeURIComponent(post.id))
       .then(function (data) { finish(data); })
       .catch(function (err) { finish(null, err); });
     setTimeout(function () { finish(null); }, 10000);
-    if (!post.content) return;   // 无内容（含无缓存）：等待拉取后重渲染或显示失败页
+    if (!post.content && !post.enc) return;   // 无正文且非加密：等待拉取后重渲染或显示失败页（加密文章无明文也要渲染锁屏）
     // 有内容（缓存或已加载）：继续渲染正文，后台拉取完成后若有更新会重渲染
   }
   var content = post.content || '';
-  var bodyHtml = renderMarkdown(content || '');
+  var locked = !!post.enc;
+  var bodyHtml = locked ? '' : renderMarkdown(content || '');
   var tocRes = buildToc(bodyHtml);
   var toc = tocRes.html;
   var tocHeadings = tocRes.headings;
@@ -2790,7 +2821,17 @@ async function renderPost(id) {
     '</div>';
   html += aiPostSlot(post);
   html += toc;
-  html += '<article class="article">' + bodyHtml + '</article>';
+  if (locked) {
+    html += '<div class="post-lock" id="postLock"><div class="post-lock-ico">' + svgIcon('lock', 26) + '</div>'
+      + '<p class="post-lock-title">' + t('post.lockedTitle') + '</p>'
+      + '<p class="post-lock-desc">' + t('post.lockedDesc') + '</p>'
+      + '<div class="post-lock-row"><input type="password" class="post-lock-input" id="postLockPwd" placeholder="' + t('post.lockedPlaceholder') + '" maxlength="64">'
+      + '<button type="button" class="btn btn-primary" id="postUnlockBtn">' + t('post.unlock') + '</button></div>'
+      + '<p class="post-lock-err" id="postLockErr"></p></div>'
+      + '<article class="article" id="postArticle" style="display:none"></article>';
+  } else {
+    html += '<article class="article">' + bodyHtml + '</article>';
+  }
   if (toc) {
     html += '<button type="button" class="toc-fab" id="tocFab" aria-label="' + t('toc.open') + '">' + svgIcon('list', 18) + '</button>' +
       '<div class="toc-sheet" id="tocSheet" hidden><div class="toc-sheet-head"><span>' + t('toc.title') + '</span>' +
@@ -2961,6 +3002,39 @@ async function renderPost(id) {
     if (tocClose) tocClose.addEventListener('click', closeTocSheet);
     tocSheet.querySelectorAll('a[data-toc]').forEach(function (a) { a.addEventListener('click', closeTocSheet); });
   }
+
+  // 受保护文章：输入密码解密后渲染正文
+  (function initLock() {
+    var btn = document.querySelector('#postUnlockBtn');
+    if (!btn) return;
+    function fill(plain) {
+      var art = document.querySelector('#postArticle');
+      var lockEl = document.querySelector('#postLock');
+      if (!art) return;
+      art.innerHTML = renderMarkdown(plain || '');
+      art.style.display = '';
+      if (lockEl) lockEl.style.display = 'none';
+      try { applyHighlights(art, hlList(post.id)); } catch (e) {}
+      try { stampHeadingNumbers(buildToc(art.innerHTML).headings); } catch (e) {}
+      try { bindArticleEnhancements(); } catch (e) {}
+      try { updateReadingProgress(); updateTocActive(); } catch (e) {}
+    }
+    btn.addEventListener('click', async function () {
+      var inp = document.querySelector('#postLockPwd');
+      var err = document.querySelector('#postLockErr');
+      var pwd = inp ? String(inp.value) : '';
+      if (!pwd) { if (err) err.textContent = t('post.lockedPlaceholder'); return; }
+      btn.disabled = true;
+      try {
+        var plain = await pfDecrypt(post.enc, pwd);
+        if (err) err.textContent = '';
+        window.__postPlain = plain;
+        fill(plain);
+        toast(t('post.unlocked'), 'ok');
+      } catch (e) { if (err) err.textContent = t('post.unlockFail'); }
+      btn.disabled = false;
+    });
+  })();
 
   // 划线高亮：恢复历史高亮，选中正文后浮出「高亮」按钮（按钮动态创建，避免改动渲染模板）
   (function initHighlight() {

@@ -851,5 +851,20 @@
   "comment.unpinComment": "अनपिन",
   "comment.feature": "चयनित करें",
   "comment.unfeature": "चयन हटाएँ",
-  "comment.likeFail": "लाइक नहीं हो सका, बाद में फिर प्रयास करें"
+  "comment.likeFail": "लाइक नहीं हो सका, बाद में फिर प्रयास करें",
+  "post.lockedTitle": "सुरक्षित पोस्ट",
+  "post.lockedDesc": "यह पोस्ट एन्क्रिप्टेड है। सामग्री पढ़ने के लिए एक्सेस पासवर्ड दर्ज करें।",
+  "post.lockedPlaceholder": "एक्सेस पासवर्ड",
+  "post.unlock": "अनलॉक करें",
+  "post.unlocked": "अनलॉक हो गया",
+  "post.unlockFail": "पासवर्ड गलत है, कृपया फिर प्रयास करें",
+  "admin.editor.protect": "पोस्ट एन्क्रिप्ट करें",
+  "admin.editor.protectHint": "सक्षम करने पर पाठकों को सामग्री देखने के लिए पासवर्ड डालना होगा। पासवर्ड केवल आपके ब्राउज़र में रहता है, इसे याद रखें।",
+  "admin.editor.protectPwdPh": "एक्सेस पासवर्ड सेट करें",
+  "admin.editor.protectEncrypted": "यह पोस्ट एन्क्रिप्टेड है: मूल पासवर्ड दर्ज करें और \"सामग्री अनलॉक करें\" पर क्लिक करके संपादित करें, या नया पासवर्ड सेट करके दोबारा एन्क्रिप्ट करें।",
+  "admin.editor.protectUnlock": "सामग्री अनलॉक करें",
+  "admin.editor.protectNeedPwd": "कृपया एक्सेस पासवर्ड दर्ज करें",
+  "admin.editor.protectUnlocked": "सामग्री अनलॉक हो गई, अब संपादित कर सकते हैं",
+  "admin.editor.protectFail": "एन्क्रिप्शन विफल रहा, कृपया फिर प्रयास करें",
+  "admin.editor.protectNeedUnlock": "एन्क्रिप्टेड पोस्ट के लिए पहले मूल पासवर्ड से सामग्री अनलॉक करें, या नई सामग्री दर्ज करें"
 }

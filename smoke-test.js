@@ -3196,6 +3196,87 @@ tests.push(['背景动画开关位于顶栏 actions（与搜索同排），侧�
   assert.ok(!html.includes('sidebar-picks-2'), '侧边栏第二排容器已移除');
 }]);
 
+/* 前端文章加密内核：AES-GCM + PBKDF2 往返 + 错误密码拒绝 */
+tests.push(['文章加密：pfEncrypt / pfDecrypt 往返与错误密码拒绝', async () => {
+  const d = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  assert.strictEqual(typeof d.win.pfEncrypt, 'function', '暴露 pfEncrypt');
+  assert.strictEqual(typeof d.win.pfDecrypt, 'function', '暴露 pfDecrypt');
+  const enc = await d.win.pfEncrypt('机密正文内容', 'p@ssw0rd');
+  assert.strictEqual(enc.alg, 'AES-GCM', '算法 AES-GCM');
+  assert.strictEqual(enc.kdf, 'PBKDF2-SHA256', 'KDF PBKDF2-SHA256');
+  assert.strictEqual(enc.iter, 100000, '迭代 100000');
+  assert.ok(enc.salt && enc.iv && enc.data, '含 salt / iv / data');
+  assert.ok(!JSON.stringify(enc).includes('机密正文内容'), '密文不含明文');
+  assert.strictEqual(await d.win.pfDecrypt(enc, 'p@ssw0rd'), '机密正文内容', '正确密码解出原文');
+  let bad = false; try { await d.win.pfDecrypt(enc, 'nope-wrong'); } catch (e) { bad = true; }
+  assert.ok(bad, '错误密码解密抛错');
+}]);
+
+/* 详情页锁屏：含 enc 渲染锁屏且不泄漏明文；protected 无 enc（历史数据）不锁屏 */
+tests.push(['加密文章：详情页渲染锁屏；protected 无 enc 不锁屏（兼容回归）', async () => {
+  const d0 = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  const enc = await d0.win.pfEncrypt('这是加密正文', 'pw-123456');
+  const posts = [
+    { id: 'locked-1', title: '锁屏文章', date: '2025-02-01', tags: [], protected: true, enc: enc, content: '' },
+    { id: 'legacy-1', title: '历史保护', date: '2025-02-02', tags: [], protected: true, content: '这是历史受保护正文' }
+  ];
+  const locked = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/posts/locked-1/');
+  assert.ok(locked.html.includes('id="postLock"'), '渲染锁屏容器');
+  assert.ok(locked.html.includes('id="postArticle"'), '隐藏正文容器存在');
+  assert.ok(locked.html.includes('id="postLockPwd"') && locked.html.includes('id="postUnlockBtn"'), '密码输入框 + 解锁按钮');
+  assert.ok(!locked.html.includes('这是加密正文'), '锁屏时不泄漏明文');
+  const legacy = await boot({ 'window.BLOG_CONFIG': { mode: 'static' }, 'window.BLOG_POSTS': posts }, '/posts/legacy-1/');
+  assert.ok(!legacy.html.includes('id="postLock"'), 'protected 无 enc 不锁屏');
+  assert.ok(legacy.html.includes('这是历史受保护正文'), '历史受保护正文正常渲染');
+}]);
+
+/* 云端：列表摘要删掉 enc → 详情补回 enc → 渲染锁屏；回归“不得无限重渲染” */
+tests.push(['云端加密文章：详情补回 enc 后渲染锁屏（回归）', async () => {
+  const d0 = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  const enc = await d0.win.pfEncrypt('云端密文正文', 'cloud-pass');
+  let detailHits = 0;
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (/\/api\/posts\/lock-cloud\/?$/.test(u.split('?')[0])) {
+      detailHits++;
+      return { ok: true, status: 200, json: async () => ({ ok: true, post: { id: 'lock-cloud', title: '云端锁屏', date: '2025-03-01', tags: [], protected: true, content: '', enc: enc } }) };
+    }
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [{ id: 'lock-cloud', title: '云端锁屏', date: '2025-03-01', tags: [], protected: true }] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/posts/lock-cloud/');
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  assert.ok(html.includes('id="postLock"'), '云端锁屏渲染（详情补回 enc）');
+  assert.ok(html.includes('id="postLockPwd"'), '密码输入框存在');
+  assert.ok(!html.includes('云端密文正文'), '锁屏不泄漏明文');
+  assert.ok(detailHits > 0 && detailHits <= 4, '详情拉取次数有限，未陷入无限重渲染（' + detailHits + ' 次）');
+  const src = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  assert.ok(src.includes('post.enc = full.enc'), '详情返回后补回 enc');
+}]);
+
+/* 后台编辑器：加密开关接入（保存时加密正文、写 protected/enc） */
+tests.push(['编辑器：文章加密开关已接入（enc / content / protected）', async () => {
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('id="abProtected"'), '加密开关复选框');
+  assert.ok(src.includes('id="abProtectPwd"'), '密码输入框');
+  assert.ok(src.includes('id="abProtectUnlock"'), '解锁正文按钮');
+  assert.ok(src.includes('await window.pfEncrypt(body, protectPwd)'), '保存时加密正文');
+  assert.ok(src.includes('content: contentToSave'), '密文文章明文 content 置空');
+  assert.ok(src.includes('protected: protectOn, enc: encData'), '写入 protected / enc 字段');
+  assert.ok(src.includes('admin.editor.protect'), '使用 i18n 文案');
+}]);
+
+/* i18n：五个语言包键数一致，且都含加密相关文案 */
+tests.push(['i18n：五个语言包键数一致且含加密文案', async () => {
+  const langs = ['zh-CN', 'en', 'ja', 'ko', 'hi'];
+  const maps = langs.map((l) => JSON.parse(fs.readFileSync(path.join(PUB, 'locales', l + '.json'), 'utf8')));
+  const counts = maps.map((m) => Object.keys(m).length);
+  assert.ok(counts.every((c) => c === counts[0]), '各语言键数一致: ' + counts.join('/'));
+  const need = ['post.lockedTitle','post.lockedDesc','post.lockedPlaceholder','post.unlock','post.unlocked','post.unlockFail','admin.editor.protect','admin.editor.protectHint','admin.editor.protectPwdPh','admin.editor.protectEncrypted','admin.editor.protectUnlock','admin.editor.protectNeedPwd','admin.editor.protectUnlocked','admin.editor.protectFail','admin.editor.protectNeedUnlock'];
+  maps.forEach((m, i) => { need.forEach((k) => assert.ok(typeof m[k] === 'string' && m[k], langs[i] + ' 缺 ' + k)); });
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

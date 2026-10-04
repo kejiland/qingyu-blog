@@ -2427,6 +2427,14 @@
         '<div class="ab-field" style="margin:0"><label class="ab-label">' + t('admin.editor.ogLabel') + '</label><input type="hidden" id="abOgImage"><div class="ab-row" style="align-items:center;gap:10px;flex-wrap:wrap"><button class="ab-btn sm" id="abOgGenerate">' + icon('image', 13) + ' ' + t('admin.editor.ogGenerate') + '</button><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer"><input type="checkbox" id="abOgAuto" checked> ' + t('admin.editor.ogAuto') + '</label></div><div id="abOgPreview" style="margin-top:8px"></div><label class="ab-hint">' + t('admin.editor.ogHint') + '</label></div>' +
         '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:0">' +
           '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="abPinned"> ' + icon('pin', 14) + ' ' + t('admin.editor.pin') + '</label>' +
+          '<label style="display:flex;align-items:center;gap:6px;font-size:14px;cursor:pointer"><input type="checkbox" id="abProtected"> ' + icon('lock', 14) + ' ' + t('admin.editor.protect') + '</label>' +
+        '</div>' +
+        '<div class="ab-field" style="margin:0">' +
+          '<div class="ab-row" id="abProtectRow" style="display:none;align-items:center;gap:8px;flex-wrap:wrap">' +
+            '<input class="ab-input" id="abProtectPwd" type="password" autocomplete="new-password" maxlength="64" placeholder="' + t('admin.editor.protectPwdPh') + '" style="max-width:280px">' +
+            '<button type="button" class="ab-btn sm" id="abProtectUnlock" style="display:none">' + icon('lock', 13) + ' ' + t('admin.editor.protectUnlock') + '</button>' +
+          '</div>' +
+          '<label class="ab-hint" id="abProtectHint">' + t('admin.editor.protectHint') + '</label>' +
         '</div>' +
       '</div>' +
       '<div id="abAiAssist" class="ab-ai-slot"></div>' +
@@ -2516,6 +2524,26 @@
     if (scheduleBtn) scheduleBtn.addEventListener('click', function () { saveEditor(content, route, 'scheduled'); });
     var historyBtn = content.querySelector('#abHistory');
     if (historyBtn) historyBtn.addEventListener('click', function () { openRevisionHistory(content, route); });
+    // 文章加密：切换密码输入行 + 用原密码解锁正文以便编辑
+    var protBox = content.querySelector('#abProtected');
+    var protRow = content.querySelector('#abProtectRow');
+    if (protBox && protRow) protBox.addEventListener('change', function () { protRow.style.display = protBox.checked ? 'flex' : 'none'; });
+    var protUnlock = content.querySelector('#abProtectUnlock');
+    if (protUnlock) protUnlock.addEventListener('click', function () {
+      var pwdEl = content.querySelector('#abProtectPwd');
+      var pwd = pwdEl ? String(pwdEl.value) : '';
+      var post = content.__editingPost;
+      if (!post || !post.enc) return;
+      if (!pwd) { toast(t('admin.editor.protectNeedPwd'), 'err'); return; }
+      protUnlock.disabled = true;
+      window.pfDecrypt(post.enc, pwd).then(function (plain) {
+        var area2 = content.querySelector('#abBody');
+        area2.value = plain || '';
+        content.__unlockedPlain = plain || '';
+        updatePreview(content); updateEditorStats(content);
+        toast(t('admin.editor.protectUnlocked'), 'ok');
+      }).catch(function () { toast(t('post.unlockFail'), 'err'); }).finally(function () { protUnlock.disabled = false; });
+    });
     var ogBtn = content.querySelector('#abOgGenerate');
     if (ogBtn) ogBtn.addEventListener('click', function () {
       var title = content.querySelector('#abTitle').value.trim();
@@ -2642,6 +2670,18 @@
     if (scheduleInput && p.publishAt) scheduleInput.value = toDateTimeLocal(p.publishAt);
     content.querySelector('#abBody').value = p.content || '';
     content.querySelector('#abPinned').checked = !!p.pinned;
+    var protBox = content.querySelector('#abProtected');
+    var protRow = content.querySelector('#abProtectRow');
+    var protUnlock = content.querySelector('#abProtectUnlock');
+    var protHint = content.querySelector('#abProtectHint');
+    if (p.enc) {
+      if (protBox) protBox.checked = true;
+      if (protRow) protRow.style.display = 'flex';
+      if (protUnlock) protUnlock.style.display = '';
+      if (protHint) protHint.textContent = t('admin.editor.protectEncrypted');
+    } else if (protHint) {
+      protHint.textContent = t('admin.editor.protectHint');
+    }
     var catEl2 = content.querySelector('#abCategory');
     if (catEl2) catEl2.value = p.category || '';
     updatePreview(content);
@@ -2657,6 +2697,21 @@
     var categoryValue = catInput ? catInput.value.trim() : '';
 
     var wantPinned = !!content.querySelector('#abPinned').checked;
+    // 文章加密：勾选后把正文加密存入 enc，明文 content 置空
+    var protectBox = content.querySelector('#abProtected');
+    var protectOn = !!(protectBox && protectBox.checked);
+    var protectPwdEl = content.querySelector('#abProtectPwd');
+    var protectPwd = protectPwdEl ? String(protectPwdEl.value) : '';
+    var hadEnc = !!(content.__editingPost && content.__editingPost.enc);
+    var encData = null;
+    var contentToSave = body;
+    if (protectOn) {
+      if (!protectPwd) { toast(t('admin.editor.protectNeedPwd'), 'err'); return; }
+      if (hadEnc && !content.__unlockedPlain && !body) { toast(t('admin.editor.protectNeedUnlock'), 'err'); return; }
+      try { encData = await window.pfEncrypt(body, protectPwd); }
+      catch (e) { toast(t('admin.editor.protectFail'), 'err'); return; }
+      contentToSave = '';
+    }
     var dateInput = content.querySelector('#abDate');
     var rawDate = dateInput ? String(dateInput.value || '').trim().replace('T', ' ') : '';
     var dateValue = rawDate || ((content.__editingPost && content.__editingPost.date) ? String(content.__editingPost.date) : normalizeEditorDate(''));
@@ -2686,7 +2741,8 @@
       ogImage: ogImage,
       seriesOrder: Math.max(0, Math.floor(Number(content.querySelector('#abSeriesOrder').value) || 0)),
       excerpt: (body.replace(/[#>*`\-!\[\]()]/g, '').slice(0, 120).trim()),
-      content: body, cover: content.querySelector('#abCover').value.trim(),
+      content: contentToSave, cover: content.querySelector('#abCover').value.trim(),
+      protected: protectOn, enc: encData,
       pinned: wantPinned, tags: tags, category: categoryValue,
       status: status
     });
