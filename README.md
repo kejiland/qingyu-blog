@@ -144,24 +144,80 @@ npx wrangler kv namespace create BLOG
 | `BLOG_ADMIN_SETUP_KEY` | 安装密钥。配置后只有拿着这串密钥的人才能初始化管理员密码（**防抢注，强烈建议**）；未配置则退化为"首次登录自动生成随机默认密码"，存在先到先得竞态 |
 | `SITE_URL` | 站点对外域名，如 `https://blog.example.com`（用于收紧 CORS / RSS / Sitemap，**末尾不要加 `/`**） |
 
-**可选：**
+**可选（按功能分组）：**
+
+*📧 邮件订阅与通知（Resend，三项齐全才启用）*
+
+| Secret | 说明 |
+| --- | --- |
+| `RESEND_API_KEY` | Resend API Key |
+| `BLOG_MAIL_FROM` | 发件人地址（域名需在 Resend 验证），如 `blog@yourdomain.com` |
+| `BLOG_MAIL_REPLY_TO` | 可选：回信地址 |
+| `BLOG_ADMIN_EMAIL` | 可选：新评论通知收件邮箱；不填回退到「个人资料 → 邮箱」 |
+
+*🔐 文章加密与预览链接*
+
+| Secret | 说明 |
+| --- | --- |
+| `BLOG_PREVIEW_SECRET` | 草稿预览分享链接的 **HMAC 签名密钥**。不填则由管理员密码哈希派生 —— **改密码会让所有已发出的预览链接立即失效** |
+
+*💬 评论*
+
+| Secret | 说明 |
+| --- | --- |
+| `COMMENT_BLOCKLIST` | 评论敏感词（换行 / 逗号分隔），**优先级高于后台词库** |
+| `BLOG_RATE_LIMIT_BINDING` | 启用 Worker 内的边缘登录限流（值为正整数命名空间，如 `1001`）；会让部署改用 wrangler 4.x。账户不支持时删掉即可 |
+
+*🤖 AI（Workers AI）*
+
+| Secret | 说明 |
+| --- | --- |
+| `BLOG_AI_ENABLED` | 设为 `0` / `false` / `off` 可**整体关闭 AI**；不填 = 有绑定就开启 |
+| `BLOG_AI_PUBLIC` | 设为 `0` / `false` / `off` 可**禁止匿名访客生成摘要**（登录后仍可用，只读缓存与 ping 不受影响） |
+
+*🗂️ R2 对象存储（音乐 / 媒体 / 备份）*
+
+| Secret | 说明 |
+| --- | --- |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3 兼容凭据（音乐、媒体、备份**共用同一对**） |
+| `R2_BUCKET` / `R2_PUBLIC_BASE` | **音乐桶**：桶名 + 公开域名（**不能为空**，否则整组 R2 配置不写入） |
+| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **媒体桶**：桶名 + 公开域名 |
+| `R2_BACKUP_BUCKET` | **私有备份桶**：保存自动 / 手动备份 JSON，**建议不要绑定公开域名**；不填则备份与恢复功能停用 |
+
+*⚙️ 其他*
 
 | Secret | 说明 |
 | --- | --- |
 | `CF_ZONE_ID` | 自定义域名的 Zone ID；配合 Token 的 Cache Purge 权限 → 发布即清边缘缓存（运行时变量 `CF_API_TOKEN` 由工作流自动写入） |
-| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3 兼容凭据（音乐与媒体**共用**同一对） |
-| `R2_BUCKET` / `R2_PUBLIC_BASE` | **音乐专用桶**：桶名 + 公开域名（**不能为空**，否则整组 R2 配置不写入） |
-| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **媒体专用桶**：桶名 + 公开域名 |
-| `R2_BACKUP_BUCKET` | **私有备份桶**：保存自动/手动备份 JSON，建议不要绑定公开域名；未配置时备份功能自动停用 |
-| `RESEND_API_KEY` / `BLOG_MAIL_FROM` | Resend 邮件订阅与通知；两者加 `SITE_URL` 齐全时启用 |
-| `BLOG_MAIL_REPLY_TO` | 可选回复邮箱 |
 | `PAGES_PROJECT_NAME` | 名字有误导性：实际作用是覆盖 **Worker 名称**。不填则用 `wrangler.workers.toml` 里的 `kejiland`。新手建议不填 |
-| `BLOG_RATE_LIMIT_BINDING` | 启用 Worker 内的边缘登录限流（值为正整数命名空间，如 `1001`）；会让部署改用 wrangler 4.x。账户不支持时删掉即可 |
-| `BLOG_ADMIN_EMAIL` | 可选：新评论通知收件邮箱；不填回退到「个人资料 → 邮箱」 |
-| `COMMENT_BLOCKLIST` | 可选：评论敏感词（换行 / 逗号分隔），优先级高于后台词库 |
-| `BLOG_PREVIEW_SECRET` | 可选：草稿预览链接签名密钥；不填则由管理员密码哈希派生（改密码即让链接全部失效） |
-| `BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` | 可选：设为 `0` / `false` / `off` 关闭 AI / 禁止匿名生成摘要 |
 | `BLOG_WRITE_TOKEN` | 旧式写入令牌，新部署不需要 |
+
+**运行时环境变量总表**（代码实际读取的全部变量；标 *自动* 的由上面的 GitHub Secret 自动写入 Worker）：
+
+| 变量 | 类型 | 未配置时的行为 |
+| --- | --- | --- |
+| `DB` | D1 绑定 | 所有接口返回「数据库未配置」 |
+| `ASSETS` | 静态资源绑定 | 静态页面 404（Workers 部署自动注入） |
+| `BLOG` | KV 绑定 | 评论 / 点赞 / 浏览的限流与去重失效（功能仍可用） |
+| `SITE_URL` | 变量 | **跨域请求一律被拒**；RSS / Sitemap 改用请求来源 |
+| `CF_ZONE_ID` + `CF_API_TOKEN` | 变量 + Secret（*自动*） | 不做边缘缓存清除（新内容延迟 1~5 分钟生效） |
+| `BLOG_ADMIN_SETUP_KEY` | Secret | 首次登录自动生成随机默认密码（有先到先得竞态）；仍是登录限流的应急通道 |
+| `BLOG_WRITE_TOKEN` | Secret | 只能走会话登录 |
+| `BLOG_RATE_LIMIT_BINDING` → `LOGIN_LIMITER` | Secret → 绑定 | 不注入边缘限流，登录限流回退到 D1 计数 |
+| `AI` | Workers AI 绑定 | `/api/ai/*` 全部 404，前端自动隐藏 AI 入口 |
+| `BLOG_AI_ENABLED` | Secret / 变量 | 有 `AI` + `DB` 时即视为开启 |
+| `BLOG_AI_PUBLIC` | Secret / 变量 | 允许匿名生成 AI 摘要 |
+| `RESEND_API_KEY` / `BLOG_MAIL_FROM` / `SITE_URL` | Secret（*自动*） | 邮件订阅、新文章通知、评论通知、订阅者群发全部停用 |
+| `BLOG_MAIL_REPLY_TO` | Secret（*自动*） | 不影响发送，仅无 reply-to |
+| `BLOG_ADMIN_EMAIL` | Secret（*自动*） | 评论通知回退到「个人资料 → 邮箱」 |
+| `COMMENT_BLOCKLIST` | Secret（*自动*） | 只使用后台维护的词库 |
+| `BLOG_PREVIEW_SECRET` | Secret（*自动*） | 预览链接密钥由管理员密码哈希派生（改密码即失效） |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | Secret（*自动*） | 图片 / 音乐上传与备份接口返回 503 |
+| `R2_BUCKET` / `R2_PUBLIC_BASE` | Secret（*自动*） | 音乐上传不可用（不影响图片） |
+| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | Secret（*自动*） | 图片上传不可用（不影响音乐） |
+| `R2_BACKUP_BUCKET` | Secret（*自动*） | 备份与恢复停用（后台备份页显示未配置） |
+
+> ⚠️ 添加或修改 Secret 后**一定要重新跑一次部署**（Deploy 工作流），新值才会写入 Worker。可选 Secret **留空不影响部署**——工作流只写入非空的那些。
 
 推送代码或手动运行 Actions，工作流会自动：
 

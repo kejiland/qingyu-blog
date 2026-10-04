@@ -158,24 +158,80 @@ Add these under **Settings → Secrets and variables → Actions → Secrets** i
 | `BLOG_ADMIN_SETUP_KEY` | Setup key. When set, only someone holding this key can initialize the admin password (**prevents someone else claiming your instance**). When unset, the first login auto-generates a random default password (first-come-first-served race). |
 | `SITE_URL` | Public site URL, e.g. `https://blog.example.com` (tightens CORS / RSS / Sitemap; **no trailing slash**) |
 
-**Optional:**
+**Optional (grouped by feature):**
+
+*📧 Email subscription & notifications (Resend — all three required to enable)*
 
 | Secret | Description |
 | --- | --- |
-| `CF_ZONE_ID` | Zone ID of your custom domain; combined with the *Cache Purge* permission it purges the edge cache on publish (the runtime `CF_API_TOKEN` is written by the workflow) |
-| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3-compatible credentials (audio and images **share** one pair) |
-| `R2_BUCKET` / `R2_PUBLIC_BASE` | **Music bucket**: bucket name + public domain (**must not be empty**, otherwise no R2 config is written at all) |
-| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **Media bucket**: bucket name + public domain |
-| `R2_BACKUP_BUCKET` | **Private backup bucket** for automatic/manual JSON backups; do not attach a public domain. Backup is disabled when unset |
-| `RESEND_API_KEY` / `BLOG_MAIL_FROM` | Email subscription and notifications via Resend; enabled when both plus `SITE_URL` are set |
-| `BLOG_MAIL_REPLY_TO` | Optional reply-to email |
-| `PAGES_PROJECT_NAME` | Misleading name: it actually overrides the **Worker name** (`--name`). Leave empty to keep `kejiland` from `wrangler.workers.toml`. Beginners should not set it. |
+| `RESEND_API_KEY` | Resend API key |
+| `BLOG_MAIL_FROM` | Sender address (domain must be verified in Resend), e.g. `blog@yourdomain.com` |
+| `BLOG_MAIL_REPLY_TO` | Optional reply-to address |
+| `BLOG_ADMIN_EMAIL` | Optional: recipient of new-comment notifications; falls back to Profile → email |
+
+*🔐 Post encryption & preview links*
+
+| Secret | Description |
+| --- | --- |
+| `BLOG_PREVIEW_SECRET` | **HMAC signing key** for draft preview links. Unset = derived from the admin password hash, so **changing the password invalidates every issued link** |
+
+*💬 Comments*
+
+| Secret | Description |
+| --- | --- |
+| `COMMENT_BLOCKLIST` | Comment blocklist words (newlines / commas); **takes precedence over the admin list** |
 | `BLOG_RATE_LIMIT_BINDING` | Enables in-Worker edge rate limiting for login (a positive integer namespace, e.g. `1001`); switches deploys to wrangler 4.x. Remove it if your account does not support the binding |
-| `BLOG_ADMIN_EMAIL` | Optional: recipient for new-comment notifications; falls back to Profile → email |
-| `COMMENT_BLOCKLIST` | Optional comment blocklist (newlines / commas); takes precedence over the admin list |
-| `BLOG_PREVIEW_SECRET` | Optional signing key for draft preview links; unset = derived from the admin password hash (changing the password invalidates every link) |
-| `BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` | Optional: set to `0` / `false` / `off` to switch AI off / forbid anonymous generation |
+
+*🤖 AI (Workers AI)*
+
+| Secret | Description |
+| --- | --- |
+| `BLOG_AI_ENABLED` | Set to `0` / `false` / `off` to **switch AI off entirely**; unset = on whenever the binding exists |
+| `BLOG_AI_PUBLIC` | Set to `0` / `false` / `off` to **forbid anonymous summary generation** (still works after logging in; cached reads and ping are unaffected) |
+
+*🗂️ R2 object storage (music / media / backups)*
+
+| Secret | Description |
+| --- | --- |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | R2 S3-compatible credentials (music, media and backups **share one pair**) |
+| `R2_BUCKET` / `R2_PUBLIC_BASE` | **Music bucket**: name + public domain (**must not be empty**, otherwise no R2 config is written) |
+| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | **Media bucket**: name + public domain |
+| `R2_BACKUP_BUCKET` | **Private backup bucket** for automatic/manual JSON backups — **do not attach a public domain**. Backup & restore are disabled when unset |
+
+*⚙️ Other*
+
+| Secret | Description |
+| --- | --- |
+| `CF_ZONE_ID` | Zone ID of your custom domain; with the *Cache Purge* permission it purges the edge cache on publish (the runtime `CF_API_TOKEN` is written by the workflow) |
+| `PAGES_PROJECT_NAME` | Misleading name: it actually overrides the **Worker name**. Leave empty to keep `kejiland`. Beginners should not set it |
 | `BLOG_WRITE_TOKEN` | Legacy write token, not needed for new deployments |
+
+**Full table of runtime environment variables** (everything the code reads; entries marked *auto* are written to the Worker from the GitHub Secrets above):
+
+| Variable | Type | Behaviour when unset |
+| --- | --- | --- |
+| `DB` | D1 binding | Every endpoint returns "database not configured" |
+| `ASSETS` | Static asset binding | Static pages 404 (Workers injects this automatically) |
+| `BLOG` | KV binding | Comment / like / view rate limiting and dedup stop working (features still function) |
+| `SITE_URL` | Variable | **Cross-origin requests are always rejected**; RSS / Sitemap fall back to the request origin |
+| `CF_ZONE_ID` + `CF_API_TOKEN` | Variable + Secret (*auto*) | No edge cache purging (new content takes 1-5 minutes to appear) |
+| `BLOG_ADMIN_SETUP_KEY` | Secret | First login auto-generates a random default password (first-come-first-served race); still the break-glass path for login throttling |
+| `BLOG_WRITE_TOKEN` | Secret | Session login only |
+| `BLOG_RATE_LIMIT_BINDING` → `LOGIN_LIMITER` | Secret → binding | No edge limiter; login throttling falls back to D1 counters |
+| `AI` | Workers AI binding | Every `/api/ai/*` returns 404 and the front end hides all AI entries |
+| `BLOG_AI_ENABLED` | Secret / variable | Treated as enabled whenever `AI` + `DB` exist |
+| `BLOG_AI_PUBLIC` | Secret / variable | Anonymous summary generation is allowed |
+| `RESEND_API_KEY` / `BLOG_MAIL_FROM` / `SITE_URL` | Secret (*auto*) | Email subscription, post notices, comment notices and broadcasts are all disabled |
+| `BLOG_MAIL_REPLY_TO` | Secret (*auto*) | Sending still works, just without reply-to |
+| `BLOG_ADMIN_EMAIL` | Secret (*auto*) | Comment notices fall back to Profile → email |
+| `COMMENT_BLOCKLIST` | Secret (*auto*) | Only the admin-maintained list is used |
+| `BLOG_PREVIEW_SECRET` | Secret (*auto*) | Preview links are signed with a key derived from the admin password hash (invalidated by a password change) |
+| `R2_ACCESS_KEY_ID` / `R2_SECRET_ACCESS_KEY` / `R2_ENDPOINT` | Secret (*auto*) | Image / music upload and backup endpoints return 503 |
+| `R2_BUCKET` / `R2_PUBLIC_BASE` | Secret (*auto*) | Music upload unavailable (images unaffected) |
+| `R2_MEDIA_BUCKET` / `R2_MEDIA_PUBLIC_BASE` | Secret (*auto*) | Image upload unavailable (music unaffected) |
+| `R2_BACKUP_BUCKET` | Secret (*auto*) | Backup & restore disabled (the admin page shows "not configured") |
+
+> ⚠️ After adding or changing a Secret you **must re-run the deploy** (Deploy workflow) so the new value reaches the Worker. Optional Secrets **can be left blank** — the workflow only writes the non-empty ones.
 
 Push to `main` (or run the workflow manually) and GitHub Actions will:
 
@@ -236,7 +292,7 @@ Or trigger the `Migrate KV to D1` workflow manually from the Actions tab (`dry-r
 | **Accent colours** | **4 accents**: Terra (赭橙) / Indigo (黛蓝) / Bamboo (竹青) / Dusk (凝夜紫). Icon button with a swatch popover on desktop, native select on mobile; each accent also retints backgrounds and borders |
 | **Multilingual UI** | Chinese / English / 日本語 / 한국어 / हिन्दी (990 keys each), auto-detect + manual switch (🌐 popover with SVG flags on desktop, native select on mobile) |
 | **PWA offline reading & writing** | Installable on desktop or mobile; the shell, core assets and previously visited articles work offline. Cloud editor changes are queued locally and synced automatically when the connection returns |
-| **Background animation** | Hand-drawn canvas particles for the four seasons (spring petals / summer green leaves / autumn leaves / six-armed branched snowflakes); home page only, pauses when the tab is hidden; on by default on desktop, off on touch devices, toggleable from the top bar, respects `prefers-reduced-motion`. Preview: `/?season=spring\|summer\|autumn\|winter&bg=1` |
+| **Background animation** | Hand-drawn canvas particles for the four seasons (spring petals / summer green leaves / autumn leaves / six-armed branched snowflakes); home page only, pauses when the tab is hidden; on by default on desktop, off on touch devices, toggleable from the top bar, respects `prefers-reduced-motion`. Preview: `/?season=spring`, `/?season=summer`, `/?season=autumn` or `/?season=winter` (add `&bg=1` to force it on) |
 | **Diagrams / math** | Bodies support **Mermaid diagrams** (```mermaid fenced blocks) and **KaTeX math** (`$…$` / `$$…$$`). Both libraries are **vendored** under `public/libs/` (offline-friendly, no CDN in the CSP) and load **only when a page actually uses them** — normal pages make zero extra requests. Can be disabled globally under Feature switches. |
 | **Smoji picker** | Emoji picker in the comment box, guestbook and editor, lazily loaded, with inline rendering in content |
 | **AI post summary** | One-click summary on any post page (30-day per-post cache); the entry hides itself when AI is unavailable |
