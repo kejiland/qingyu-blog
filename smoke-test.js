@@ -602,7 +602,9 @@ function makeD1() {
         rows.sort((a, b) => (Number(b.pinned) || 0) - (Number(a.pinned) || 0)
           || (Number(b.featured) || 0) - (Number(a.featured) || 0)
           || (Number(b.likes) || 0) - (Number(a.likes) || 0)
-          || (a.__rowid || 0) - (b.__rowid || 0));
+          || (s.indexOf('rowid DESC') >= 0 ? ((b.__rowid || 0) - (a.__rowid || 0)) : ((a.__rowid || 0) - (b.__rowid || 0))));
+      } else if (s.indexOf('rowid DESC') >= 0) {
+        rows.sort((a, b) => (b.__rowid || 0) - (a.__rowid || 0));
       } else {
         rows.sort((a, b) => (a.__rowid || 0) - (b.__rowid || 0));
       }
@@ -623,6 +625,10 @@ function makeD1() {
       const [id, post_id, author, content, date, status, parent_id] = params;
       t.comments.set(id, { id, post_id, author, content, date, status, parent_id, likes: 0, featured: 0, pinned: 0, __rowid: ++seq });
       return { success: true };
+    }
+    if (s === 'SELECT id FROM comments WHERE post_id = ? AND id = ?') {
+      const r = t.comments.get(params[1]);
+      return (r && r.post_id === params[0]) ? { id: r.id } : null;
     }
     if (s === 'SELECT 1 FROM comments WHERE post_id = ? AND id = ?') {
       const r = t.comments.get(params[1]);
@@ -2205,6 +2211,25 @@ tests.push(['friend links page', async () => {
   assert.ok(html.includes('friend-grid'), 'grid rendered');
   const foot = b.ctx.renderFooter();
   assert.ok(foot.includes('/links'), 'footer entry present');
+}]);
+
+tests.push(['comment server paging and sort', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  const post = (body) => core.handleComments(new Request('http://t/api/posts/sp/comments', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }), env, 'sp');
+  const ids = [];
+  for (let i = 0; i < 12; i++) { const r = await post({ author: 'u' + i, content: 'c' + i }); ids.push((await r.json()).comment.id); }
+  await post({ author: 'r', content: 'reply', parent_id: ids[0] });
+  let r = await core.handleComments(new Request('http://t/api/posts/sp/comments?page=1&per=5'), env, 'sp');
+  let d = await r.json();
+  assert.strictEqual(d.total, 13, 'total includes reply');
+  assert.strictEqual(d.rootTotal, 12, 'root total');
+  assert.strictEqual(d.pages, 3, 'three pages');
+  assert.ok(d.comments.length >= 5, 'first page has 5 roots');
+  r = await core.handleComments(new Request('http://t/api/posts/sp/comments?sort=new&page=1&per=5'), env, 'sp');
+  d = await r.json();
+  assert.strictEqual(d.sort, 'new', 'sort flag');
+  assert.strictEqual(d.comments[0].author, 'u11', 'newest first');
 }]);
 
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {

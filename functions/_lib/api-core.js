@@ -527,12 +527,27 @@ export async function handleComments(request, env, postId) {
   const method = request.method.toUpperCase();
 
   if (method === 'GET') {
-    // 按写入顺序返回（rowid 单调递增），与旧版 KV 行为一致；
-    // 仅返回已通过审核的评论（status 缺失视为已通过，兼容旧数据）。
-    const list = await dbAll(env.DB, "SELECT *, rowid AS rid FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY COALESCE(pinned,0) DESC, COALESCE(featured,0) DESC, COALESCE(likes,0) DESC, rowid ASC", postId);
-    // 评论是用户实时互动内容、变化频繁，不进边缘缓存（no-store），
-    // 保证发表/删除后立即可见；否则命中 60s 缓存会导致删除"不刷新"。
-    return json({ ok: true, postId, comments: list }, 200, request, env, { 'Cache-Control': NO_CACHE });
+    const url = new URL(request.url);
+    const sortNew = url.searchParams.get('sort') === 'new';
+    const pageNum = Math.max(1, Math.floor(Number(url.searchParams.get('page')) || 0));
+    const perNum = Math.min(100, Math.floor(Number(url.searchParams.get('per')) || 0));
+    const paged = pageNum > 0 && perNum > 0;
+    const orderBy = sortNew
+      ? 'COALESCE(pinned,0) DESC, rowid DESC'
+      : 'COALESCE(pinned,0) DESC, COALESCE(featured,0) DESC, COALESCE(likes,0) DESC, rowid ASC';
+    const list = await dbAll(env.DB, "SELECT *, rowid AS rid FROM comments WHERE post_id = ? AND (status = 'approved' OR status IS NULL) ORDER BY " + orderBy, postId);
+    if (!paged) return json({ ok: true, postId, comments: list }, 200, request, env, { 'Cache-Control': NO_CACHE });
+    const byId = {}; const children = {};
+    list.forEach(function (c) { byId[c.id] = c; children[c.id] = []; });
+    const roots = [];
+    list.forEach(function (c) { if (c.parent_id && byId[c.parent_id]) children[c.parent_id].push(c); else roots.push(c); });
+    const rootTotal = roots.length;
+    const pages = Math.max(1, Math.ceil(rootTotal / perNum));
+    const start = (pageNum - 1) * perNum;
+    const out = [];
+    function walk(c) { out.push(c); (children[c.id] || []).forEach(walk); }
+    roots.slice(start, start + perNum).forEach(walk);
+    return json({ ok: true, postId, comments: out, total: list.length, rootTotal: rootTotal, page: pageNum, per: perNum, pages: pages, sort: sortNew ? 'new' : 'hot' }, 200, request, env, { 'Cache-Control': NO_CACHE });
   }
 
   if (method === 'POST') {

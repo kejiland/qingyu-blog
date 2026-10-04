@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.36';
+var BLOG_VERSION = '2.10.37';
 
 /* ---------- 全局缓存 ---------- */
 var _searchOpen = false;   // 顶部导航搜索是否展开
@@ -3111,7 +3111,7 @@ async function renderPost(id) {
 
   // load comments（顶层 + 嵌套回复统一渲染；支持「最热 / 最新」排序与分页）
   var CMT_PAGE = 8;
-  var _cmtState = { sort: 'hot', shown: CMT_PAGE, list: [] };
+  var _cmtState = { sort: 'hot', shown: CMT_PAGE, list: [], serverPaged: false, serverPage: 0, serverPages: 1 };
   function refreshComments(list) {
     _cmtState.list = Array.isArray(list) ? list : [];
     _cmtState.shown = CMT_PAGE;
@@ -3131,8 +3131,10 @@ async function renderPost(id) {
     }
     var canDel = !_cloudOn() || adminOk();
     var sorter = _cmtState.sort === 'new' ? commentSortNew : commentSort;
-    ul.innerHTML = renderCommentTree(list, canDel, { sorter: sorter, limit: _cmtState.shown });
-    if (moreWrap) moreWrap.style.display = commentRootCount(list) > _cmtState.shown ? 'block' : 'none';
+    var paged = _cmtState.serverPaged;
+    ul.innerHTML = renderCommentTree(list, canDel, { sorter: sorter, limit: paged ? 0 : _cmtState.shown });
+    var hasMore = paged ? (_cmtState.serverPage < _cmtState.serverPages) : (commentRootCount(list) > _cmtState.shown);
+    if (moreWrap) moreWrap.style.display = hasMore ? 'block' : 'none';
     bindCommentActions(ul);
   }
   function bindCommentActions(ul) {
@@ -3194,6 +3196,17 @@ async function renderPost(id) {
         if (v === _cmtState.sort) return;
         _cmtState.sort = v;
         _cmtState.shown = CMT_PAGE;
+        if (_cmtState.serverPaged) {
+          _cmtState.list = [];
+          _cmtState.serverPage = 0;
+          cloudCommentPage(1, v).then(function (res) {
+            _cmtState.serverPage = 1;
+            _cmtState.serverPages = Number(res && res.pages) || 1;
+            refreshComments((res && res.comments) || []);
+          });
+          renderCommentView();
+          return;
+        }
         sortWrap.querySelectorAll('[data-sort]').forEach(function (x) {
           var on = x === b;
           x.classList.toggle('active', on);
@@ -3204,11 +3217,42 @@ async function renderPost(id) {
     });
   }
   var moreBtn = document.querySelector('#commentMoreBtn');
-  if (moreBtn) moreBtn.addEventListener('click', function () {
+  if (moreBtn) moreBtn.addEventListener('click', async function () {
+    if (_cmtState.serverPaged) {
+      moreBtn.disabled = true;
+      try {
+        var next = _cmtState.serverPage + 1;
+        var res = await cloudCommentPage(next, _cmtState.sort);
+        var have = {};
+        _cmtState.list.forEach(function (c) { have[c.id] = 1; });
+        ((res && res.comments) || []).forEach(function (c) { if (!have[c.id]) _cmtState.list.push(c); });
+        _cmtState.serverPage = next;
+        _cmtState.serverPages = Number(res && res.pages) || _cmtState.serverPages;
+      } catch (e) { toast(t('comment.likeFail'), 'err'); }
+      moreBtn.disabled = false;
+      renderCommentView();
+      return;
+    }
     _cmtState.shown += CMT_PAGE;
     renderCommentView();
   });
-  loadComments(post.id).then(refreshComments);
+  function cloudCommentPage(page, sort) {
+    var qs = '?page=' + page + '&per=' + CMT_PAGE + '&sort=' + encodeURIComponent(sort || 'hot') + '&_=' + Date.now();
+    return apiFetch('api/posts/' + encodeURIComponent(post.id) + '/comments' + qs);
+  }
+  (function loadInitialComments() {
+    if (_cloudOn()) {
+      cloudCommentPage(1, _cmtState.sort).then(function (res) {
+        _cmtState.serverPaged = true;
+        _cmtState.serverPage = 1;
+        _cmtState.serverPages = Number(res && res.pages) || 1;
+        refreshComments((res && res.comments) || []);
+      }).catch(function () { _cmtState.serverPaged = false; loadComments(post.id).then(refreshComments); });
+      return;
+    }
+    _cmtState.serverPaged = false;
+    loadComments(post.id).then(refreshComments);
+  })();
 
   // 取消回复
   var replyCancel = document.querySelector('#replyCancel');
