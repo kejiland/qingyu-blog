@@ -2245,6 +2245,19 @@ tests.push(['stats sources api', async () => {
   assert.ok(Array.isArray(d.referrers) && Array.isArray(d.devices), 'arrays');
 }]);
 
+tests.push(['health check api', async () => {
+  const core = await import('./functions/_lib/api-core.js');
+  const env = mockEnv();
+  env.BLOG_WRITE_TOKEN = 'tok-hc';
+  let r = await core.handleHealth(new Request('http://t/api/admin/health', {}), env);
+  assert.strictEqual(r.status, 401, 'auth required');
+  r = await core.handleHealth(new Request('http://t/api/admin/health', { headers: { Authorization: 'Bearer tok-hc' } }), env);
+  assert.strictEqual(r.status, 200, 'ok');
+  const d = await r.json();
+  const keys = (d.items || []).map(function (x) { return x.key; });
+  ['db','kv','r2media','r2backup','ai','mail'].forEach(function (k) { assert.ok(keys.indexOf(k) >= 0, 'has ' + k); });
+}]);
+
 tests.push(['加密：服务端 PBKDF2 哈希往返验证', async () => {
 tests.push(['标签：批量重命名 / 删除接口', async () => {
   const core = await import('./functions/_lib/api-core.js');

@@ -1790,3 +1790,38 @@ export async function handleStatsSources(request, env) {
   });
   return json({ ok: true, days: days, since: since, referrers: refs.slice(0, 10), devices: devices, refTotal: refTotal, devTotal: devTotal }, 200, request, env, { 'Cache-Control': NO_CACHE });
 }
+
+/** GET /api/admin/health（需登录）：站点绑定与数据健康检查 */
+export async function handleHealth(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
+  const items = [];
+  let dbOk = false;
+  const counts = {};
+  try {
+    await dbFirst(env.DB, 'SELECT 1 AS ok');
+    dbOk = true;
+    const tables = ['posts','comments','media','music','subscribers','backups','audit_log'];
+    for (const t of tables) {
+      const r = await dbFirst(env.DB, 'SELECT COUNT(*) AS c FROM ' + t).catch(() => null);
+      counts[t] = r ? Number(r.c) : null;
+    }
+  } catch (e) {}
+  items.push({ key: 'db', ok: dbOk, counts: counts });
+  let kvOk = false;
+  if (env.BLOG) {
+    try {
+      const probe = 'health:' + Date.now();
+      await env.BLOG.put(probe, '1', { expirationTtl: 60 });
+      kvOk = (await env.BLOG.get(probe)) !== null;
+    } catch (e) {}
+  }
+  items.push({ key: 'kv', ok: kvOk, bound: !!env.BLOG });
+  const r2Creds = !!(env.R2_ACCESS_KEY_ID && env.R2_SECRET_ACCESS_KEY && env.R2_ENDPOINT);
+  items.push({ key: 'r2media', ok: r2Creds && !!env.R2_MEDIA_BUCKET, bound: !!env.R2_MEDIA_BUCKET });
+  items.push({ key: 'r2backup', ok: r2Creds && !!env.R2_BACKUP_BUCKET, bound: !!env.R2_BACKUP_BUCKET });
+  items.push({ key: 'ai', ok: !!env.AI, bound: !!env.AI });
+  items.push({ key: 'mail', ok: !!(env.RESEND_API_KEY && env.BLOG_MAIL_FROM && env.SITE_URL), bound: !!env.RESEND_API_KEY });
+  return json({ ok: true, items: items, checkedAt: Date.now() }, 200, request, env, { 'Cache-Control': NO_CACHE });
+}

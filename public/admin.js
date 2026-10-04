@@ -674,6 +674,7 @@
         { key: 'music', label: t('admin.sidebar.musicManage'), icon: 'music', href: '/admin/music' },
         { key: 'subscribers', label: t('admin.sidebar.subscribers'), icon: 'send', href: '/admin/subscribers' },
         { key: 'audit', label: t('admin.sidebar.audit'), icon: 'clock', href: '/admin/audit' },
+        { key: 'health', label: t('admin.sidebar.health'), icon: 'gauge', href: '/admin/health' },
         { key: 'backup', label: t('admin.sidebar.backups'), icon: 'save', href: '/admin/backups' },
         { key: 'transfer', label: t('admin.sidebar.importExport'), icon: 'download', href: '/admin/import-export' },
         { key: 'settings', label: t('admin.sidebar.settings'), icon: 'sliders', href: '/admin/settings' }
@@ -826,6 +827,7 @@
     if (path === '/admin/music') return { key: 'music', page: 'music' };
     if (path === '/admin/subscribers') return { key: 'subscribers', page: 'subscribers' };
     if (path === '/admin/audit') return { key: 'audit', page: 'audit' };
+    if (path === '/admin/health') return { key: 'health', page: 'health' };
     if (path === '/admin/backups') return { key: 'backup', page: 'backup' };
     if (path === '/admin/import-export') return { key: 'transfer', page: 'transfer' };
     if (path === '/admin/settings') return { key: 'settings', page: 'settings' };
@@ -1029,6 +1031,7 @@
     if (route.page === 'music') return pageMusic(content);
     if (route.page === 'subscribers') return pageSubscribers(content);
     if (route.page === 'audit') return pageAudit(content);
+    if (route.page === 'health') return pageHealth(content);
     if (route.page === 'backup') return pageBackups(content);
     if (route.page === 'transfer') return pageImportExport(content);
     if (route.page === 'settings') return pageSettings(content);
@@ -3550,6 +3553,34 @@
       transferDownloadText('audit-' + transferStamp() + '.csv', '\ufeff' + csv, 'text/csv;charset=utf-8');
       toast(t('admin.audit.exported'), 'ok');
     } catch (e) { toast(t('admin.postList.opFail') + (e.message || e), 'err'); }
+  }
+
+  /* ====================== 站点健康检查 ====================== */
+  var HEALTH_LABELS = { db: 'admin.health.db', kv: 'admin.health.kv', r2media: 'admin.health.r2media', r2backup: 'admin.health.r2backup', ai: 'admin.health.ai', mail: 'admin.health.mail' };
+  async function pageHealth(content) {
+    content.innerHTML = '<div class="ab-page-head"><div><h1 class="ab-page-title">' + t('admin.health.title') + '</h1><p class="ab-page-sub">' + t('admin.health.desc') + '</p></div>' +
+      '<button class="ab-btn" id="abHealthRefresh">' + icon('refresh', 14) + ' ' + t('admin.backup.refresh') + '</button></div>' +
+      '<div class="ab-card"><div id="abHealthBody"><span class="ab-spin"></span> ' + t('site.loading') + '</div></div>';
+    content.querySelector('#abHealthRefresh').addEventListener('click', function () { loadHealth(content); });
+    loadHealth(content);
+  }
+  async function loadHealth(content) {
+    var box = content.querySelector('#abHealthBody');
+    if (!box) return;
+    box.innerHTML = '<span class="ab-spin"></span> ' + t('site.loading');
+    try {
+      var d = await api('api/admin/health');
+      var items = (d && d.items) || [];
+      box.innerHTML = items.map(function (it) {
+        var label = t(HEALTH_LABELS[it.key] || it.key);
+        var chip = it.ok ? '<span class="ab-status approved">' + t('admin.health.ok') + '</span>' : '<span class="ab-status pending">' + t('admin.health.missing') + '</span>';
+        var extra = '';
+        if (it.key === 'db' && it.counts) {
+          extra = '<div class="ab-muted" style="font-size:12px;margin-top:4px">' + Object.keys(it.counts).map(function (k) { return esc(k) + ' ' + (it.counts[k] === null ? '—' : it.counts[k]); }).join(' · ') + '</div>';
+        }
+        return '<div class="ab-row" style="justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--ab-border)"><div><b>' + esc(label) + '</b>' + extra + '</div>' + chip + '</div>';
+      }).join('');
+    } catch (e) { box.innerHTML = '<div class="ab-empty"><p>' + esc(e.message || e) + '</p></div>'; }
   }
 
   /* ====================== 博客设置 ====================== */
