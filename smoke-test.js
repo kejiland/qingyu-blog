@@ -3726,6 +3726,27 @@ tests.push(['评论表单：提交带蜜罐与时间戳字段', async () => {
   assert.strictEqual(bodies[0].hp, '', '蜜罐为空');
 }]);
 
+/* 编辑器本地草稿：读写清除 + 自动保存接线（崩溃恢复回归） */
+tests.push(['编辑器草稿：本地自动保存读写清除 + 保存后清理', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const draft = b.win.QingyuAdmin && b.win.QingyuAdmin._editor && b.win.QingyuAdmin._editor.draft;
+  assert.ok(draft && typeof draft.write === 'function' && typeof draft.read === 'function' && typeof draft.clear === 'function', '暴露草稿读写接口');
+  assert.strictEqual(draft.read('p1'), null, '初始无草稿');
+  draft.write('p1', { title: '未发布的标题', body: '正文', date: '2026-01-01T10:00' });
+  const got = draft.read('p1');
+  assert.ok(got && got.data && got.data.title === '未发布的标题', '写入后可读回');
+  assert.ok(got.savedAt > 0, '带保存时间');
+  draft.clear('p1');
+  assert.strictEqual(draft.read('p1'), null, '清除后为空');
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('function autosaveEditorDraft'), '存在自动保存函数');
+  assert.ok(src.includes('setInterval(function () { autosaveEditorDraft'), '定时自动保存已接入');
+  assert.ok(src.includes('clearEditorDraft(id)'), '保存成功后清除草稿');
+  assert.ok(src.includes('renderDraftBar'), '恢复提示条已接入');
+  assert.ok(src.includes('editorDraftEnabled'), '加密文章跳过本地草稿');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;

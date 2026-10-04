@@ -927,5 +927,11 @@
   "admin.settings.featErrReportHint": "オンにすると訪問者ブラウザの実行時エラーが匿名で「エラーログ」に送信され、不具合の早期発見に役立ちます（個人情報は含みません）",
   "admin.settings.featAntiSpam": "コメント迷惑防止",
   "admin.settings.featCommentGuard": "コメントのボット対策",
-  "admin.settings.featCommentGuardHint": "オンにすると：非表示のハニーポット欄が入力されていればボットとみなし破棄し、フォーム表示から 2 秒未満の送信は拒否します。通常の訪問者には影響ありません。"
+  "admin.settings.featCommentGuardHint": "オンにすると：非表示のハニーポット欄が入力されていればボットとみなし破棄し、フォーム表示から 2 秒未満の送信は拒否します。通常の訪問者には影響ありません。",
+  "admin.editor.draftFound": "{time} に自動保存された未公開の下書きがあります",
+  "admin.editor.draftRestore": "復元",
+  "admin.editor.draftDiscard": "破棄",
+  "admin.editor.draftRestored": "下書きを復元しました",
+  "admin.editor.draftSavedAt": "{time} に自動保存しました",
+  "admin.editor.draftDiscarded": "下書きを破棄しました"
 }

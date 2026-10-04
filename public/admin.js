@@ -1021,6 +1021,7 @@
     var content = root.querySelector('#abContent');
     if (window.destroySmojiPicker) window.destroySmojiPicker();
     if (_feedTimer) { clearInterval(_feedTimer); _feedTimer = null; } // 离开仪表盘时停止评论自动滚动
+    if (_editorDraftTimer) { clearInterval(_editorDraftTimer); _editorDraftTimer = null; } // 离开编辑器时停止草稿自动保存
     if (route.page === 'dashboard') return pageDashboard(content);
     if (route.page === 'posts') return pagePosts(content);
     if (route.page === 'analytics') return pageAnalytics(content);
@@ -2433,9 +2434,77 @@
   function rememberPostPwd(id, pwd) { try { if (id && pwd) localStorage.setItem(POST_PWD_PREFIX + id, String(pwd)); } catch (e) {} }
   function readPostPwd(id) { try { return localStorage.getItem(POST_PWD_PREFIX + id) || ''; } catch (e) { return ''; } }
   function forgetPostPwd(id) { try { if (id) localStorage.removeItem(POST_PWD_PREFIX + id); } catch (e) {} }
+  /* ---------- 编辑器本地草稿（自动保存 / 崩溃恢复） ----------
+   * 每 10 秒或输入停顿 1.5 秒自动存到 localStorage；保存成功后清除。
+   * 加密文章不落本地明文（避免把待加密正文写进浏览器存储）。 */
+  var EDITOR_DRAFT_PREFIX = 'qingyu.editorDraft.';
+  var _editorDraftTimer = null;
+  function editorDraftKey(id) { return String(id || '__new'); }
+  function readEditorDraft(id) {
+    try { var raw = localStorage.getItem(EDITOR_DRAFT_PREFIX + editorDraftKey(id)); if (!raw) return null; var d = JSON.parse(raw); return (d && d.data) ? d : null; } catch (e) { return null; }
+  }
+  function writeEditorDraft(id, data) { try { localStorage.setItem(EDITOR_DRAFT_PREFIX + editorDraftKey(id), JSON.stringify({ v: 1, savedAt: Date.now(), data: data })); } catch (e) {} }
+  function clearEditorDraft(id) { try { localStorage.removeItem(EDITOR_DRAFT_PREFIX + editorDraftKey(id)); } catch (e) {} }
+  function editorDraftEnabled(content) {
+    var prot = content.querySelector('#abProtected');
+    return !(prot && prot.checked);   // 加密文章不自动保存明文
+  }
+  function collectEditorDraft(content) {
+    return {
+      title: val(content, '#abTitle'), tags: val(content, '#abTags'), category: val(content, '#abCategory'),
+      series: val(content, '#abSeries'), seriesOrder: val(content, '#abSeriesOrder'),
+      cover: val(content, '#abCover'), date: val(content, '#abDate'),
+      pinned: !!(content.querySelector('#abPinned') || {}).checked,
+      body: val(content, '#abBody')
+    };
+  }
+  function setDraftHint(content, at) {
+    var el = content.querySelector('#abDraftHint');
+    if (!el) return;
+    el.textContent = at ? t('admin.editor.draftSavedAt', { time: fmtTimestamp(at) }) : '';
+  }
+  function autosaveEditorDraft(content, route) {
+    try {
+      if (!editorDraftEnabled(content)) { clearEditorDraft(route.id); setDraftHint(content, 0); return; }
+      var d = collectEditorDraft(content);
+      if (!d.title && !d.body) return;   // 空编辑器不产生草稿
+      writeEditorDraft(route.id, d);
+      setDraftHint(content, Date.now());
+    } catch (e) {}
+  }
+  function applyEditorDraft(content, data) {
+    var set = function (sel, v) { var el = content.querySelector(sel); if (el) el.value = v == null ? '' : v; };
+    set('#abTitle', data.title); set('#abTags', data.tags); set('#abCategory', data.category);
+    set('#abSeries', data.series); set('#abSeriesOrder', data.seriesOrder);
+    set('#abCover', data.cover); set('#abDate', data.date); set('#abBody', data.body);
+    var pin = content.querySelector('#abPinned'); if (pin) pin.checked = !!data.pinned;
+    try { updatePreview(content); updateEditorStats(content); } catch (e) {}
+  }
+  function renderDraftBar(content, route) {
+    var bar = content.querySelector('#abDraftBar');
+    if (!bar) return;
+    var d = readEditorDraft(route.id);
+    if (!d || !d.savedAt) { bar.innerHTML = ''; return; }
+    bar.innerHTML = '<div class="ab-card" style="margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">' +
+      '<span>' + icon('save', 14) + ' ' + esc(t('admin.editor.draftFound', { time: fmtTimestamp(d.savedAt) })) + '</span>' +
+      '<button class="ab-btn sm primary" id="abDraftRestore">' + t('admin.editor.draftRestore') + '</button>' +
+      '<button class="ab-btn sm ghost" id="abDraftDiscard">' + t('admin.editor.draftDiscard') + '</button></div>';
+    bar.querySelector('#abDraftRestore').addEventListener('click', function () {
+      applyEditorDraft(content, d.data);
+      bar.innerHTML = '';
+      toast(t('admin.editor.draftRestored'), 'ok');
+    });
+    bar.querySelector('#abDraftDiscard').addEventListener('click', function () {
+      clearEditorDraft(route.id);
+      bar.innerHTML = '';
+      setDraftHint(content, 0);
+      toast(t('admin.editor.draftDiscarded'), 'ok');
+    });
+  }
   function pageEditor(content, route) {
     content.innerHTML =
       '<div class="ab-page-head"><div><h1 class="ab-page-title">' + (route.isNew ? t('admin.editor.newPost') : t('admin.editor.editPost')) + '</h1><p class="ab-page-sub">' + t('editor.markdownHint') + '</p></div></div>' +
+      '<div id="abDraftBar"></div>' +
       '<div class="ab-editor-head">' +
         '<div class="ab-editor-meta">' +
           '<div class="ab-field ab-title-field" style="margin:0"><label class="ab-label" for="abTitle">' + t('admin.editor.titleLabel') + '</label><input class="ab-input" id="abTitle" placeholder="' + t('admin.editor.titlePlaceholder') + '" autocomplete="off"><label class="ab-hint">' + t('admin.editor.titleHint') + '</label></div>' +
@@ -2486,6 +2555,7 @@
         '<div class="ab-editor-pane"><div class="ab-editor-preview" id="abPreviewPane"></div></div>' +
       '</div>' +
       '<div class="ab-row ab-editor-actions">' +
+        '<span class="ab-hint" id="abDraftHint" style="margin-right:auto"></span>' +
         (cloudOn() ? '' : '<button class="ab-btn" id="abExport">' + t('editor.exportAll') + '</button>') +
         (route.id ? '<button class="ab-btn" id="abHistory">' + icon('refresh', 15) + ' ' + t('admin.revisions.button') + '</button>' : '') +
         (cloudOn() ? '<button class="ab-btn" id="abScheduleBtn">' + icon('clock', 15) + ' ' + t('admin.editor.scheduleButton') + '</button>' : '') +
@@ -2495,6 +2565,7 @@
 
     bindEditor(content, route);
     fillCategoryOptions(content);
+    renderDraftBar(content, route);
     if (route.id) loadEditor(content, route.id);
     else {
       var dateInput = content.querySelector('#abDate');
@@ -2506,6 +2577,10 @@
 
   function bindEditor(content, route) {
     var area = content.querySelector('#abBody');
+    // 本地草稿自动保存：输入停顿 1.5s + 每 10s 一次（加密文章不落明文）
+    content.addEventListener('input', debounce(function () { autosaveEditorDraft(content, route); }, 1500));
+    if (_editorDraftTimer) { clearInterval(_editorDraftTimer); _editorDraftTimer = null; }
+    _editorDraftTimer = setInterval(function () { autosaveEditorDraft(content, route); }, 10000);
     area.addEventListener('input', function () { autosizeArea(area); updateEditorStats(content); });
     area.addEventListener('input', debounce(function () { updatePreview(content); }, 200));
     area.addEventListener('paste', function (e) {
@@ -2789,6 +2864,7 @@
     try {
       var r = await savePost(post, isNew);
       if (r && (r.ok || r.post)) {
+        clearEditorDraft(id);
         toast(status === 'published' ? t('admin.editor.saved') : (status === 'scheduled' ? t('admin.editor.scheduled') : t('admin.editor.savedDraft')), 'ok');
         if (cloudOn()) go('/admin/posts'); else {
           toast(t('admin.editor.savedLocal'), 'ok');
@@ -2797,7 +2873,7 @@
         toast(t('admin.editor.saveFail'), 'err');
       }
     } catch (e) {
-      if (!cloudOn()) { saveStaticPost(post); toast(t('admin.editor.savedDraft'), 'ok'); }
+      if (!cloudOn()) { saveStaticPost(post); clearEditorDraft(id); toast(t('admin.editor.savedDraft'), 'ok'); }
       else if (isNetworkFailure(e)) { queueOfflinePost(post, isNew); toast(t('admin.editor.savedOffline'), 'ok'); }
       else toast(t('admin.editor.saveFail') + (e.message || e), 'err');
     } finally { btn.disabled = false; }
@@ -4637,6 +4713,7 @@
     _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
     _list: { paginatePosts: paginatePosts },
     _editor: {
+      draft: { key: editorDraftKey, read: readEditorDraft, write: writeEditorDraft, clear: clearEditorDraft },
       toDateTimeLocal: toDateTimeLocal,
       normalizeEditorDate: normalizeEditorDate,
       fmtPostDate: fmtPostDate

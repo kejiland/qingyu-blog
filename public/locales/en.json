@@ -927,5 +927,11 @@
   "admin.settings.featErrReportHint": "When on, runtime errors in visitors' browsers are reported anonymously to the Error log so broken features surface quickly (no personal data)",
   "admin.settings.featAntiSpam": "Comment anti-spam",
   "admin.settings.featCommentGuard": "Comment anti-bot check",
-  "admin.settings.featCommentGuardHint": "When on: a filled hidden honeypot field is treated as a bot (silently dropped), and submitting less than 2s after the form loads is rejected. Normal visitors notice nothing."
+  "admin.settings.featCommentGuardHint": "When on: a filled hidden honeypot field is treated as a bot (silently dropped), and submitting less than 2s after the form loads is rejected. Normal visitors notice nothing.",
+  "admin.editor.draftFound": "Found an unpublished draft auto-saved at {time}",
+  "admin.editor.draftRestore": "Restore",
+  "admin.editor.draftDiscard": "Discard",
+  "admin.editor.draftRestored": "Draft restored",
+  "admin.editor.draftSavedAt": "Auto-saved {time}",
+  "admin.editor.draftDiscarded": "Draft discarded"
 }

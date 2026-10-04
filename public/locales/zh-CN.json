@@ -927,5 +927,11 @@
   "admin.settings.featErrReportHint": "开启后，访客浏览器里的运行时异常会匿名上报到「错误日志」，便于及时发现功能异常（不含个人隐私）",
   "admin.settings.featAntiSpam": "评论反垃圾",
   "admin.settings.featCommentGuard": "评论反机器人校验",
-  "admin.settings.featCommentGuardHint": "开启后：隐藏蜜罐字段被填写视为机器人（静默丢弃），表单填入不足 2 秒即提交会被拒绝；对正常访客无感"
+  "admin.settings.featCommentGuardHint": "开启后：隐藏蜜罐字段被填写视为机器人（静默丢弃），表单填入不足 2 秒即提交会被拒绝；对正常访客无感",
+  "admin.editor.draftFound": "检测到 {time} 自动保存的未发布草稿",
+  "admin.editor.draftRestore": "恢复内容",
+  "admin.editor.draftDiscard": "丢弃草稿",
+  "admin.editor.draftRestored": "已恢复自动保存的草稿",
+  "admin.editor.draftSavedAt": "已自动保存 {time}",
+  "admin.editor.draftDiscarded": "已丢弃草稿"
 }
