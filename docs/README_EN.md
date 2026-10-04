@@ -75,7 +75,7 @@ It runs in two modes:
 
 The entire site lives in `public/`: frontend `index.html` + `style.css` + `app.js` + `posts.js` + `music-player.js` + `bg-anim.js`, admin `admin.js` + `admin.css`, i18n `i18n.js` + `locales/`.
 
-> 🆕 **Current version `v2.10.61`.** Beyond writing / comments / stats, it also ships: **post encryption** (AES-GCM, client-side), **per-post SEO** (title / description / canonical / noindex), **draft preview links** (HMAC-signed), **one-click static site export**, **print / PDF**, **Webmention**, **multi-author + author pages**, **Mermaid diagrams + KaTeX math** (vendored, on-demand), **subscriber groups & broadcast**, **front-end error log**, **comment anti-bot**, **country / device detection**, and an admin "**Feature switches**" page.
+> 🆕 **Current version `v2.10.62`.** Beyond writing / comments / stats, it also ships: **post encryption** (AES-GCM, client-side), **per-post SEO** (title / description / canonical / noindex), **draft preview links** (HMAC-signed), **one-click static site export**, **print / PDF**, **Webmention**, **multi-author + author pages**, **Mermaid diagrams + KaTeX math** (vendored, on-demand), **subscriber groups & broadcast**, **front-end error log**, **comment anti-bot**, **country / device detection**, and an admin "**Feature switches**" page.
 
 > 💡 The root `index.html` is just a redirect that opens `public/index.html` (the Workers / Pages deploy directory). Opening `public/index.html` locally works the same.
 
@@ -292,7 +292,7 @@ Or trigger the `Migrate KV to D1` workflow manually from the Actions tab (`dry-r
 | Card list | Cover thumbnails (from `cover` or the first image in the body), pin badge, tags pinned to the bottom, loading skeleton, pagination (`?page=`) |
 | **Dark / light theme** | One-click toggle, follows the system preference, no flash of unstyled content; the top bar deepens its shadow as you scroll |
 | **Accent colours** | **4 accents**: Terra (赭橙) / Indigo (黛蓝) / Bamboo (竹青) / Dusk (凝夜紫). Icon button with a swatch popover on desktop, native select on mobile; each accent also retints backgrounds and borders |
-| **Multilingual UI** | Chinese / English / 日本語 / 한국어 / हिन्दी (990 keys each), auto-detect + manual switch (🌐 popover with SVG flags on desktop, native select on mobile) |
+| **Multilingual UI** | Chinese / English / 日本語 / 한국어 / हिन्दी (993 keys each), auto-detect + manual switch (🌐 popover with SVG flags on desktop, native select on mobile) |
 | **PWA offline reading & writing** | Installable on desktop or mobile; the shell, core assets and previously visited articles work offline. Cloud editor changes are queued locally and synced automatically when the connection returns |
 | **Background animation** | Hand-drawn canvas particles for the four seasons (spring petals / summer green leaves / autumn leaves / six-armed branched snowflakes); home page only, pauses when the tab is hidden; on by default on desktop, off on touch devices, toggleable from the top bar, respects `prefers-reduced-motion`. Preview: `/?season=spring`, `/?season=summer`, `/?season=autumn` or `/?season=winter` (add `&bg=1` to force it on) |
 | **Diagrams / math** | Bodies support **Mermaid diagrams** (```mermaid fenced blocks) and **KaTeX math** (`$…$` / `$$…$$`). Both libraries are **vendored** under `public/libs/` (offline-friendly, no CDN in the CSP) and load **only when a page actually uses them** — normal pages make zero extra requests. Can be disabled globally under Feature switches. |
@@ -338,8 +338,8 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 | Tag management | Tag list derived from the posts in real time; rename / delete with bulk updates |
 | Media library | Image upload (browser **direct-to-R2** presigned URLs, metadata in D1), grid preview, **click a thumbnail for a full preview (arrow keys / Esc to close)**, **file-name search + pagination (24 per page)**, **multi-select bulk delete**, copy URL or **copy Markdown image syntax**, delete (R2 object first, then the D1 row); static / non-cloud mode shows a hint |
 | **Music management** | Audio upload (direct to R2 with a percentage progress bar, drag-and-drop supported); **filename parsing fills in "song - artist"**; **title / artist search + pagination (15 per page)**; inline per-row preview (play / pause / seek / elapsed and total time), rename, delete (synced with the R2 object); inner-scrolling list card with a sticky table header |
-| **Feature switches** | Admin → Settings → Feature switches moves code-only toggles into the UI: **posts per page** (0 = no paging) and the **ads master switch** + AdSense client ID + three ad slots (above list / between list items + interval / below post). Saved settings take effect immediately — no code change or redeploy |
-| Blog settings | 6 tabs: **Site basics** (name / description / avatar logo / about-page content / footer copyright / footer notice / moderate new comments), **Feature switches** (home paging / ads / front-end error reporting / comment anti-bot), **Profile** (name / bio / avatar / email), **Navigation menu** (visual editor with add / remove / sub-items / reset), **Footer navigation**, **Friend links** |
+| **Feature switches** | Admin → Settings → Feature switches moves code-only toggles into the UI: **posts per page** (0 = no paging), a **new-navigation-items switch**, and the **ads master switch** + AdSense client ID + three ad slots (above list / between list items + interval / below post). Saved settings take effect immediately — no code change or redeploy |
+| Blog settings | 6 tabs: **Site basics** (name / description / avatar logo / about-page content / footer copyright / footer notice / moderate new comments), **Feature switches** (home paging / new navigation items / ads / front-end error reporting / comment anti-bot / diagrams & math), **Profile** (name / bio / avatar / email), **Navigation menu** (visual editor with add / remove / sub-items / reset), **Footer navigation**, **Friend links** |
 | **Front-end error log** | Captures unhandled exceptions and promise rejections in visitors' browsers and reports them anonymously to `/admin/errors`; identical errors are grouped with a hit count (plus source, page and UA), searchable and clearable. On by default, can be disabled under Feature switches |
 | **Site health check** | `/admin/health` verifies D1 table readability (with row counts), KV read/write, R2 media & backup buckets, and AI / mail (Resend) bindings |
 | **Traffic sources / devices** | Records the referrer host, **country/region** (Cloudflare edge IP geolocation — only the 2-letter code is stored, never the raw IP), **device type** (desktop / mobile / tablet / bot), **OS** (iOS / Android / HarmonyOS / Windows / macOS / Linux) and **device brand** (Apple / Samsung / Xiaomi / Huawei / OPPO / vivo …) for every view, aggregated per day; the dashboard shows a 30-day card with top referrers and device share |
@@ -416,7 +416,7 @@ The admin panel is a separate bundle (`admin.js` + `admin.css`) lazy-loaded only
 │   ├── i18n.js / i18n.min.js          # i18n module (zh/en/ja/ko/hi, built-in Chinese fallback)
 │   ├── posts.js / posts.min.js        # Static-mode post data (generated by "Export posts.js")
 │   ├── static-export.json             # File manifest used by the "export static site" feature
-│   ├── locales/                       # Language packs (zh-CN / en / ja / ko / hi, 990 keys each)
+│   ├── locales/                       # Language packs (zh-CN / en / ja / ko / hi, 993 keys each)
 │   ├── flags/                         # SVG flags for the language switcher (cn / gb / jp / kr / in)
 │   ├── libs/smoji/                    # Smoji emoji picker (lazy-loaded)
 │   ├── libs/katex/                    # KaTeX math (vendored, lazy-loaded)
@@ -707,7 +707,7 @@ window.BLOG_CONFIG = {
 };
 ```
 
-> **Tip:** "Posts per page" (`pageSize`) and the whole `ads` block can now be edited in the admin under **Settings → Feature switches** (stored in D1 `site_settings.features`, overriding the defaults here — **no code change or redeploy needed**). The same page also toggles front-end error reporting, comment anti-bot and diagram/math rendering.
+> **Tip:** "Posts per page" (`pageSize`) and the whole `ads` block can now be edited in the admin under **Settings → Feature switches** (stored in D1 `site_settings.features`, overriding the defaults here — **no code change or redeploy needed**). The same page can also hide newly added navigation items and toggle front-end error reporting, comment anti-bot and diagram/math rendering.
 
 **Navigation precedence**: cloud "Blog settings → Navigation menu" (stored in D1 `site_settings.nav_menu`) > the `NAV` fallback array in `app.js`. The footer nav and friend links work the same way (D1 first, `config.js` as fallback).
 
@@ -721,7 +721,7 @@ window.BLOG_CONFIG = {
 
 ### Multilingual (i18n)
 
-`i18n.js` ships 5 languages (Chinese / English / 日本語 / 한국어 / हिन्दी) with **990 keys each**. Detection order: `localStorage('blog.locale')` → `navigator.language`, plus a manual switcher. Packs live in `public/locales/<lang>.json`; Chinese is also embedded as a fallback so core text stays readable when previewing via `file://`.
+`i18n.js` ships 5 languages (Chinese / English / 日本語 / 한국어 / हिन्दी) with **993 keys each**. Detection order: `localStorage('blog.locale')` → `navigator.language`, plus a manual switcher. Packs live in `public/locales/<lang>.json`; Chinese is also embedded as a fallback so core text stays readable when previewing via `file://`.
 
 ---
 

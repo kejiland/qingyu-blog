@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.61';
+var BLOG_VERSION = '2.10.62';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -1973,6 +1973,10 @@ function app() { return document.querySelector('#app'); }
   // 导航默认项版本：老后台保存的 nav_menu 没有这个版本号时，说明它还是升级前
   // 的旧导航；首次加载自动补齐当时没有的新默认项，但不会在用户删除后反复加回。
   var NAV_DEFAULT_VERSION = 1;
+  var NAV_EXTRA_PATHS = { '/categories': 1, '/history': 1, '/series': 1, '/popular': 1 };
+  function hideExtraNav(items) {
+    return items.filter(function (it) { return !NAV_EXTRA_PATHS[navUrlKey(it)]; });
+  }
 
   function navUrlKey(it) {
     var u = String((it && it.url) || '/').replace(/^#/, '');
@@ -2004,10 +2008,14 @@ function app() { return document.querySelector('#app'); }
   // 用户在后台删除的项目会保持删除，不再被自动加回。
   function navItems() {
     var c = getConfig();
+    var items;
     if (Array.isArray(c.nav) && c.nav.length) {
-      return c.navDefaultsVersion < NAV_DEFAULT_VERSION ? mergeNavDefaults(c.nav) : c.nav;
+      items = c.navDefaultsVersion < NAV_DEFAULT_VERSION ? mergeNavDefaults(c.nav) : c.nav;
+    } else {
+      items = NAV;
     }
-    return NAV;
+    if (c.features && c.features.navExtras === false) items = hideExtraNav(items);
+    return items;
   }
 
   // 旧后台保存数据里的默认中文文案：路径命中内置项时，仅当文本为空或等于当初的

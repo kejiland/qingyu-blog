@@ -1794,9 +1794,11 @@ tests.push(['后台设置：新增「功能开关」标签页（分页 / 广告�
   const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
   assert.ok(src.indexOf('data-tab="features"') >= 0, '功能开关标签');
   assert.ok(src.indexOf('id="abFeatPageSize"') >= 0, '每页文章数输入');
+  assert.ok(src.indexOf('id="abFeatNavExtras"') >= 0, '新增导航显示开关');
   assert.ok(src.indexOf('id="abAdsEnabled"') >= 0, '广告总开关');
   assert.ok(src.indexOf('id="abAdsClient"') >= 0, 'AdSense 客户端 ID');
   assert.ok(src.indexOf('features: JSON.stringify({') >= 0, '保存 features 配置');
+  assert.ok(src.indexOf('navExtras:') >= 0, '保存新增导航开关');
   assert.ok(src.indexOf('syncFeaturesDraft') >= 0, '载入 features 草稿');
 }]);
 
@@ -2735,6 +2737,18 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   b.ctx._siteSettings.nav_menu = JSON.stringify([{ text: '首页', url: '/' }, { text: '归档', url: '/archive' }]);
   const respectedNav = b.ctx.navItems();
   assert.ok(!respectedNav.some(function (x) { return x.url === '/categories'; }), '版本已同步后不再把用户删除的默认项加回');
+  b.ctx._siteSettings.features = JSON.stringify({ navExtras: false });
+  b.ctx._siteSettings.nav_menu = JSON.stringify([
+    { text: '首页', url: '/' }, { text: '标签', url: '/tags' },
+    { text: '分类', url: '/categories' }, { text: '历史', url: '/history' },
+    { text: '系列', url: '/series' }, { text: '热门', url: '/popular' },
+    { text: '关于', url: '/about' }, { text: '监控', url: 'https://status.example' }
+  ]);
+  const hiddenNav = b.ctx.navItems();
+  assert.ok(!hiddenNav.some(function (x) { return x.url === '/categories'; }), '关闭开关后隐藏分类导航');
+  assert.ok(!hiddenNav.some(function (x) { return x.url === '/history'; }), '关闭开关后隐藏历史导航');
+  assert.ok(hiddenNav.some(function (x) { return x.url === '/tags'; }), '关闭新增导航开关不影响基础导航');
+  assert.ok(hiddenNav.some(function (x) { return x.url === 'https://status.example'; }), '关闭新增导航开关不影响自定义链接');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {

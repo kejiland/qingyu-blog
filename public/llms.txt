@@ -1,7 +1,7 @@
 # Qingyu'Blog
 
-> 零框架 / 零构建的轻量博客系统（原生 HTML/CSS/JS + Cloudflare Workers·D1·KV·R2）。当前版本 v2.10.61。
-> A lightweight, framework-free blog system — vanilla HTML/CSS/JS plus Cloudflare Workers/D1/KV/R2. Current version v2.10.61.
+> 零框架 / 零构建的轻量博客系统（原生 HTML/CSS/JS + Cloudflare Workers·D1·KV·R2）。当前版本 v2.10.62。
+> A lightweight, framework-free blog system — vanilla HTML/CSS/JS plus Cloudflare Workers/D1/KV/R2. Current version v2.10.62.
 
 ## 关键页面 / Key pages
 
@@ -34,8 +34,8 @@
   Subscriptions: double opt-in email subscription, **subscriber groups with segmented broadcast**, and new-post / new-comment notifications (Resend, optional).
 - 后台：仪表盘（趋势图、来源 / 国家 / 设备 / 系统 / 品牌）、文章与修订、评论批量操作、媒体与音乐库、标签与系列、订阅者、健康检查、操作审计、**前端错误日志**、备份恢复、导入导出、**一键导出静态站**、站点设置与**功能开关**。
   Admin: dashboard (trends, referrers / countries / devices / OSes / brands), posts & revisions, bulk comment ops, media & music libraries, tags & series, subscribers, health check, audit log, **front-end error log**, backup & restore, import/export, **one-click static site export**, settings and **feature switches**.
-- 多语言界面：简体中文 / English / 日本語 / 한국어 / हिन्दी（各 990 个语言键），自动识别浏览器语言。
-  UI languages: Simplified Chinese / English / 日本語 / 한국어 / हिन्दी (990 keys each), auto-detected from the browser.
+- 多语言界面：简体中文 / English / 日本語 / 한국어 / हिन्दी（各 993 个语言键），自动识别浏览器语言。
+  UI languages: Simplified Chinese / English / 日本語 / 한국어 / हिन्दी (993 keys each), auto-detected from the browser.
 - 本地 `file://` 双击 `public/index.html` 即可离线预览与写作，无需构建步骤。
   Opening `public/index.html` directly from disk (`file://`) works offline — no build step required.
 
