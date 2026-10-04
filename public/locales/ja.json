@@ -254,7 +254,6 @@
   "admin.dashboard.sourcesTitle": "参照元 / 端末",
   "admin.dashboard.colRef": "参照元",
   "admin.dashboard.colDevice": "デバイス",
-  "admin.dashboard.noData": "データなし",
   "admin.dashboard.pendingComments": "承認待ちコメント",
   "admin.dashboard.noTitle": "（タイトルなし）",
   "admin.dashboard.anonymous": "匿名",

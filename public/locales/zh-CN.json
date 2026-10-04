@@ -254,7 +254,6 @@
   "admin.dashboard.sourcesTitle": "访问来源 / 设备",
   "admin.dashboard.colRef": "来源",
   "admin.dashboard.colDevice": "设备",
-  "admin.dashboard.noData": "暂无数据",
   "admin.dashboard.pendingComments": "待审核评论",
   "admin.dashboard.noTitle": "(无标题)",
   "admin.dashboard.anonymous": "匿名",

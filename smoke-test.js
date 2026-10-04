@@ -3334,9 +3334,6 @@ tests.push(['订阅分组：PUT 保存分组 + 列表返回分组与计数', asy
 /* 订阅群发：按分组入队 + 必填校验 + Cron 异步发送 */
 tests.push(['订阅群发：按分组入队，Cron 异步发送且校验必填', async () => {
   const { env, token } = await authEnv();
-  env.RESEND_API_KEY = 're_test';
-  env.BLOG_MAIL_FROM = 'blog@example.com';
-  env.SITE_URL = 'https://blog.example';
   const subscribe = await import('./functions/_lib/subscribe.js');
   env._d1.subscribers.set('s1', { id: 's1', email: 'a@example.com', status: 'active', token: 'tok-a', locale: 'zh-CN', groups: '["newsletter"]', created_at: 1 });
   env._d1.subscribers.set('s2', { id: 's2', email: 'b@example.com', status: 'active', token: 'tok-b', locale: 'zh-CN', groups: '["vip"]', created_at: 2 });
@@ -3344,9 +3341,13 @@ tests.push(['订阅群发：按分组入队，Cron 异步发送且校验必填',
   env._d1.subscribers.set('s4', { id: 's4', email: 'd@example.com', status: 'pending', token: 'tok-d', locale: 'zh-CN', groups: '["newsletter"]', created_at: 4 });
   const auth = { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token };
   const post = (body) => subscribe.handleSubscriberBroadcast(new Request('http://t/api/admin/subscribers/broadcast', { method: 'POST', headers: auth, body: JSON.stringify(body) }), env);
+  assert.strictEqual((await post({ subject: 's', body: 'b' })).status, 503, '邮件未配置时拒绝群发');
+  env.RESEND_API_KEY = 're_test';
+  env.BLOG_MAIL_FROM = 'blog@example.com';
+  env.SITE_URL = 'https://blog.example';
   assert.strictEqual((await post({ body: 'x' })).status, 400, '缺主题拒绝');
   assert.strictEqual((await post({ subject: 's' })).status, 400, '缺正文拒绝');
-  let r = await post({ subject: '分组通知', body: '你好 newsletter', groups: ['newsletter'] });
+  let r = await post({ subject: '分组通知', body: '你好 <img src=x onerror=alert(1)>', groups: ['newsletter'] });
   assert.strictEqual((await r.json()).queued, 1, '仅命中已确认的 newsletter 订阅者（pending 不计）');
   r = await post({ subject: '全员通知', body: '大家好', groups: [] });
   assert.strictEqual((await r.json()).queued, 3, '留空发送全部已确认订阅者');
@@ -3359,12 +3360,103 @@ tests.push(['订阅群发：按分组入队，Cron 异步发送且校验必填',
   try {
     const result = await subscribe.processMailOutbox(env, 50);
     assert.strictEqual(result.sent, 4, '4 封全部发出');
-    assert.ok(emails.some((m) => m.subject === '分组通知'), '含分组通知邮件');
+    const xssMail = emails.filter((m) => m.subject === '分组通知')[0];
+    assert.ok(xssMail, '含分组通知邮件');
+    assert.ok(xssMail.html.indexOf('&lt;img') >= 0, '群发正文 HTML 已转义');
+    assert.ok(xssMail.html.indexOf('<img src=x') < 0, '群发正文不含未转义标签');
     assert.ok(emails.some((m) => m.subject === '全员通知'), '含全员通知邮件');
     assert.ok(emails.some((m) => String(m.html || '').indexOf('取消订阅') >= 0), '群发含退订入口');
   } finally {
     global.fetch = originalFetch;
   }
+}]);
+
+/* i18n 完整性：内嵌中文兜底必须与 zh-CN.json 完全一致，且各语言包无重复键 */
+tests.push(['i18n 完整性：兜底与 zh-CN.json 一致、语言包无重复键', async () => {
+  const zhRaw = fs.readFileSync(path.join(PUB, 'locales', 'zh-CN.json'), 'utf8');
+  const zh = JSON.parse(zhRaw);
+  const i18nSrc = fs.readFileSync(path.join(PUB, 'i18n.js'), 'utf8');
+  const fallback = {};
+  for (const m of i18nSrc.matchAll(/^\s*"([A-Za-z0-9_.\-]+)"\s*:/gm)) fallback[m[1]] = 1;
+  const missing = Object.keys(zh).filter((k) => !fallback[k]);
+  const extra = Object.keys(fallback).filter((k) => !(k in zh));
+  assert.deepStrictEqual(missing, [], '内嵌兜底缺少 zh-CN 的键: ' + missing.join(','));
+  assert.deepStrictEqual(extra, [], '内嵌兜底存在多余键: ' + extra.join(','));
+  for (const lang of ['zh-CN', 'en', 'ja', 'ko', 'hi']) {
+    const raw = fs.readFileSync(path.join(PUB, 'locales', lang + '.json'), 'utf8');
+    const seen = {}; const dups = [];
+    for (const m of raw.matchAll(/^\s*"([^"]+)"\s*:/gm)) { if (seen[m[1]]) dups.push(m[1]); seen[m[1]] = 1; }
+    assert.deepStrictEqual(dups, [], lang + ' 存在重复键: ' + dups.join(','));
+  }
+}]);
+
+/** 让 boot() 的 #app 支持局部 querySelector，并桥接 app.js 暴露到 window 的函数，
+/** 用于在伪 DOM 中挂载新版 admin UI（覆盖静态检查抓不到的运行时错误）。 */
+function mountAdminUi(b) {
+  const appEl = b.ctx.document.querySelector('#app');
+  const fakeEl = () => { const el = stubEl(); const kids = {}; el.querySelector = (sel) => kids[sel] || (kids[sel] = fakeEl()); el.querySelectorAll = () => []; return el; };
+  const kids = {};
+  appEl.querySelector = (sel) => kids[sel] || (kids[sel] = fakeEl());
+  appEl.querySelectorAll = () => [];
+  Object.keys(b.ctx).forEach((k) => { if (typeof b.ctx[k] === 'function' && !b.win[k]) b.win[k] = b.ctx[k]; });
+  b.ctx._setSessionToken('SES-T1');
+  b.ctx._setAdminSession(true);
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  return appEl;
+}
+
+/* 新版后台 UI 运行时冒烟：伪 DOM 挂载订阅者页（覆盖静态检查抓不到的运行时错误） */
+tests.push(['后台（新版 UI）：订阅者页挂载渲染分组列与群发入口', async () => {
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/admin/subscribers') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, enabled: true, counts: { total: 2, active: 2, pending: 0, unsubscribed: 0 }, groups: [{ name: 'newsletter', count: 1 }], subscribers: [{ id: 's1', email: 'a@example.com', status: 'active', created_at: 1, groups: ['newsletter'] }, { id: 's2', email: 'b@example.com', status: 'active', created_at: 2, groups: [] }] }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/admin/subscribers');
+  const appEl = mountAdminUi(b);
+  await new Promise((r) => setTimeout(r, 60));
+  const shell = appEl.innerHTML || '';
+  assert.ok(shell.indexOf('ab-root') >= 0, '新版后台外壳已渲染（非门禁页）');
+  const content = appEl.querySelector('#abContent');
+  assert.ok((content.innerHTML || '').indexOf('abSubBroadcast') >= 0, '订阅者页含「群发邮件」入口');
+  const body = content.querySelector('#abSubBody').innerHTML || '';
+  assert.ok(body.indexOf('a@example.com') >= 0, '订阅者行已渲染');
+  assert.ok(body.indexOf('newsletter') >= 0 && body.indexOf('data-sub-groups') >= 0, '分组列 + 编辑分组按钮');
+  const sel = content.querySelector('#abSubGroup').innerHTML || '';
+  assert.ok(sel.indexOf('newsletter') >= 0, '分组筛选下拉已填充');
+}]);
+
+/* 新版后台 UI 运行时冒烟：全部文章页云端分页（serverTotal 未定义 / 重复切片 回归） */
+tests.push(['后台（新版 UI）：全部文章页云端分页渲染（serverTotal 回归）', async () => {
+  const fn = async (url) => {
+    const u = String(url);
+    if (u.indexOf('/locales/') >= 0) return { ok: false, status: 404, json: async () => ({}) };
+    if (u.indexOf('/api/posts?') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [{ id: 'p1', title: '第一篇文章', date: '2026-01-01', tags: [], status: 'published', pinned: false }], total: 25, page: 1, per: 10, pages: 3 }) };
+    if (u.indexOf('/api/posts') >= 0) return { ok: true, status: 200, json: async () => ({ ok: true, posts: [] }) };
+    return { ok: true, status: 200, json: async () => ({ ok: true }) };
+  };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: fn }, '/admin/posts');
+  const appEl = b.ctx.document.querySelector('#app');
+  // 预置筛选控件（伪 DOM 没有真实 select 的默认值），挂载后再读取
+  const fakeEl0 = () => { const el = stubEl(); const kids = {}; el.querySelector = (sel) => kids[sel] || (kids[sel] = fakeEl0()); el.querySelectorAll = () => []; return el; };
+  const kids0 = {};
+  appEl.querySelector = (sel) => kids0[sel] || (kids0[sel] = fakeEl0());
+  appEl.querySelectorAll = () => [];
+  const preContent = appEl.querySelector('#abContent');
+  preContent.querySelector('#abPostStatus').value = 'all';
+  preContent.querySelector('#abPostKw').value = '';
+  Object.keys(b.ctx).forEach((k) => { if (typeof b.ctx[k] === 'function' && !b.win[k]) b.win[k] = b.ctx[k]; });
+  b.ctx._setSessionToken('SES-T1'); b.ctx._setAdminSession(true);
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  await new Promise((r) => setTimeout(r, 60));
+  const content = appEl.querySelector('#abContent');
+  const body = content.querySelector('#abPostBody').innerHTML || '';
+  assert.ok(body.indexOf('第一篇文章') >= 0, '文章行已渲染（不再 serverTotal 报错）');
+  assert.ok(body.indexOf('加载失败') < 0 && body.indexOf('serverTotal') < 0, '列表未显示加载失败');
+  const pg = content.querySelector('#abPostPage').innerHTML || '';
+  assert.ok(pg.indexOf('3') >= 0, '分页显示服务端总页数 3');
 }]);
 
 /* ---------- 运行 ---------- */
