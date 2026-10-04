@@ -952,5 +952,14 @@
   "admin.editor.previewCopied": "Link copied",
   "admin.editor.previewFail": "Failed to create preview link: ",
   "preview.banner": "Preview mode · not published",
-  "preview.invalid": "Preview link is invalid or expired"
+  "preview.invalid": "Preview link is invalid or expired",
+  "admin.staticExport.title": "Export static site",
+  "admin.staticExport.hint": "Bundle the whole site into a pure-static ZIP: pre-rendered pages, all static assets and published-posts-only data. Unzip and upload anywhere.",
+  "admin.staticExport.button": "Build & download ZIP",
+  "admin.staticExport.empty": "No published posts to export",
+  "admin.staticExport.building": "Building static site…",
+  "admin.staticExport.progress": "Packing assets {done}/{total}",
+  "admin.staticExport.done": "Exported {count} posts ({files} files)",
+  "admin.staticExport.fail": "Static export failed: ",
+  "admin.staticExport.readme": "Qingyu'Blog · Static site export\n\nThis ZIP is a ready-to-deploy static site:\n- Every route has its own index.html, so no SPA rewrite rules are needed\n- Only PUBLISHED posts are included (drafts / scheduled posts are skipped)\n- Data lives in posts.min.js, config in config.min.js (already switched to static mode)\n- The admin UI is not included\n- Encrypted posts keep their ciphertext; readers unlock them with the password\n- Media stored on R2/object storage is NOT bundled\n\nHow to use:\n1. Unzip into an empty directory\n2. Upload the whole directory to any static host (Netlify / Vercel / GitHub Pages / object storage / Nginx…)\n3. If deploying to a sub-path keep the folder structure (asset links are relative)\n\nSite: {site}\nPublished posts: {count}"
 }

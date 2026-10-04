@@ -952,5 +952,14 @@
   "admin.editor.previewCopied": "リンクをコピーしました",
   "admin.editor.previewFail": "プレビューリンクの作成に失敗しました：",
   "preview.banner": "プレビューモード · 未公開",
-  "preview.invalid": "プレビューリンクが無効か期限切れです"
+  "preview.invalid": "プレビューリンクが無効か期限切れです",
+  "admin.staticExport.title": "静的サイトを書き出す",
+  "admin.staticExport.hint": "サイト全体を純粋な静的 ZIP にまとめます（事前レンダリング済みページ・全静的アセット・公開記事データ）。解凍して任意のホストへ。",
+  "admin.staticExport.button": "ZIP を生成してダウンロード",
+  "admin.staticExport.empty": "公開記事がないため書き出せません",
+  "admin.staticExport.building": "静的サイトを生成中…",
+  "admin.staticExport.progress": "アセットを梱包中 {done}/{total}",
+  "admin.staticExport.done": "{count} 件の記事を書き出しました（{files} ファイル）",
+  "admin.staticExport.fail": "静的サイトの書き出しに失敗：",
+  "admin.staticExport.readme": "Qingyu'Blog · 静的サイト書き出し\n\nこの ZIP はそのまま配備できる静的サイトです：\n· 各ルートに index.html があるため SPA のリライト設定は不要\n· 公開済みの記事のみ（下書き・予約投稿は含まれません）\n· データは posts.min.js、設定は config.min.js（static モード）\n· 管理画面は含まれません\n· 暗号化記事は暗号文のままで、パスワード入力で解除します\n· R2 等のメディア本体は含まれません\n\n使い方：\n1. 空のディレクトリに解凍\n2. そのまま任意の静的ホスティングへアップロード\n3. サブディレクトリに置く場合も構成を保ってください（リンクは相対パス）\n\nサイト：{site}\n公開記事数：{count}"
 }

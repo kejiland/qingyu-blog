@@ -1834,6 +1834,7 @@
   function transferU16(n) { return [n & 0xFF, (n >>> 8) & 0xFF]; }
   function transferU32(n) { return [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF]; }
   function transferBytes(text) {
+    if (text instanceof Uint8Array) return text;   // 二进制资源直接透传
     if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(String(text || ''));
     var out = [];
     var s = unescape(encodeURIComponent(String(text || '')));
@@ -1860,7 +1861,7 @@
     var dt = transferDosTime(new Date());
     (files || []).forEach(function (file) {
       var name = transferBytes(file.name);
-      var data = transferBytes(file.text || '');
+      var data = file.data instanceof Uint8Array ? file.data : transferBytes(file.text || '');
       var crc = transferCrc32(data);
       var localHead = transferConcat([
         new Uint8Array([0x50, 0x4B, 0x03, 0x04]), new Uint8Array(transferU16(20)),
@@ -1906,6 +1907,114 @@
     files.push({ name: 'posts.json', text: transferBackupJson(posts) });
     return transferZip(files);
   }
+  /* ----------------------- 导出静态站（一键打包可部署的纯静态版本） ----------------------- */
+  /** 相对化模板里的资源链接：嵌套目录页面（posts/x/）需要 ../ 前缀 */
+  function staticRebase(html, base) {
+    if (!base) return html;
+    return html.replace(/(href|src)="(?!https?:|\/\/|data:|#)([^"]*)"/g, function (m, attr, val) {
+      var clean = val.charAt(0) === '/' ? val.slice(1) : val;
+      return attr + '="' + base + clean + '"';
+    });
+  }
+  /** 基于 index.html 模板生成某一页（替换标题/描述/canonical/#app 内容，去掉 Service Worker） */
+  function staticPageFromTemplate(tpl, o) {
+    var out = String(tpl || '');
+    out = out.replace(/<title>[\s\S]*?<\/title>/, '<title>' + esc(o.title || '') + '</title>');
+    out = out.replace(/<meta name="description" content="[^"]*">/, '<meta name="description" content="' + esc(o.desc || '') + '">');
+    out = out.replace(/<link rel="canonical" href="[^"]*">/, '<link rel="canonical" href="' + esc(o.canonical || '') + '">');
+    if (o.noindex) out = out.replace(/<\/head>/, '<meta name="robots" content="noindex, nofollow">' + '\n' + '</head>');
+    var start = out.indexOf('<div id="app">');
+    var appScript = out.indexOf('<script defer src="app.min.js', start);
+    if (start >= 0 && appScript > start) {
+      out = out.slice(0, start + '<div id="app">'.length) + (o.app || '') + '\n' + out.slice(appScript);
+    }
+    out = out.replace(/<script>[\s\S]*?navigator\.serviceWorker[\s\S]*?<\/script>/, '');
+    return staticRebase(out, o.base || '');
+  }
+  function staticPostDir(id) { return /[\\/]/.test(String(id)) ? encodeURIComponent(id) : String(id); }
+  async function exportStaticSite(content, button) {
+    var status = content ? content.querySelector('#abIeStatus') : null;
+    var old = button ? button.innerHTML : '';
+    if (button) { button.disabled = true; button.innerHTML = icon('spinner', 12) + ' ' + t('admin.transfer.exporting'); }
+    try {
+      var all = (content && content.__iePosts) || await listFullPosts();
+      var posts = (all || []).filter(function (p) { return (p.status || 'published') === 'published'; });
+      if (!posts.length) { toast(t('admin.staticExport.empty'), 'err'); return; }
+      if (status) status.textContent = t('admin.staticExport.building');
+      var cfg = window.getConfig ? window.getConfig() : (window.BLOG_CONFIG || {});
+      var siteUrl = String(cfg.siteUrl || location.origin + '/').replace(/\/+$/, '/');
+      var siteName = window.getSiteName ? window.getSiteName() : (document.title || 'Blog');
+      var siteDesc = (cfg.site && cfg.site.desc) || '';
+      var files = [];
+      // ① 静态数据（只导出已发布文章；加密文章只带密文）
+      var data = posts.map(function (p) {
+        return { id: p.id, title: p.title, date: p.date, excerpt: p.excerpt || '',
+          content: p.enc ? '' : (p.content || ''), cover: p.cover || '', ogImage: p.ogImage || '',
+          pinned: !!p.pinned, protected: !!p.protected, enc: p.enc || null, tags: p.tags || [],
+          category: p.category || '', series: p.series || '', seriesOrder: Number(p.seriesOrder) || 0,
+          status: 'published', seo: p.seo || {} };
+      });
+      files.push({ name: 'posts.min.js', text: 'window.BLOG_POSTS = ' + JSON.stringify(data) + ';\n' });
+      files.push({ name: 'config.min.js', text: 'window.BLOG_CONFIG = ' + JSON.stringify({ mode: 'static', apiBase: '', siteUrl: String(cfg.siteUrl || ''), writeToken: '', adminPwd: '', pageSize: 0, ads: {} }) + ';\n' });
+      // ② 复制静态资源（清单见 public/static-export.json）
+      var manifest = [];
+      try { manifest = await (await fetch('static-export.json', { cache: 'no-store' })).json(); } catch (e) { manifest = []; }
+      for (var i = 0; i < manifest.length; i++) {
+        if (status) status.textContent = t('admin.staticExport.progress', { done: i + 1, total: manifest.length });
+        try {
+          var buf = await (await fetch(manifest[i], { cache: 'no-store' })).arrayBuffer();
+          files.push({ name: manifest[i], data: new Uint8Array(buf) });
+        } catch (e) { /* 单个资源缺失不阻塞导出 */ }
+      }
+      // ③ 页面（每个路由独立 index.html → 任意静态托管都无需重写规则）
+      var tpl = await (await fetch('index.html', { cache: 'no-store' })).text();
+      var homeApp = window.renderNav('/') + '<main class="container page-fade"><div class="list-head"><h2 class="page-title">' + t('home.latest') + '</h2></div><div id="listContainer" class="list-nopager">' + window.renderCardList(data, {}, false) + '</div></main>' + window.renderFooter();
+      files.push({ name: 'index.html', text: staticPageFromTemplate(tpl, { title: siteName + ' · ' + t('site.subtitle'), desc: siteDesc, canonical: siteUrl, app: homeApp, base: '' }) });
+      data.forEach(function (p) {
+        var body = p.enc ? '' : window.renderMarkdown(p.content || '');
+        var toc = window.buildToc(body).html;
+        var tags = (p.tags || []).map(function (x) { return '<span>' + esc(x) + '</span>'; }).join('');
+        var art = '<div class="post-body"><div class="post-header"><h1>' + esc(p.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(p.date || '') + '</span></div></div>' + toc + '<article class="article">' + body + '</article><div class="article-footer"><div class="af-tags">' + tags + '</div></div></div>';
+        var appHtml = window.renderNav('/posts/' + encodeURIComponent(p.id) + '/') + '<main class="container page-fade">' + art + '</main>' + window.renderFooter();
+        var seo = p.seo || {};
+        files.push({ name: 'posts/' + staticPostDir(p.id) + '/index.html', text: staticPageFromTemplate(tpl, {
+          title: seo.title || ((p.title || '') + ' · ' + siteName),
+          desc: seo.desc || p.excerpt || '',
+          canonical: seo.canonical || (siteUrl + 'posts/' + encodeURIComponent(p.id) + '/'),
+          app: appHtml, base: '../../', noindex: !!seo.noindex
+        }) });
+      });
+      var simple = [
+        { dir: 'archive', fn: 'renderArchive', title: t('archive.title') },
+        { dir: 'tags', fn: 'renderTags', title: t('tags.title') },
+        { dir: 'categories', fn: 'renderCategories', title: t('categories.title') },
+        { dir: 'links', fn: 'renderLinks', title: t('links.title') },
+        { dir: 'about', fn: 'renderAbout', title: t('about.title') }
+      ];
+      simple.forEach(function (sp) {
+        var appHtml = '';
+        try { if (typeof window[sp.fn] === 'function') appHtml = window[sp.fn](); } catch (e) { appHtml = ''; }
+        files.push({ name: sp.dir + '/index.html', text: staticPageFromTemplate(tpl, { title: sp.title + ' · ' + siteName, desc: sp.title + ' - ' + siteDesc, canonical: siteUrl + sp.dir + '/', app: appHtml, base: '../' }) });
+      });
+      ['series', 'history', 'popular', 'guestbook', 'subscribe'].forEach(function (dir) {
+        files.push({ name: dir + '/index.html', text: staticPageFromTemplate(tpl, { title: siteName, desc: siteDesc, canonical: siteUrl + dir + '/', app: '', base: '../' }) });
+      });
+      var notFoundApp = window.renderNav('/') + '<main class="container page-fade"><div class="empty"><div class="big">' + svgIcon('question', 36) + '</div><p>' + t('post.notFound') + '</p><p><a href="' + esc(window.href ? window.href('/') : '/') + '">' + t('post.backHome') + '</a></p></div></main>' + window.renderFooter();
+      files.push({ name: '404.html', text: staticPageFromTemplate(tpl, { title: '404 · ' + siteName, desc: '', app: notFoundApp, base: '', noindex: true }) });
+      // ④ RSS / Sitemap / 说明
+      try { if (window.buildSitemapClient) files.push({ name: 'sitemap.xml', text: window.buildSitemapClient() }); } catch (e) {}
+      try { if (window.buildFeedXmlClient) files.push({ name: 'feed.xml', text: window.buildFeedXmlClient(data, 20) }); } catch (e) {}
+      files.push({ name: 'README-静态站说明.txt', text: t('admin.staticExport.readme', { site: siteName, count: data.length }) });
+      transferDownload('qingyu-static-site-' + transferStamp() + '.zip', transferZip(files));
+      toast(t('admin.staticExport.done', { count: data.length, files: files.length }), 'ok');
+    } catch (e) {
+      toast(t('admin.staticExport.fail') + (e.message || e), 'err');
+    } finally {
+      if (button) { button.disabled = false; button.innerHTML = old; }
+      if (status) status.textContent = '';
+    }
+  }
+
   async function transferExportOne(id, button, content) {
     var old = button ? button.innerHTML : '';
     if (button) { button.disabled = true; button.innerHTML = icon('spinner', 12) + ' ' + t('admin.transfer.exporting'); }
@@ -2046,6 +2155,9 @@
           '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.exportHint') + '</p>' +
           '<div class="ab-row" style="gap:8px;flex-wrap:wrap"><button class="ab-btn" id="abIeExportAll" disabled>' + icon('download', 14) + ' ' + t('admin.transfer.exportAll') + '</button>' +
           '<button class="ab-btn" id="abIeExportBackup" disabled>' + icon('save', 14) + ' ' + t('admin.transfer.exportBackup') + '</button></div></div>' +
+        '<div class="ab-card"><div class="ab-section-title">' + icon('cloud', 16) + ' ' + t('admin.staticExport.title') + '</div>' +
+          '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.staticExport.hint') + '</p>' +
+          '<button class="ab-btn" id="abIeExportStatic" disabled>' + icon('download', 14) + ' ' + t('admin.staticExport.button') + '</button></div>' +
         '<div class="ab-card"><div class="ab-section-title">' + icon('upload', 16) + ' ' + t('admin.transfer.importTitle') + '</div>' +
           '<p class="ab-muted" style="line-height:1.7;margin:10px 0 14px">' + t('admin.transfer.importHint') + '</p>' +
           '<p class="ab-hint" id="abIeStatus" style="min-height:18px;margin:0"></p></div>' +
@@ -2070,6 +2182,8 @@
     folderInput.addEventListener('change', function () { transferImportFiles(folderInput.files, content); });
     content.querySelector('#abIeExportAll').addEventListener('click', function () { transferExportPosts(content, null); });
     content.querySelector('#abIeExportBackup').addEventListener('click', function () { transferExportBackup(content); });
+    var staticBtn = content.querySelector('#abIeExportStatic');
+    if (staticBtn) staticBtn.addEventListener('click', function () { exportStaticSite(content, staticBtn); });
     var all = content.querySelector('#abIeSelectAll');
     all.addEventListener('change', function () {
       content.querySelectorAll('.ab-ie-check').forEach(function (cb) { cb.checked = all.checked; });
@@ -2122,7 +2236,7 @@
       var ids = Array.prototype.slice.call(content.querySelectorAll('.ab-ie-check')).filter(function (cb) { return cb.checked; }).map(function (cb) { return dec(cb.getAttribute('data-id')); });
       transferExportPosts(content, ids);
     };
-    ['#abIeExportAll', '#abIeExportBackup', '#abIeExportSelected'].forEach(function (sel) {
+    ['#abIeExportAll', '#abIeExportBackup', '#abIeExportStatic', '#abIeExportSelected'].forEach(function (sel) {
       var btn = content.querySelector(sel);
       if (btn) btn.disabled = false;
     });
@@ -4774,6 +4888,7 @@
     },
     _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
     _list: { paginatePosts: paginatePosts },
+    _staticExport: { rebase: staticRebase, page: staticPageFromTemplate, postDir: staticPostDir },
     _editor: {
       draft: { key: editorDraftKey, read: readEditorDraft, write: writeEditorDraft, clear: clearEditorDraft },
       toDateTimeLocal: toDateTimeLocal,

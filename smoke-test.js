@@ -3843,6 +3843,32 @@ tests.push(['草稿预览页：/preview/<token> 渲染正文与预览提示条',
   assert.ok(admin.indexOf('abPreviewLink') >= 0 && admin.indexOf('api/admin/preview-link') >= 0, '后台生成入口已接入');
 }]);
 
+/* 导出静态站：资源清单 + 模板生成 + ZIP 支持二进制 */
+tests.push(['导出静态站：模板生成 / 资源清单 / ZIP 二进制', async () => {
+  const manifest = JSON.parse(fs.readFileSync(path.join(PUB, 'static-export.json'), 'utf8'));
+  assert.ok(Array.isArray(manifest) && manifest.length > 20, '资源清单存在');
+  for (const need of ['style.min.css', 'app.min.js', 'i18n.min.js', 'locales/zh-CN.json']) assert.ok(manifest.indexOf(need) >= 0, '清单含 ' + need);
+  assert.ok(manifest.some((x) => x.indexOf('libs/katex/') === 0), '清单含 KaTeX');
+  assert.ok(manifest.some((x) => x.indexOf('libs/mermaid/') === 0), '清单含 Mermaid');
+  assert.ok(manifest.indexOf('admin.min.js') < 0 && manifest.indexOf('sw.js') < 0, '不打包后台与 Service Worker');
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const se = b.win.QingyuAdmin && b.win.QingyuAdmin._staticExport;
+  assert.ok(se && typeof se.page === 'function', '暴露静态导出模板函数');
+  const tpl = '<html><head><title>old</title><meta name="description" content="x"><link rel="canonical" href="/"><link rel="stylesheet" href="style.min.css"></head><body><div id="app"><p>loading</p></div><script defer src="app.min.js"></script><a href="/">home</a></body></html>';
+  const out = se.page(tpl, { title: 'T1', desc: 'D1', canonical: 'https://x/y', app: '<h1>HI</h1>', base: '../../' });
+  assert.ok(out.indexOf('<title>T1</title>') >= 0, '标题替换');
+  assert.ok(out.indexOf('content="D1"') >= 0, '描述替换');
+  assert.ok(out.indexOf('href="https://x/y"') >= 0, 'canonical 替换');
+  assert.ok(out.indexOf('<h1>HI</h1>') >= 0 && out.indexOf('loading') < 0, '#app 内容替换');
+  assert.ok(out.indexOf('href="../../style.min.css"') >= 0 && out.indexOf('src="../../app.min.js"') >= 0, '嵌套页资源前缀');
+  assert.ok(out.indexOf('href="../../"') >= 0, '根链接相对化');
+  const zip = b.win.QingyuAdmin._transfer.zip([{ name: 'a.txt', text: 'hi' }, { name: 'b.bin', data: new Uint8Array([1, 2, 3]) }]);
+  assert.ok(zip, 'ZIP 含二进制文件也能生成');
+  const admin = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(admin.indexOf('id="abIeExportStatic"') >= 0 && admin.indexOf('function exportStaticSite') >= 0, '后台导出入口已接入');
+}]);
+
 /* ---------- 运行 ---------- */
 (async () => {
   let passed = 0, failed = 0;
