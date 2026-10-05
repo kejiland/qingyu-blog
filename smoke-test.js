@@ -1799,6 +1799,7 @@ tests.push(['后台设置：新增「功能开关」标签页（分页 / 广告�
   assert.ok(src.indexOf('id="abAdsClient"') >= 0, 'AdSense 客户端 ID');
   assert.ok(src.indexOf('features: JSON.stringify({') >= 0, '保存 features 配置');
   assert.ok(src.indexOf('navExtras:') >= 0, '保存新增导航开关');
+  assert.ok(src.indexOf('ab-ai-text') >= 0 && src.indexOf('ab-ai-result\"><pre>') < 0, 'AI 结果不再直接按代码块显示');
   assert.ok(src.indexOf('syncFeaturesDraft') >= 0, '载入 features 草稿');
 }]);
 
@@ -3548,6 +3549,7 @@ tests.push(['i18n 完整性：兜底与 zh-CN.json 一致、语言包无重复�
     for (const m of raw.matchAll(/^\s*"([^"]+)"\s*:/gm)) { if (seen[m[1]]) dups.push(m[1]); seen[m[1]] = 1; }
     assert.deepStrictEqual(dups, [], lang + ' 存在重复键: ' + dups.join(','));
   }
+  assert.ok(!/```|\$\$/.test(zh['admin.settings.featRichContentHint'] || ''), '功能开关提示不直接显示代码语法');
 }]);
 
 /** 让 boot() 的 #app 支持局部 querySelector，并桥接 app.js 暴露到 window 的函数，

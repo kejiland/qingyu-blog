@@ -2409,7 +2409,7 @@
     if (isReplace) {
       extraPaste = '<button type="button" class="ab-btn sm ghost" data-abai-use="paste">' + icon('download', 12) + ' ' + esc(t('ai.assist.pasteEnd')) + '</button>';
     }
-    return '<div class="ab-ai-result"><pre>' + esc(result) + '</pre>'
+    return '<div class="ab-ai-result"><div class="ab-ai-text">' + esc(result) + '</div>'
       + '<div class="ab-row" style="gap:8px;margin-top:8px;flex-wrap:wrap">'
       + '<button type="button" class="ab-btn sm primary" data-abai-use="' + useAct + '">' + esc(useLabel) + '</button>'
       + extraPaste

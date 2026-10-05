@@ -758,7 +758,7 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-ai-msg { font-size: 12.5px; color: var(--ab-muted); width: 100%; }
 .ab-ai-out { width: 100%; }
 .ab-ai-result { border: 1px solid var(--ab-border); border-radius: var(--ab-radius-sm); background: var(--ab-card-solid); padding: 9px 11px; margin-top: 2px; }
-.ab-ai-result pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.6; max-height: 220px; overflow: auto; }
+.ab-ai-result .ab-ai-text { margin: 0; white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.7; max-height: 220px; overflow: auto; font-family: inherit; }
 .ab-ai-card { border: 1px solid var(--ab-border); border-left: 3px solid var(--ab-primary); border-radius: var(--ab-radius-sm); background: var(--ab-card-solid); padding: 13px 15px; }
 
 /* ============================================================

@@ -942,7 +942,7 @@
   "admin.editor.seoHint": "Empty fields are generated automatically; use these for custom search/share copy",
   "admin.settings.featRich": "Content rendering",
   "admin.settings.featRichContent": "Diagrams / math rendering",
-  "admin.settings.featRichContentHint": "When on, ```mermaid fenced blocks render as diagrams and $…$ / $$…$$ render as math. The libraries load only when a page actually uses them, so normal pages make no extra requests",
+  "admin.settings.featRichContentHint": "When on, Mermaid blocks render as diagrams and math syntax renders as formulas. The libraries load only when a page actually uses them, so normal pages make no extra requests",
   "admin.settings.featNavigation": "Top navigation",
   "admin.settings.featNavExtras": "Show new navigation items",
   "admin.settings.featNavExtrasHint": "When on, newly added default navigation items (Categories, History, Series, Popular) are shown; turning it off hides only those items and keeps custom links",

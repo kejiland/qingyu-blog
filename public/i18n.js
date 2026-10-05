@@ -692,7 +692,7 @@
     "admin.settings.featDiag": "诊断与上报",
     "admin.settings.featRich": "内容渲染",
     "admin.settings.featRichContent": "图表 / 公式渲染",
-    "admin.settings.featRichContentHint": "开启后，正文里的 ```mermaid 代码块会渲染成图表、$…$ / $$…$$ 会渲染成数学公式；仅在页面真的用到时才加载对应库，普通页面零额外请求",
+  "admin.settings.featRichContentHint": "开启后，正文里的 Mermaid 代码块会渲染成图表，数学公式语法会渲染成公式；仅在页面真的用到时才加载对应库，普通页面零额外请求",
   "admin.settings.featNavigation": "顶部导航",
   "admin.settings.featNavExtras": "显示新增导航项",
   "admin.settings.featNavExtrasHint": "开启后显示分类、历史、系列、热门等新增默认导航项；关闭只隐藏这些新增项，不影响后台自定义链接",
