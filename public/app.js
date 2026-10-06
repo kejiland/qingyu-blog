@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.65';
+var BLOG_VERSION = '2.10.66';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -197,6 +197,7 @@ function svgIcon(name, size) {
     doc: '<svg ' + s + ' ' + c + '><path d="M7 3h7l4 4v14H7z"/><path d="M14 3v4h4M9.5 12h5M9.5 15h5"/></svg>',
     top: '<svg ' + s + ' ' + c + '><path d="M12 20V6"/><path d="M6 11.5 12 5.5l6 6"/></svg>',
     'arrow-left': '<svg ' + s + ' ' + c + '><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+    chevron: '<svg ' + s + ' ' + c + '><path d="M6 9.5l6 6 6-6"/></svg>',
     pen: '<svg ' + s + ' ' + c + '><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     logout: '<svg ' + s + ' ' + c + '><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
     trash: '<svg ' + s + ' ' + c + '><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/></svg>',
@@ -2157,7 +2158,7 @@ function app() { return document.querySelector('#app'); }
   var dropdownHtml = '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>'
     + '<button type="button" class="nav-link nav-dropdown-trigger' + (secondaryActive ? ' active' : '') + '"'
     + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false" aria-controls="navExploreMenu">'
-    + esc(t('nav.explore')) + '</button>'
+    + esc(t('nav.explore')) + '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
     + '<div class="sub-menu" id="navExploreMenu" role="menu">' + secondaryLinks + '</div></div>';
   var insertAt = 0;
   for (var pi = 0; pi < navs.length; pi++) {
@@ -2205,7 +2206,7 @@ function app() { return document.querySelector('#app'); }
   var sidebarGroup = '<div class="sidebar-nav-group' + (secondaryActive ? ' has-active' : '') + '" data-nav-dropdown>'
     + '<button type="button" class="sidebar-link sidebar-dropdown-trigger' + (secondaryActive ? ' active' : '') + '"'
     + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false" aria-controls="sidebarExploreMenu">'
-    + '<span>' + esc(t('nav.explore')) + '</span><span class="sidebar-caret" aria-hidden="true">⌄</span></button>'
+    + '<span>' + esc(t('nav.explore')) + '</span><span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
     + '<div class="sidebar-submenu" id="sidebarExploreMenu">' + sidebarSecondary + '</div></div>';
   var sidebarInsert = 0;
   for (var si = 0; si < navs.length; si++) {
