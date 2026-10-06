@@ -4997,7 +4997,7 @@
         var badge = (builtin && inDiscover) ? '<span class="ab-nav-badge">' + t('admin.settings.navDiscoverBadge') + '</span>' : '';
         var toggle = badge + '<button class="ab-btn-icon' + (inDiscover ? ' is-on' : '') + '" data-toggle-discover="' + i + '"'
           + ' title="' + t(inDiscover ? 'admin.settings.navDiscoverRemove' : 'admin.settings.navDiscoverToggle') + '">' + icon('layers', 14) + '</button>';
-        return '<div class="ab-nav-row' + (inDiscover ? ' is-discover' : '') + '" data-idx="' + i + '"'
+        return '<div class="ab-nav-group"><div class="ab-nav-row' + (inDiscover ? ' is-discover' : '') + '" data-idx="' + i + '"'
           + (state === null ? '' : ' data-discover="' + state + '"') + '>' +
           '<span class="ab-nav-drag" draggable="true" data-idx="' + i + '" title="' + t('admin.settings.navDragHandle') + '">' + icon('grip', 14) + '</span>' +
           '<input class="ab-input ab-nav-text" data-idx="' + i + '" value="' + esc(it.text || '') + '" placeholder="' + t('admin.settings.newMenu') + '">' +
@@ -5005,7 +5005,7 @@
           '<span class="ab-nav-discover">' + toggle + '</span>' +
           '<button class="ab-btn-icon" data-addchild="' + i + '" title="' + t('admin.settings.subMenu') + '">' + icon('plus', 14) + '</button>' +
           '<button class="ab-btn-icon danger" data-rmitem="' + i + '" title="' + t('admin.comments.delete') + '">' + icon('trash', 14) + '</button>' +
-        '</div>' + childRowsHtml(it, i);
+        '</div>' + childRowsHtml(it, i) + '</div>';
       }).join('') + '</div>' : '<div class="ab-hint">' + t('admin.settings.navEmpty') + '</div>');
 
     wrap.innerHTML += '<div class="ab-nav-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +

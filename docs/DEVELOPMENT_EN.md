@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.77** (2026-10-07).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.78** (2026-10-07).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -217,6 +217,7 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.75 | Fix admin "remove from Discover" button showing no state change: admin isDiscoverNav ignored discover:false, so built-in entries stayed in the Discover submenu |
 | 2026-10-07 | v2.10.76 | Unified input widths in the admin nav editor: top-level and child rows now use a fixed column grid, the Discover badge no longer squeezes the inputs, and child rows are no longer indented |
 | 2026-10-07 | v2.10.77 | Custom categories: add free-form sub-categories (software / system / server…) under the Categories nav, pick a category per post from a dropdown, and clicking a category lists matching posts via ?category= exactly like the homepage; nested sub-categories now expand inline inside the Discover dropdown |
+| 2026-10-07 | v2.10.78 | Stronger hierarchy in the admin nav editor: each top-level item and its sub-items are grouped with a connector line, elbow branches, node dots and a parent accent bar, without changing the input widths |
 
 ---
 

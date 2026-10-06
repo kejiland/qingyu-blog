@@ -959,3 +959,62 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-chart .line { stroke-linecap: round; stroke-linejoin: round; }
 .ab-chart .ylab { font-size: 10px; }
 .ab-chart .dot { transition: r .12s ease, fill .12s ease; }
+
+/* 导航编辑器层级感：父级 + 二级子级包成一组，用竖线 / 折角 / 节点点 + 底色表达从属关系
+   （只用绝对定位画连接线，不加内边距，保证一级与二级输入框宽度完全一致） */
+.ab-nav-group {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 0;
+  border-radius: 12px;
+  background: var(--ab-hover);
+  background: color-mix(in srgb, var(--ab-primary) 5%, transparent);
+}
+.ab-nav-group::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 25px;
+  bottom: 25px;
+  border-left: 1.5px dashed var(--ab-line);
+  border-left-color: color-mix(in srgb, var(--ab-primary) 42%, transparent);
+}
+.ab-nav-group > .ab-nav-row:not(.child) { position: relative; }
+.ab-nav-group > .ab-nav-row:not(.child)::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--ab-primary);
+}
+.ab-nav-group > .ab-nav-row:not(.child) .ab-nav-text { font-weight: 600; }
+.ab-nav-row.child {
+  position: relative;
+  background: transparent;
+}
+.ab-nav-row.child::before {
+  content: "";
+  position: absolute;
+  left: 11px;
+  top: 50%;
+  width: 13px;
+  border-top: 1.5px dashed var(--ab-line);
+  border-top-color: color-mix(in srgb, var(--ab-primary) 42%, transparent);
+}
+.ab-nav-row.child::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: var(--ab-primary);
+  opacity: .55;
+}
