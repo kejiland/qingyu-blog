@@ -1018,3 +1018,10 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
   background: var(--ab-primary);
   opacity: .55;
 }
+
+/* 父子成组整体拖拽：拖动父级时整组一起变暗，落点线覆盖父级 + 全部二级 */
+.ab-nav-group.dragging { opacity: .5; }
+.ab-nav-group.dragging > .ab-nav-row.dragging { opacity: 1; }
+.ab-nav-group.drop-before { box-shadow: inset 0 2px 0 var(--ab-primary); }
+.ab-nav-group.drop-after { box-shadow: inset 0 -2px 0 var(--ab-primary); }
+.ab-nav-group.drop-into { background: var(--ab-primary-weak); }

@@ -5068,13 +5068,16 @@
 
     /* ---------- 拖拽排序：一级项之间、一级与二级之间、二级之间都可拖动 ---------- */
     function clearMarks() {
-      wrap.querySelectorAll('.ab-nav-row').forEach(function (r) {
+      wrap.querySelectorAll('.ab-nav-row, .ab-nav-group').forEach(function (r) {
         r.classList.remove('drop-before', 'drop-after', 'drop-into');
       });
     }
     function applyDrop(src, row) {
       if (!src || !row) return false;
       var isChild = row.classList.contains('child');
+      // 父级行的落点标记画在整个分组（父级+子级）上，所以读标记要看分组
+      var mark = (!isChild && row.parentNode && row.parentNode.classList.contains('ab-nav-group')) ? row.parentNode : row;
+      if (src.kind === 'item' && isChild && parseInt(row.getAttribute('data-idx'), 10) === src.idx) return false; // 不能拖成自己的子级
       var ridx = parseInt(row.getAttribute('data-idx'), 10);
       if (src.kind === 'child') {
         var parent = settingsDraft.nav[src.idx];
@@ -5083,8 +5086,8 @@
         if (isChild && ridx === src.idx) {
           var kids = settingsDraft.nav[src.idx].children;
           var tc = parseInt(row.getAttribute('data-cidx'), 10);
-          var pos = tc + (row.classList.contains('drop-after') ? 1 : 0);
-          if (row.classList.contains('drop-into')) pos = kids.length;
+          var pos = tc + (mark.classList.contains('drop-after') ? 1 : 0);
+          if (mark.classList.contains('drop-into')) pos = kids.length;
           kids.splice(Math.max(0, Math.min(pos, kids.length)), 0, moving);
         } else if (isChild) {
           var target = settingsDraft.nav[ridx];
@@ -5094,7 +5097,7 @@
         } else {
           // 拖回一级：插到该行前面
           var arr = settingsDraft.nav;
-          var pos2 = ridx + (row.classList.contains('drop-after') ? 1 : 0);
+          var pos2 = ridx + (mark.classList.contains('drop-after') ? 1 : 0);
           if (pos2 > arr.length) pos2 = arr.length;
           arr.splice(pos2, 0, moving);
         }
@@ -5108,13 +5111,13 @@
         if (!host) { list.splice(Math.min(src.idx, list.length), 0, item); return false; }
         if (!host.children) host.children = [];
         var cpos = host.children.length;
-        if (row.classList.contains('drop-after')) {
+        if (mark.classList.contains('drop-after')) {
           cpos = parseInt(row.getAttribute('data-cidx'), 10) + 1;
         }
         if (cpos > host.children.length) cpos = host.children.length;
         host.children.splice(cpos, 0, item);
       } else {
-        var pos = ridx + (row.classList.contains('drop-after') ? 1 : 0);
+        var pos = ridx + (mark.classList.contains('drop-after') ? 1 : 0);
         if (pos > list.length) pos = list.length;
         list.splice(pos, 0, item);
       }
@@ -5128,6 +5131,11 @@
         dragSrc = cidx === null ? { kind: 'item', idx: idx } : { kind: 'child', idx: idx, cidx: parseInt(cidx, 10) };
         var row = h.closest ? h.closest('.ab-nav-row') : null;
         if (row) row.classList.add('dragging');
+        // 父级：整组（父级 + 二级子级）一起高亮，让「成组拖拽」看得见
+        if (dragSrc.kind === 'item') {
+          var grp = h.closest ? h.closest('.ab-nav-group') : null;
+          if (grp) grp.classList.add('dragging');
+        }
         try {
           e.dataTransfer.effectAllowed = 'move';
           e.dataTransfer.setData('text/plain', String(idx));
@@ -5137,6 +5145,7 @@
         dragSrc = null;
         clearMarks();
         wrap.querySelectorAll('.ab-nav-row').forEach(function (r) { r.classList.remove('dragging'); });
+        wrap.querySelectorAll('.ab-nav-group').forEach(function (g) { g.classList.remove('dragging'); });
       });
     });
 
@@ -5152,14 +5161,16 @@
           // 子项行：靠上/靠中拖进该子项的父级，靠下插到它后面
           if (ratio < 0.34) { row.classList.add('drop-into'); row.classList.remove('drop-after'); }
           else { row.classList.add('drop-after'); row.classList.remove('drop-into'); }
-        } else if (ratio < 0.5) {
-          row.classList.add('drop-before');
         } else {
-          row.classList.add('drop-after');
+          // 父级：落点标记画在整个分组上（父级 + 所有子级一起移动）
+          var grp2 = row.parentNode && row.parentNode.classList.contains('ab-nav-group') ? row.parentNode : row;
+          grp2.classList.add(ratio < 0.5 ? 'drop-before' : 'drop-after');
         }
       });
       row.addEventListener('dragleave', function () {
         row.classList.remove('drop-before', 'drop-after', 'drop-into');
+        var gl = row.parentNode;
+        if (gl && gl.classList && gl.classList.contains('ab-nav-group')) gl.classList.remove('drop-before', 'drop-after');
       });
       row.addEventListener('drop', function (e) {
         if (!dragSrc) return;
