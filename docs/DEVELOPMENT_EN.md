@@ -211,6 +211,7 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.69 | Admin nav editor supports custom dropdowns: any top-level item can host a submenu, submenus can be toggled into the 「发现」 group, and nav entries are freely drag-and-drop reorderable across levels |
 | 2026-10-07 | v2.10.70 | Unify dropdown styling globally: the built-in 「发现」 menu and custom top-level dropdowns share one set of caret position, size, color and expanded-state rules, so any new dropdown added in the admin matches automatically |
 | 2026-10-07 | v2.10.71 | 展开态配色统一：自定义下拉展开时主链接文字与箭头一起变为强调色（此前只有箭头变色），桌面顶栏与手机侧栏同步生效 |
+| 2026-10-07 | v2.10.72 | 紧急修复：修正 index.html 中 app.min.js 脚本地址多出的反斜杠，导致线上主脚本 404、页面永久停在「加载中」；同时首屏渲染抛错时不再卡死加载动画（改为显示错误与返回首页），「发现」下拉无内容时不再渲染空菜单 |
 
 ---
 

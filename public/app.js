@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.71';
+var BLOG_VERSION = '2.10.72';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -2252,7 +2252,8 @@ function app() { return document.querySelector('#app'); }
     var sKey = navs[si].path || (/^#\//.test(sRaw) ? sRaw.slice(1) : (/^\//.test(sRaw) ? sRaw : null));
     if (sKey === '/') { sidebarInsert = si + 1; break; }
   }
-  sidebarPrimary.splice(sidebarInsert, 0, sidebarGroup);
+  // 「发现」下拉没有任何内容时不渲染（避免出现点开是空的菜单）
+  if (secondaryNavs.length) sidebarPrimary.splice(sidebarInsert, 0, sidebarGroup);
   var sidebarLinks = sidebarPrimary.join('');
 
   // 侧栏：品牌名 + 主题切换 + 导航链接 + 语言切换
@@ -6151,8 +6152,15 @@ window.__bootPromise = (async function () {
   try {
     route();
   } catch (errBoot) {
+    try { console.error('[boot] route failed:', errBoot); } catch (e) { /* ignore */ }
     var app0 = document.querySelector('#app');
-    if (app0 && !app0.innerHTML.trim()) app0.innerHTML = '<div class="container"><p>' + (getSiteName ? getSiteName() : '') + '</p></div>';
+    var boot0 = document.getElementById('bootLoad');
+    if (boot0 && boot0.parentNode) boot0.parentNode.removeChild(boot0);
+    if (app0 && !app0.querySelector('main')) {
+      app0.innerHTML = '<main class="container"><div class="empty"><div class="big">!</div>'
+        + '<p>' + esc((errBoot && errBoot.message) || 'render failed') + '</p>'
+        + '<p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>';
+    }
   }
   window.addEventListener('hashchange', function () { route(); });
   window.addEventListener('popstate', function () { route(); });
