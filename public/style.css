@@ -411,6 +411,7 @@ a:hover { text-decoration: underline; }
 /* 展开时统一：内置「发现」与自定义下拉的触发区都变为强调色 */
 .main-nav .click-dropdown.dropdown-open > .nav-dropdown-trigger,
 .main-nav .click-dropdown.dropdown-open > .nav-sub-caret { color: var(--accent); }
+.main-nav .click-dropdown.dropdown-open > .nav-link { color: var(--accent); }
 
 /* 侧栏里带自定义二级的项：链接行 + 右侧展开箭头 */
 .sidebar-link-row { position: relative; }
@@ -436,6 +437,7 @@ a:hover { text-decoration: underline; }
 .sidebar-link-row > .sidebar-link.active ~ .sidebar-sub-caret { color: var(--accent); }
 .sidebar-link-row:hover > .sidebar-sub-caret { color: var(--fg); }
 .sidebar-nav-group.dropdown-open > .sidebar-link-row > .sidebar-sub-caret { color: var(--accent); }
+.sidebar-nav-group.dropdown-open > .sidebar-link-row > .sidebar-link { color: var(--accent); }
 
 /* ---------- 汉堡按钮（默认隐藏，仅移动端显示） ---------- */
 .hamburger-btn {

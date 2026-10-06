@@ -210,6 +210,7 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.68 | Fix 「发现」 dropdown item alignment: dropdown entries no longer inherit the top-nav underline style; now a left-aligned list with left accent bar + soft highlight for the active item. |
 | 2026-10-07 | v2.10.69 | Admin nav editor supports custom dropdowns: any top-level item can host a submenu, submenus can be toggled into the 「发现」 group, and nav entries are freely drag-and-drop reorderable across levels |
 | 2026-10-07 | v2.10.70 | Unify dropdown styling globally: the built-in 「发现」 menu and custom top-level dropdowns share one set of caret position, size, color and expanded-state rules, so any new dropdown added in the admin matches automatically |
+| 2026-10-07 | v2.10.71 | 展开态配色统一：自定义下拉展开时主链接文字与箭头一起变为强调色（此前只有箭头变色），桌面顶栏与手机侧栏同步生效 |
 
 ---
 
