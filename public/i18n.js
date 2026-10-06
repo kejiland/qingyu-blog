@@ -19,7 +19,7 @@
 
   var DEFAULT_LANG = 'zh-CN';
   /* 语言 JSON 缓存版本：修改 locales/*.json 后递增，强制浏览器拉新文件 */
-  var I18N_VER = '9';
+  var I18N_VER = '10';
   var _locale = DEFAULT_LANG;
   var _translations = {};
 
@@ -51,6 +51,7 @@
     "categories.title": "分类",
     "categories.empty": "暂无分类",
     "nav.archive": "归档",
+    "nav.explore": "发现",
     "nav.about": "关于",
     "nav.admin": "后台",
     "nav.toggle": "展开导航",

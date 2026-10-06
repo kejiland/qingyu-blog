@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.63** (2026-10-04).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.64** (2026-10-04).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 

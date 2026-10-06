@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.63';
+var BLOG_VERSION = '2.10.64';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -1978,6 +1978,17 @@ function app() { return document.querySelector('#app'); }
     return items.filter(function (it) { return !NAV_EXTRA_PATHS[navUrlKey(it)]; });
   }
 
+  // 「发现」下拉菜单的固定内容：标签 / 分类 / 历史 / 系列 / 热门。
+  // 这里无视旧版 navExtras 隐藏开关：五个入口始终可从二级菜单打开。
+  var SECONDARY_NAV = [
+    { i18n: 'nav.tags',       url: '/tags',       path: '/tags' },
+    { i18n: 'nav.categories', url: '/categories', path: '/categories' },
+    { i18n: 'nav.history',    url: '/history',     path: '/history' },
+    { i18n: 'nav.series',     url: '/series',     path: '/series' },
+    { i18n: 'nav.popular',    url: '/popular',    path: '/popular' }
+  ];
+  var SECONDARY_NAV_KEYS = {};
+  SECONDARY_NAV.forEach(function (it) { SECONDARY_NAV_KEYS[navUrlKey(it)] = 1; });
   function navUrlKey(it) {
     var u = String((it && it.url) || '/').replace(/^#/, '');
     if (u.charAt(0) !== '/') return u;
@@ -2016,6 +2027,34 @@ function app() { return document.querySelector('#app'); }
     }
     if (c.features && c.features.navExtras === false) items = hideExtraNav(items);
     return items;
+  }
+
+  // 一级导航中移出五个固定入口，改由「发现」按钮点击展开。
+  function primaryNavItems() {
+    return navItems().filter(function (it) { return !SECONDARY_NAV_KEYS[navUrlKey(it)]; });
+  }
+
+  // 始终返回完整的二级菜单；自定义文案可覆盖，但删除/隐藏不会让入口消失。
+  function secondaryNavItems() {
+    var configured = navItems();
+    return SECONDARY_NAV.map(function (def) {
+      var key = navUrlKey(def);
+      var match = null;
+      for (var i = 0; i < configured.length; i++) {
+        if (navUrlKey(configured[i]) === key) { match = configured[i]; break; }
+      }
+      if (!match) return def;
+      var out = {};
+      Object.keys(def).forEach(function (k) { out[k] = def[k]; });
+      if (match.path) out.path = match.path;
+      if (match.i18n) {
+        out.i18n = match.i18n;
+      } else if (match.text) {
+        delete out.i18n;
+        out.text = match.text;
+      }
+      return out;
+    });
   }
 
   // 旧后台保存数据里的默认中文文案：路径命中内置项时，仅当文本为空或等于当初的
@@ -2078,7 +2117,23 @@ function app() { return document.querySelector('#app'); }
   }
 
   function renderNav(active) {
-  var navs = resolveNav(navItems());
+  var navs = resolveNav(primaryNavItems());
+  var secondaryNavs = resolveNav(secondaryNavItems());
+  var secondaryActive = secondaryNavs.some(function (n) {
+    var raw = n.url || '/';
+    var key = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
+    return !!key && key === active;
+  });
+
+  // 二级菜单链接：点击「发现」后展示
+  var secondaryLinks = secondaryNavs.map(function (n) {
+    var raw = n.url || '/';
+    var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
+    var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
+    var cls = (pathKey && pathKey === active) ? 'nav-link active' : 'nav-link';
+    return '<a href="' + esc(url) + '" class="' + cls + '" role="menuitem">' + esc(n.text || '') + '</a>';
+  }).join('');
+
   var links = navs.map(function (n) {
     var raw = n.url || '/';
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
@@ -2096,7 +2151,21 @@ function app() { return document.querySelector('#app'); }
     }
     var ext = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
     return '<div class="nav-item"><a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a></div>';
-  }).join('');
+  });
+
+  // 「发现」入口：button 负责点击展开/收起，本身不触发页面跳转
+  var dropdownHtml = '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>'
+    + '<button type="button" class="nav-link nav-dropdown-trigger' + (secondaryActive ? ' active' : '') + '"'
+    + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false" aria-controls="navExploreMenu">'
+    + esc(t('nav.explore')) + '</button>'
+    + '<div class="sub-menu" id="navExploreMenu" role="menu">' + secondaryLinks + '</div></div>';
+  var insertAt = 0;
+  for (var pi = 0; pi < navs.length; pi++) {
+    var pRaw = navs[pi].url || '/';
+    var pKey = navs[pi].path || (/^#\//.test(pRaw) ? pRaw.slice(1) : (/^\//.test(pRaw) ? pRaw : null));
+    if (pKey === '/') { insertAt = pi + 1; break; }
+  }
+  links.splice(insertAt, 0, dropdownHtml);
 
   var langSwitch = '<div class="lang-wrap" id="langWrap" role="group" aria-label="' + langTitle() + '">'
     + '<button class="icon-btn" id="langToggle" aria-label="' + langTitle() + '" title="' + langTitle() + '" aria-haspopup="listbox" aria-controls="langPop" aria-expanded="false">' + svgIcon('globe', 18) + '</button>'
@@ -2117,15 +2186,35 @@ function app() { return document.querySelector('#app'); }
   var bgAnimBtn = '<button class="icon-btn" id="bgAnimToggle" aria-pressed="' + (bgAnimOn ? 'true' : 'false') + '" aria-label="' + t('bgAnim.title') + '" title="' + (bgAnimOn ? t('bgAnim.on') : t('bgAnim.off')) + '">' + svgIcon('spark', 18) + '</button>';
   var hamburger = '<button class="hamburger-btn" id="hamburgerBtn" aria-label="' + t('nav.toggle') + '"><span></span><span></span><span></span></button>';
 
-  // 侧边栏导航项（移动端用）
-  var sidebarLinks = navs.map(function (n) {
+  // 侧边栏同样采用点击展开的二级菜单（移动端没有桌面顶栏）
+  var sidebarPrimary = navs.map(function (n) {
     var raw = n.url || '/';
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'sidebar-link active' : 'sidebar-link';
     var ext = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
     return '<a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a>';
+  });
+  var sidebarSecondary = secondaryNavs.map(function (n) {
+    var raw = n.url || '/';
+    var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
+    var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
+    var cls = (pathKey && pathKey === active) ? 'sidebar-link sidebar-child active' : 'sidebar-link sidebar-child';
+    return '<a href="' + esc(url) + '" class="' + cls + '">' + esc(n.text || '') + '</a>';
   }).join('');
+  var sidebarGroup = '<div class="sidebar-nav-group' + (secondaryActive ? ' has-active' : '') + '" data-nav-dropdown>'
+    + '<button type="button" class="sidebar-link sidebar-dropdown-trigger' + (secondaryActive ? ' active' : '') + '"'
+    + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false" aria-controls="sidebarExploreMenu">'
+    + '<span>' + esc(t('nav.explore')) + '</span><span class="sidebar-caret" aria-hidden="true">⌄</span></button>'
+    + '<div class="sidebar-submenu" id="sidebarExploreMenu">' + sidebarSecondary + '</div></div>';
+  var sidebarInsert = 0;
+  for (var si = 0; si < navs.length; si++) {
+    var sRaw = navs[si].url || '/';
+    var sKey = navs[si].path || (/^#\//.test(sRaw) ? sRaw.slice(1) : (/^\//.test(sRaw) ? sRaw : null));
+    if (sKey === '/') { sidebarInsert = si + 1; break; }
+  }
+  sidebarPrimary.splice(sidebarInsert, 0, sidebarGroup);
+  var sidebarLinks = sidebarPrimary.join('');
 
   // 侧栏：品牌名 + 主题切换 + 导航链接 + 语言切换
   var sidebar = '<div class="sidebar-overlay" id="sidebarOverlay"></div>'
@@ -2155,7 +2244,7 @@ function app() { return document.querySelector('#app'); }
     + '<header class="topbar' + (active && _searchOpen ? ' searching' : '') + '">'
     + '<div class="container topbar-inner">'
     + '<div class="topbar-left">' + hamburger + '<a class="brand" href="' + esc(href('/')) + '">' + getSiteName() + '</a></div>'
-    + '<nav class="main-nav">' + links + '</nav>'
+    + '<nav class="main-nav">' + links.join('') + '</nav>'
     + '<div class="topbar-actions">' + searchBtn + langSwitch + accentSwitch + bgAnimBtn + themeBtn + '</div>'
     + searchForm
     + '</div>'
@@ -5682,6 +5771,38 @@ function bindNavClicks() {
   if (typeof document === 'undefined') return;
   document.addEventListener('click', function (e) {
     try {
+      // 「发现」下拉：点击切换；桌面顶栏与手机侧栏共用同一套状态
+      var trigger = e.target;
+      while (trigger && !(trigger.getAttribute && trigger.getAttribute('data-nav-dropdown-trigger') !== null)) {
+        trigger = trigger.parentNode;
+      }
+      if (trigger) {
+        e.preventDefault();
+        var group = trigger;
+        while (group && !(group.getAttribute && group.getAttribute('data-nav-dropdown') !== null)) {
+          group = group.parentNode;
+        }
+        var shouldOpen = group && !group.classList.contains('dropdown-open');
+        document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
+          openItem.classList.remove('dropdown-open');
+          var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
+          if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+        });
+        if (group && shouldOpen) {
+          group.classList.add('dropdown-open');
+          trigger.setAttribute('aria-expanded', 'true');
+        }
+        return;
+      }
+      // 点击菜单和按钮以外的区域时收起
+      document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
+        if (!openItem.contains(e.target)) {
+          openItem.classList.remove('dropdown-open');
+          var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
+          if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+        }
+      });
+
       var a = e.target;
       while (a && a.tagName !== 'A') a = a.parentNode;
       if (!a || !a.getAttribute) return;
@@ -5719,6 +5840,14 @@ function bindNavClicks() {
       }
       catch (err) {}
   }, true);
+  document.addEventListener('keydown', function (e) {
+    if (!e || e.key !== 'Escape') return;
+    document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
+      openItem.classList.remove('dropdown-open');
+      var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
+      if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+    });
+  });
 }
 
 /* 目录点击：平滑滚动到正文对应标题，避免改变 location.hash 触发 hash 路由 */

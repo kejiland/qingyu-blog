@@ -2692,13 +2692,16 @@ tests.push(['保存文件：系统对话框原地覆盖，不支持时回退下�
   assert.strictEqual(ok2, false, '无对话框时回退下载');
 }]);
 
-tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文本/子菜单/外链', async () => {
+tests.push(['导航渲染：一级导航 + 「发现」点击下拉 + resolveNav 支持 i18n/直接文本/子菜单/外链', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
-  // 默认主导航渲染：9 项（首页/标签/分类/历史/系列/热门/归档/留言/关于）
+  // 一级导航只留 首页/归档/留言板/关于，其余五项收进「发现」下拉
   const mainNav = (b.html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
   assert.ok(mainNav.includes('>首页<') || mainNav.includes('>Home<'), '默认导航含首页（i18n）');
-  assert.ok(mainNav.includes('>归档<') || mainNav.includes('>Archive<'), '默认导航含归档');
-  assert.ok((mainNav.match(/nav-link/g) || []).length >= 7, '默认导航至少 7 个链接');
+  assert.ok(mainNav.includes('data-nav-dropdown-trigger') && mainNav.includes('id="navExploreMenu"'), '「发现」是点击展开的下拉入口');
+  ['标签', '分类', '历史', '系列', '热门'].forEach((t) => assert.ok(mainNav.includes('>' + t + '<'), '下拉菜单含「' + t + '」'));
+  assert.ok(mainNav.includes('href="/tags"') && mainNav.includes('href="/categories"') && mainNav.includes('href="/history"') && mainNav.includes('href="/series"') && mainNav.includes('href="/popular"'), '下拉菜单五个链接齐全（历史走 /history）');
+  assert.ok(mainNav.includes('>归档<') || mainNav.includes('>Archive<'), '一级导航保留「归档」');
+  assert.ok((mainNav.match(/nav-link/g) || []).length >= 7, '默认导航至少 7 个可点链接');
   assert.ok(!mainNav.includes('target="_blank"'), '默认导航全为站内链接（无外链）');
   // resolveNav 支持直接 text（无 i18n key）与子菜单（自定义导航移除后解析器仍保留该能力）
   const items = [
@@ -2750,6 +2753,23 @@ tests.push(['导航渲染：默认主导航 + resolveNav 支持 i18n/直接文�
   assert.ok(!hiddenNav.some(function (x) { return x.url === '/history'; }), '关闭开关后隐藏历史导航');
   assert.ok(hiddenNav.some(function (x) { return x.url === '/tags'; }), '关闭新增导航开关不影响基础导航');
   assert.ok(hiddenNav.some(function (x) { return x.url === 'https://status.example'; }), '关闭新增导航开关不影响自定义链接');
+}]);
+
+tests.push(['「发现」下拉：后台删掉/隐藏入口后五个二级项仍然存在', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.ctx._siteSettings = {
+    nav_defaults_version: String(b.ctx.NAV_DEFAULT_VERSION),
+    nav_menu: JSON.stringify([{ i18n: 'nav.home', url: '/', path: '/' }]),
+    features: JSON.stringify({ navExtras: false })
+  };
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  const mainNav = (html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
+  assert.strictEqual(b.ctx.secondaryNavItems().length, 5, '二级菜单固定 5 项');
+  ['标签', '分类', '历史', '系列', '热门'].forEach((t) => assert.ok(mainNav.includes('>' + t + '<'), '删除/隐藏后「' + t + '」仍在下拉里'));
+  assert.ok(mainNav.includes('data-nav-dropdown-trigger') && mainNav.includes('id="navExploreMenu"'), '下拉结构仍在');
+  assert.ok(mainNav.includes('href="/history"'), '历史入口指向 /history');
+  assert.ok(!mainNav.includes('>留言<'), '一级导航只渲染配置里的项');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
