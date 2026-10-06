@@ -4701,7 +4701,9 @@
       ['i18n', 'path', 'discover'].forEach(function (k) {
         if (old[k] !== undefined && old[k] !== null && old[k] !== '') item[k] = old[k];
       });
-      if (row.getAttribute('data-discover') === '1') item.discover = true;
+      var rowDiscover = row.getAttribute('data-discover');
+      if (rowDiscover === '1') item.discover = true;
+      else if (rowDiscover === '0') item.discover = false;
       var childRows = wrap.querySelectorAll('.ab-nav-row.child[data-idx="' + idx + '"]');
       if (childRows.length) {
         item.children = [];
@@ -4974,10 +4976,13 @@
       (items.length ? '<div class="ab-nav-list">' + items.map(function (it, i) {
         var builtin = !!NAV_DISCOVER_PATHS[navKeyOf(it.url)];
         var inDiscover = isDiscoverNav(it);
-        var toggle = builtin
-          ? '<span class="ab-nav-badge">' + t('admin.settings.navDiscoverBadge') + '</span>'
-          : '<button class="ab-btn-icon' + (it.discover ? ' is-on' : '') + '" data-toggle-discover="' + i + '" title="' + t('admin.settings.navDiscoverToggle') + '">' + icon('layers', 14) + '</button>';
-        return '<div class="ab-nav-row' + (inDiscover ? ' is-discover' : '') + '" data-idx="' + i + '"' + (inDiscover ? ' data-discover="1"' : '') + '>' +
+        // 三态：'1' 明确放入 / '0' 明确移出（含内置入口）/ null 未设置（内置项保持默认在「发现」里）
+        var state = it.discover === true ? '1' : (it.discover === false ? '0' : null);
+        var badge = (builtin && inDiscover) ? '<span class="ab-nav-badge">' + t('admin.settings.navDiscoverBadge') + '</span>' : '';
+        var toggle = badge + '<button class="ab-btn-icon' + (inDiscover ? ' is-on' : '') + '" data-toggle-discover="' + i + '"'
+          + ' title="' + t(inDiscover ? 'admin.settings.navDiscoverRemove' : 'admin.settings.navDiscoverToggle') + '">' + icon('layers', 14) + '</button>';
+        return '<div class="ab-nav-row' + (inDiscover ? ' is-discover' : '') + '" data-idx="' + i + '"'
+          + (state === null ? '' : ' data-discover="' + state + '"') + '>' +
           '<span class="ab-nav-drag" draggable="true" data-idx="' + i + '" title="' + t('admin.settings.navDragHandle') + '">' + icon('grip', 14) + '</span>' +
           '<input class="ab-input ab-nav-text" data-idx="' + i + '" value="' + esc(it.text || '') + '" placeholder="' + t('admin.settings.newMenu') + '">' +
           '<input class="ab-input ab-nav-url" data-idx="' + i + '" value="' + esc(it.url || '') + '" placeholder="/path">' +
@@ -5012,7 +5017,8 @@
         var idx = parseInt(btn.getAttribute('data-toggle-discover'), 10);
         var it = settingsDraft.nav[idx];
         if (!it) return;
-        if (it.discover) delete it.discover; else it.discover = true;
+        // 再次点击即取消：内置入口（标签/分类/历史/系列/热门）也能移出「发现」，回到一级导航
+        it.discover = isDiscoverNav(it) ? false : true;
         refresh();
       });
     });

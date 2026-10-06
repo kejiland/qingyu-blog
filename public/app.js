@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.73';
+var BLOG_VERSION = '2.10.74';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -2035,7 +2035,10 @@ function app() { return document.querySelector('#app'); }
 
   // 是否归入「发现」二级下拉：内置五项（按路径识别，兼容旧数据）+ 后台手动标记的项。
   function isDiscoverItem(it) {
-    return !!SECONDARY_NAV_KEYS[navUrlKey(it)] || !!(it && it.discover);
+    if (!it) return false;
+    // 后台显式设为 false 的项（discover:false）一律移出一级导航，即使路径是内置入口
+    if (it.discover === false) return false;
+    return !!SECONDARY_NAV_KEYS[navUrlKey(it)] || !!it.discover;
   }
   // 一级导航中移出「发现」下拉里的入口，改由「发现」按钮点击展开。
   function primaryNavItems() {

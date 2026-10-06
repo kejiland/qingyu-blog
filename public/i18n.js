@@ -992,6 +992,7 @@
     "admin.settings.navDragHandle": "拖动排序",
     "admin.settings.navDiscoverBadge": "发现 · 二级",
     "admin.settings.navDiscoverToggle": "放入 / 移出「发现」下拉",
+    "admin.settings.navDiscoverRemove": "移出「发现」下拉",
     "admin.settings.addMenuItem": "添加菜单项",
     "admin.settings.resetDefault": "重置为默认导航",
     "toast.encryptedCloud": "已加密（云端已更新）",

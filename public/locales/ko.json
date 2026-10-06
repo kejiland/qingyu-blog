@@ -480,6 +480,7 @@
   "admin.settings.navDragHandle": "드래그하여 정렬",
   "admin.settings.navDiscoverBadge": "탐색 · 서브",
   "admin.settings.navDiscoverToggle": "「탐색」 드롭다운에 넣기/빼기",
+  "admin.settings.navDiscoverRemove": "「탐색」 드롭다운에서 빼기",
   "admin.settings.addMenuItem": "메뉴 항목 추가",
   "admin.settings.resetDefault": "기본 내비로 초기화",
   "admin.error.apiFetchUnavailable": "apiFetch를 사용할 수 없습니다",

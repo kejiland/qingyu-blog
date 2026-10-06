@@ -480,6 +480,7 @@
   "admin.settings.navDragHandle": "ドラッグで並べ替え",
   "admin.settings.navDiscoverBadge": "発見 · サブ",
   "admin.settings.navDiscoverToggle": "「発見」ドロップダウンに出し入れ",
+  "admin.settings.navDiscoverRemove": "「発見」ドロップダウンから移す",
   "admin.settings.addMenuItem": "メニューアイテムを追加",
   "admin.settings.resetDefault": "デフォルトナビに戻す",
   "admin.error.apiFetchUnavailable": "apiFetch が利用できません",

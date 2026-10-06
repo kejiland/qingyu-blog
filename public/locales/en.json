@@ -480,6 +480,7 @@
   "admin.settings.navDragHandle": "Drag to reorder",
   "admin.settings.navDiscoverBadge": "Discover · sub",
   "admin.settings.navDiscoverToggle": "Move in / out of the Explore dropdown",
+  "admin.settings.navDiscoverRemove": "Remove from the Explore dropdown",
   "admin.settings.addMenuItem": "Add menu item",
   "admin.settings.resetDefault": "Reset to default nav",
   "admin.error.apiFetchUnavailable": "apiFetch unavailable",
