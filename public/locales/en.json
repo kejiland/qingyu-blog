@@ -61,6 +61,7 @@
   "home.noPosts": "No posts yet.",
   "home.loadingCloud": "Fetching posts…",
   "home.noPostsCloud": "You haven't published any posts yet",
+  "home.noPostsFiltered": "Nothing here yet",
   "home.loadFail": "Failed to load posts",
   "featured.title": "Featured Articles",
   "archive.title": "Archive",

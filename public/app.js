@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.82';
+var BLOG_VERSION = '2.10.83';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -2539,9 +2539,12 @@ function renderHome() {
     body = { html: '<div id="listContainer" class="list-nopager">' + homeLoadingHtml() + '</div>', page: 1, totalPages: 1 };
   } else {
     // 云端已确认在线且列表为空 → 「你还未发布文章」+ 写文章引导；静态空（或探测失败）→ 原「还没有文章」
+    // 带标签 / 分类筛选时的空列表属于「该筛选下暂无内容」，不是「本站还没有文章」，
+    // 因此不显示「去写一篇」——否则任何访客点开一个空的二级菜单就能看到后台写作入口
+    var isFiltered = !!(tag || cat);
     var cloudEmpty = _cloudReady && _cloudOn() && !filtered.length;
-    var emptyMsg = cloudEmpty ? t('home.noPostsCloud') : t('home.noPosts');
-    var emptyExtra = cloudEmpty
+    var emptyMsg = isFiltered ? t('home.noPostsFiltered') : (cloudEmpty ? t('home.noPostsCloud') : t('home.noPosts'));
+    var emptyExtra = (cloudEmpty && !isFiltered)
       ? '<a class="btn btn-sm btn-primary" style="margin-top:14px" href="' + esc(href('/admin/posts/new')) + '" data-no-hijack="1">' + svgIcon('pen', 14) + ' ' + t('admin.dashboard.goWrite') + '</a>'
       : '';
     body = homeListHtml(filtered, ads, adsEnabled, page, pageSize, emptyMsg, emptyExtra);

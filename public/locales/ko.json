@@ -61,6 +61,7 @@
   "home.noPosts": "아직 글이 없습니다.",
   "home.loadingCloud": "글을 불러오는 중…",
   "home.noPostsCloud": "아직 글을 게시하지 않았습니다",
+  "home.noPostsFiltered": "여기에 아직 글이 없습니다",
   "home.loadFail": "글 불러오기 실패",
   "featured.title": "주요 글",
   "archive.title": "아카이브",

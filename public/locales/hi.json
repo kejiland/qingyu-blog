@@ -61,6 +61,7 @@
   "home.noPosts": "अभी कोई लेख नहीं है।",
   "home.loadingCloud": "लेख लाए जा रहे हैं…",
   "home.noPostsCloud": "आपने अभी कोई लेख प्रकाशित नहीं किया है",
+  "home.noPostsFiltered": "यहाँ अभी कोई लेख नहीं है",
   "home.loadFail": "लेख लोड करने में विफल",
   "featured.title": "विशेष लेख",
   "archive.title": "संग्रह",

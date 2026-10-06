@@ -61,6 +61,7 @@
   "home.noPosts": "まだ記事がありません。",
   "home.loadingCloud": "記事を取得中…",
   "home.noPostsCloud": "まだ記事を公開していません",
+  "home.noPostsFiltered": "ここにはまだ記事がありません",
   "home.loadFail": "記事の読み込みに失敗しました",
   "featured.title": "おすすめ記事",
   "archive.title": "アーカイブ",
