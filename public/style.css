@@ -291,7 +291,6 @@ a:hover { text-decoration: underline; }
   transition: transform 0.18s ease;
 }
 .nav-caret svg { display: block; }
-.click-dropdown.dropdown-open > .nav-dropdown-trigger .nav-caret,
 .sidebar-nav-group.dropdown-open .nav-caret { transform: rotate(180deg); }
 .sidebar-dropdown-trigger .nav-caret { margin-left: auto; }
 .sub-menu {
@@ -323,9 +322,9 @@ a:hover { text-decoration: underline; }
   transform: translateY(-4px);
 }
 .click-dropdown > .nav-dropdown-trigger {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
   vertical-align: middle;
   appearance: none;
   -webkit-appearance: none;
@@ -334,6 +333,19 @@ a:hover { text-decoration: underline; }
   color: inherit;
   font: inherit;
   cursor: pointer;
+}
+/* 右侧留出箭头位（用更高优先级，避免被窄屏的 padding 覆盖） */
+.main-nav .click-dropdown > .nav-dropdown-trigger { padding-right: 23px; }
+/* 选中下划线只覆盖文字宽度，避免因右侧留了箭头位而显得偏右 */
+.main-nav .click-dropdown > .nav-dropdown-trigger::after { right: 23px; }
+.click-dropdown > .nav-dropdown-trigger .nav-caret {
+  position: absolute;
+  right: 3px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.click-dropdown.dropdown-open > .nav-dropdown-trigger .nav-caret {
+  transform: translateY(-50%) rotate(180deg);
 }
 .sub-menu a {
   color: var(--fg);
