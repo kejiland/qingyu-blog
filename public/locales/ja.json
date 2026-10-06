@@ -985,7 +985,6 @@
   "admin.webmentions.deleteFail": "削除に失敗しました：",
   "admin.webmentions.deleteConfirm": "この引用を削除しますか？",
   "nav.authors": "著者",
-  "nav.all": "すべて",
   "authors.title": "著者",
   "authors.empty": "著者がまだいません",
   "authors.count": "{n} 件の記事",
