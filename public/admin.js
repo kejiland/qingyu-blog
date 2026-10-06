@@ -4945,7 +4945,10 @@
     return v.replace(/\/+$/, '') || '/';
   }
   function isDiscoverNav(it) {
-    return !!NAV_DISCOVER_PATHS[navKeyOf(it && it.url)] || !!(it && it.discover);
+    if (!it) return false;
+    // 与前台保持一致：discover === false 表示用户明确移出「发现」，内置入口也不例外
+    if (it.discover === false) return false;
+    return !!NAV_DISCOVER_PATHS[navKeyOf(it.url)] || !!it.discover;
   }
 
   function renderNavVisual(content) {

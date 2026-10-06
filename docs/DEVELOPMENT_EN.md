@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.70** (2026-10-07).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.75** (2026-10-07).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -213,7 +213,8 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.71 | 展开态配色统一：自定义下拉展开时主链接文字与箭头一起变为强调色（此前只有箭头变色），桌面顶栏与手机侧栏同步生效 |
 | 2026-10-07 | v2.10.72 | 紧急修复：修正 index.html 中 app.min.js 脚本地址多出的反斜杠，导致线上主脚本 404、页面永久停在「加载中」；同时首屏渲染抛错时不再卡死加载动画（改为显示错误与返回首页），「发现」下拉无内容时不再渲染空菜单 |
 | 2026-10-07 | v2.10.73 | 修正「发现」字号偏小：下拉触发按钮上的 font 简写会把字号重置为 16px（其他导航 18.5px），改为只继承字体族；侧栏导航同步继承字体族 |
-| 2026-10-07 | v2.10.74 | 后台导航新增「取消发现二级」：内置的标签 / 分类 / 历史 / 系列 / 热门也能一键移出「发现」下拉、回到一级导航，再点一次可放回；支持放入 / 移出 / 默认三态 |
+| 2026-10-07 | v2.10.74 | Admin nav can now opt out of the "Discover" submenu: built-in Tags / Categories / History / Series / Popular can be moved back to the top level, with put-in / take-out / default tri-state toggle |
+| 2026-10-07 | v2.10.75 | Fix admin "remove from Discover" button showing no state change: admin isDiscoverNav ignored discover:false, so built-in entries stayed in the Discover submenu |
 
 ---
 
