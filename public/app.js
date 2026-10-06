@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.64';
+var BLOG_VERSION = '2.10.65';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -5680,8 +5680,11 @@ function bindMobileSidebar() {
   if (hamburger) hamburger.addEventListener('click', openSidebar);
   if (closeBtn) closeBtn.addEventListener('click', closeSidebar);
   if (overlay) overlay.addEventListener('click', closeSidebar);
-  // 点击侧边栏链接后自动关闭
-  sidebar.querySelectorAll('.sidebar-link').forEach(function (a) {
+  // 点击侧边栏链接后自动关闭。
+  // 注意：排除「发现」下拉触发按钮——它同样带 .sidebar-link，若一并绑定 closeSidebar，
+  // 点击会在展开下拉的同一帧把整个侧栏关掉，导致手机端下拉看起来「点了没反应」。
+  // 改为展开/收起下拉时不关侧栏，点了菜单项（真实链接）才关闭。
+  sidebar.querySelectorAll('.sidebar-link:not([data-nav-dropdown-trigger])').forEach(function (a) {
     a.addEventListener('click', closeSidebar);
   });
   // 侧边栏内的主题切换（独立 ID，与顶栏不冲突）
@@ -5765,6 +5768,29 @@ function updateBackTop() {
 
 /* 站内链接点击拦截：history 模式用 pushState，避免整页刷新 */
 var _navClickBound = false;
+// 展开/收起「发现」下拉：切class的同时直接写内联 display。
+// 这样即使浏览器/Service Worker 还缓存着旧样式（缺 .dropdown-open 规则），
+// 下拉依然能正常打开，不会出现「点了没反应」。
+function setDropdownOpen(group, open) {
+    if (!group) return;
+    var panel = group.querySelector('.sub-menu, .sidebar-submenu');
+    if (group.classList.contains('dropdown-open')) group.classList.remove('dropdown-open');
+    else if (open) group.classList.add('dropdown-open');
+    var trigger = group.querySelector('[data-nav-dropdown-trigger]');
+    if (trigger) trigger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if (!panel) return;
+    if (open) {
+      panel.style.display = group.classList.contains('sidebar-nav-group') ? 'block' : 'flex';
+      panel.style.opacity = '1';
+      panel.style.visibility = 'visible';
+      panel.style.transform = 'translateY(0)';
+    } else {
+      panel.style.display = '';
+      panel.style.opacity = '';
+      panel.style.visibility = '';
+      panel.style.transform = '';
+    }
+  }
 function bindNavClicks() {
   if (_navClickBound) return;
   _navClickBound = true;
@@ -5784,12 +5810,10 @@ function bindNavClicks() {
         }
         var shouldOpen = group && !group.classList.contains('dropdown-open');
         document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
-          openItem.classList.remove('dropdown-open');
-          var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
-          if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+          setDropdownOpen(openItem, false);
         });
         if (group && shouldOpen) {
-          group.classList.add('dropdown-open');
+          setDropdownOpen(group, true);
           trigger.setAttribute('aria-expanded', 'true');
         }
         return;
@@ -5797,9 +5821,7 @@ function bindNavClicks() {
       // 点击菜单和按钮以外的区域时收起
       document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
         if (!openItem.contains(e.target)) {
-          openItem.classList.remove('dropdown-open');
-          var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
-          if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+          setDropdownOpen(openItem, false);
         }
       });
 
@@ -5843,9 +5865,7 @@ function bindNavClicks() {
   document.addEventListener('keydown', function (e) {
     if (!e || e.key !== 'Escape') return;
     document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
-      openItem.classList.remove('dropdown-open');
-      var openTrigger = openItem.querySelector('[data-nav-dropdown-trigger]');
-      if (openTrigger) openTrigger.setAttribute('aria-expanded', 'false');
+      setDropdownOpen(openItem, false);
     });
   });
 }
@@ -6078,14 +6098,23 @@ window.__bootPromise = (async function () {
   bindNavClicks();
   // 全局样式非阻塞加载后，首帧渲染前需等它就绪（与 i18n 并行），避免 FOUC
   var _cssReady = _waitGlobalStyle();
-  // 确保 i18n 翻译数据在首次渲染前加载完成
+  // 确保 i18n 翻译数据在首次渲染前加载完成。
+  // 网络挂起时最多等 I18N_WAIT_MS：超时也照样先渲染（内嵌字典兜底，导航照常可用），
+  // 语言包到达后会自动重渲染，避免整页卡在加载动画、下拉点不开。
   if (window.__i18n && window.__i18n.loadLocale && !window.__i18n.isReady()) {
-    await window.__i18n.loadLocale(window.__i18n.getLocale());
-    _i18nReady = true;
+    var _i18nLoad = window.__i18n.loadLocale(window.__i18n.getLocale()).then(function () { _i18nReady = true; });
+    var _i18nTimer = new Promise(function (resolve) { setTimeout(resolve, 3000); });
+    await Promise.race([_i18nLoad, _i18nTimer]);
   }
 
   await _cssReady;
-  route();
+  // 首屏渲染兜底：route() 抛错时也要把页面画出来，避免停在加载动画
+  try {
+    route();
+  } catch (errBoot) {
+    var app0 = document.querySelector('#app');
+    if (app0 && !app0.innerHTML.trim()) app0.innerHTML = '<div class="container"><p>' + (getSiteName ? getSiteName() : '') + '</p></div>';
+  }
   window.addEventListener('hashchange', function () { route(); });
   window.addEventListener('popstate', function () { route(); });
 

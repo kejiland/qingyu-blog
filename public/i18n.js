@@ -1077,15 +1077,22 @@
     var base = _baseDir();
     var url = base + '/locales/' + lang + '.json?v=' + I18N_VER;
     var loaded = false;
+    // 超时兜底：网络/CDN 挂起时（弱网、Workers 冷启动）最多等 LOCALE_TIMEOUT_MS，
+    // 超时立刻回退内嵌字典，绝不让首屏卡在这里
+    var LOCALE_TIMEOUT_MS = 6000;
+    var ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ctrl ? setTimeout(function () { ctrl.abort(); }, LOCALE_TIMEOUT_MS) : null;
     try {
-      var resp = await fetch(url);
+      var resp = await fetch(url, ctrl ? { signal: ctrl.signal } : undefined);
       if (resp.ok) {
         _translations = await resp.json();
         loaded = true;
       }
     } catch (e) {}
-    // fetch 失败时回退 XMLHttpRequest
-    if (!loaded) {
+    if (timer) clearTimeout(timer);
+    // fetch 失败时回退 XMLHttpRequest：仅用于 file:// 直开（fetch/XHR 被拦截），
+    // 网络环境不再用同步 XHR 兜底——同步请求遇到挂起的连接会冻结整个页面
+    if (!loaded && typeof location !== 'undefined' && location.protocol === 'file:') {
       try {
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, false);

@@ -8,9 +8,11 @@
  * ============================================================ */
 'use strict';
 
-var CACHE_VERSION = '2.10.64';
+var CACHE_VERSION = '2.10.65';
 var SHELL_CACHE = 'qingyu-shell-' + CACHE_VERSION;
 var RUNTIME_CACHE = 'qingyu-runtime-' + CACHE_VERSION;
+// 只预缓存「首屏必需」资源：后台编辑器 / 音乐播放器 / 背景动画体积大且用不到，
+// 预缓存它们会和首屏抢带宽（弱网下反而更慢），改为首次访问时按需进运行时缓存。
 var SHELL = [
   './',
   './index.html',
@@ -19,11 +21,6 @@ var SHELL = [
   './posts.min.js',
   './i18n.min.js',
   './app.min.js',
-  './admin.min.css',
-  './admin.min.js',
-  './music-player.min.css',
-  './music-player.min.js',
-  './bg-anim.min.js',
   './manifest.webmanifest',
   './icons/icon-192.png',
   './icons/icon-512.png',

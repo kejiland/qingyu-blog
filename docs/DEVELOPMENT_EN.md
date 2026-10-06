@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.64** (2026-10-04).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.65** (2026-10-06).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -204,6 +204,7 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-04 | Navigation | Legacy `nav_menu` data is merged with newly added defaults on first load; once saved, items deliberately removed by the owner are not re-added |
 | 2026-10-04 | Navigation switch | Feature switches can hide the newly added defaults (Categories / History / Series / Popular) while keeping base navigation and custom links |
 | 2026-10-05 | Admin display | Removed raw Mermaid / math syntax from feature-switch hints; AI results now use normal text layout instead of a code block |
+| 2026-10-06 | First-paint stability | Timeout fallbacks for locale/API loads (a hung request no longer freezes the page), inline-style fallback for the Explore dropdown, trimmed Service Worker precache |
 
 ---
 
