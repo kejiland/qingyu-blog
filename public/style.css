@@ -331,7 +331,9 @@ a:hover { text-decoration: underline; }
   border: 0;
   background: transparent;
   color: inherit;
-  font: inherit;
+  /* 只继承字体族，不要用 font 简写：简写会把字号重置为父级的 16px，
+     导致「发现」比同级导航小一圈。字号统一交给 .nav-link / .sidebar-link。 */
+  font-family: inherit;
   cursor: pointer;
 }
 /* 右侧留出箭头位（用更高优先级，避免被窄屏的 padding 覆盖） */
@@ -536,6 +538,7 @@ a:hover { text-decoration: underline; }
 .sidebar-link {
   display: block;
   padding: 12px 24px;
+  font-family: inherit;
   font-size: 15px;
   color: var(--fg);
   text-decoration: none;
