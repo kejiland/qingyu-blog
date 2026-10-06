@@ -2957,9 +2957,21 @@
     if (!list) return;
     var posts = [];
     try { posts = await listPosts(); } catch (e) {}
-    var seen = {};
-    posts.forEach(function (x) { if (x && x.category) seen[x.category] = 1; });
-    list.innerHTML = Object.keys(seen).sort().map(function (c) { return '<option value="' + esc(c) + '"></option>'; }).join('');
+    var seen = {}; var names = [];
+    // 先放后台「分类」导航里自定义的分类（软件 / 系统 / 服务器…），再补历史已用分类，保证都能选
+    var navCfg = parseArr(settingsCache && settingsCache.nav_menu, []);
+    navCfg.forEach(function (it) {
+      if (!it || String(it.url || '').replace(/\/+$/, '') !== '/categories') return;
+      (it.children || []).forEach(function (c) {
+        var name = c && String(c.text || '').trim();
+        if (name && !seen[name]) { seen[name] = 1; names.push(name); }
+      });
+    });
+    posts.forEach(function (x) {
+      var c2 = x && x.category ? String(x.category).trim() : '';
+      if (c2 && !seen[c2]) { seen[c2] = 1; names.push(c2); }
+    });
+    list.innerHTML = names.map(function (c) { return '<option value="' + esc(c) + '"></option>'; }).join('');
   }
   /** 作者候选：来自已有文章的作者 + 站点个人资料昵称 */
   async function fillAuthorOptions(content) {

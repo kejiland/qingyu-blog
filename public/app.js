@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.76';
+var BLOG_VERSION = '2.10.77';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -2058,7 +2058,7 @@ function app() { return document.querySelector('#app'); }
       }
       if (!def) {
         // 自定义放进「发现」的项：直接沿用后台配置
-        out.push({ text: it.text || '', url: it.url, path: it.path, i18n: it.i18n });
+        out.push({ text: it.text || '', url: it.url, path: it.path, i18n: it.i18n, children: it.children });
         return;
       }
       var item = {};
@@ -2070,6 +2070,7 @@ function app() { return document.querySelector('#app'); }
         delete item.i18n;
         item.text = it.text;
       }
+      if (it.children && it.children.length) item.children = it.children;
       out.push(item);
     });
     return out;
@@ -2123,15 +2124,56 @@ function app() { return document.querySelector('#app'); }
       var i18n = it.i18n || (isDefaultZhText(norm, it.text) ? (defMap[norm] || '') : '');
       var text = (i18n ? t(i18n) : '') || it.text || '';
       var n = { text: text, url: it.url, path: it.path };
+      var isCatParent = navUrlKey(it) === '/categories';
       if (it.children && it.children.length) {
         n.children = it.children.map(function (c) {
           var cNorm = String(c.url || '/').replace(/^#?\//, '/');
           var cI18n = c.i18n || (isDefaultZhText(cNorm, c.text) ? (defMap[cNorm] || '') : '');
-          return { text: (cI18n ? t(cI18n) : '') || c.text || '', url: c.url };
+          var cText = (cI18n ? t(cI18n) : '') || c.text || '';
+          // 分类导航的子项 = 自定义分类：链接自动指向「按该分类筛选」的文章列表（/?category=名称），
+          // 后台只需填写分类名称，无需手写链接
+          var cUrl = isCatParent ? ('/?category=' + encodeURIComponent(String(cText).trim())) : c.url;
+          return { text: cText, url: cUrl };
         });
       }
       return n;
     });
+  }
+
+  /* ---------- 自定义分类 ----------
+   * 「分类」导航（/categories）的子菜单 = 自定义分类列表，后台可自由增删改名，不写死。
+   * 每篇文章只属于一个分类；点击分类即按 ?category= 过滤，列表样式与首页一致。 */
+  function categoryNavItem() {
+    var list = resolveNav(navItems());
+    for (var i = 0; i < list.length; i++) {
+      if (navUrlKey(list[i]) === '/categories') return list[i];
+    }
+    return null;
+  }
+  function configuredCategories() {
+    var it = categoryNavItem();
+    if (!it || !it.children || !it.children.length) return null;
+    var seen = {}, out = [];
+    it.children.forEach(function (c) {
+      var n = String(c.text || '').trim();
+      if (n && !seen[n]) { seen[n] = 1; out.push(n); }
+    });
+    return out.length ? out : null;
+  }
+  function categoryCounts() {
+    var counts = {};
+    getPublishedPosts().forEach(function (p) {
+      var c = String(p.category || '').trim();
+      if (c) counts[c] = (counts[c] || 0) + 1;
+    });
+    return counts;
+  }
+  // 分类总表：后台自定义的分类在前，其余历史用过的按字母补在后面
+  function allCategories() {
+    var out = [], seen = {};
+    (configuredCategories() || []).forEach(function (n) { if (!seen[n]) { seen[n] = 1; out.push(n); } });
+    Object.keys(categoryCounts()).sort().forEach(function (n) { if (!seen[n]) { seen[n] = 1; out.push(n); } });
+    return out;
   }
 
   // 外链自动补 target="_blank" rel="noopener"
@@ -2147,13 +2189,33 @@ function app() { return document.querySelector('#app'); }
     return !!key && key === active;
   });
 
-  // 二级菜单链接：点击「发现」后展示
+  // 当前选中的分类（首页按 ?category= 过滤时高亮对应项）
+  var _routeQ = (typeof currentRoute === 'function' ? currentRoute() : null);
+  var activeCategory = String((_routeQ && _routeQ.query && _routeQ.query.category) || '').trim();
+
+  // 二级菜单链接：点击「发现」后展示。带子项的入口（如分类）再挂一层可就地展开的子菜单
   var secondaryLinks = secondaryNavs.map(function (n) {
     var raw = n.url || '/';
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'nav-link active' : 'nav-link';
     var tgt = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
+    if (n.children && n.children.length) {
+      var kids = n.children.map(function (c) {
+        var cRaw = c.url || '/';
+        var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
+        var cTxt = String(c.text || '').trim();
+        var cCls = (cTxt && cTxt === activeCategory) ? 'nav-link active' : 'nav-link';
+        return '<a href="' + esc(cUrl) + '" class="' + cCls + '" role="menuitem">' + esc(c.text || '') + '</a>';
+      }).join('');
+      return '<div class="sub-item-group" data-nav-dropdown>'
+        + '<div class="sub-item-row">'
+        + '<a href="' + esc(url) + '" class="' + cls + '"' + tgt + ' role="menuitem">' + esc(n.text || '') + '</a>'
+        + '<button type="button" class="sub-caret" data-nav-dropdown-trigger="true" aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">'
+        + '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
+        + '</div>'
+        + '<div class="sub-menu sub-sub-menu" role="menu">' + kids + '</div></div>';
+    }
     return '<a href="' + esc(url) + '" class="' + cls + '" role="menuitem"' + tgt + '>' + esc(n.text || '') + '</a>';
   }).join('');
 
@@ -2242,6 +2304,21 @@ function app() { return document.querySelector('#app'); }
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'sidebar-link sidebar-child active' : 'sidebar-link sidebar-child';
+    if (n.children && n.children.length) {
+      var kids = n.children.map(function (c) {
+        var cRaw = c.url || '/';
+        var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
+        var cTxt = String(c.text || '').trim();
+        var cCls = (cTxt && cTxt === activeCategory) ? 'sidebar-link sidebar-child active' : 'sidebar-link sidebar-child';
+        return '<a href="' + esc(cUrl) + '" class="' + cCls + '">' + esc(c.text || '') + '</a>';
+      }).join('');
+      return '<div class="sidebar-nav-group" data-nav-dropdown>'
+        + '<div class="sidebar-link-row">'
+        + '<a href="' + esc(url) + '" class="' + cls + '">' + esc(n.text || '') + '</a>'
+        + '<button type="button" class="sidebar-sub-caret" data-nav-dropdown-trigger="true" aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">'
+        + '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
+        + '</div><div class="sidebar-submenu">' + kids + '</div></div>';
+    }
     return '<a href="' + esc(url) + '" class="' + cls + '">' + esc(n.text || '') + '</a>';
   }).join('');
   var sidebarGroup = '<div class="sidebar-nav-group' + (secondaryActive ? ' has-active' : '') + '" data-nav-dropdown>'
@@ -3967,10 +4044,9 @@ function renderTags() {
 }
 
 function renderCategories() {
-  var posts = getPublishedPosts();
-  var counts = {};
-  posts.forEach(function (p) { var c = String(p.category || '').trim(); if (c) counts[c] = (counts[c] || 0) + 1; });
-  var names = Object.keys(counts).sort();
+  var counts = categoryCounts();
+  // 分类来源：后台「分类」导航的自定义子分类 + 历史文章已用分类
+  var names = allCategories();
   var html = renderNav(currentRoute().path);
   html += '<main class="container page-fade"><h2 class="page-title">' + svgIcon('tag', 20) + ' ' + t('categories.title') + '</h2><div class="tag-cloud">';
   names.forEach(function (c) { html += '<a class="cloud-chip" href="' + esc(href('/', { category: c })) + '">' + esc(c) + '<span class="cloud-count">' + counts[c] + '</span></a>'; });
@@ -5828,6 +5904,12 @@ function setDropdownOpen(group, open) {
       panel.style.visibility = 'visible';
       panel.style.transform = 'translateY(0)';
     } else {
+      // 收起外层时同时收起内部仍展开的子分组，避免下次打开残留展开状态
+      try {
+        group.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (d) {
+          if (d !== group) setDropdownOpen(d, false);
+        });
+      } catch (e) {}
       panel.style.display = '';
       panel.style.opacity = '';
       panel.style.visibility = '';
@@ -5852,8 +5934,10 @@ function bindNavClicks() {
           group = group.parentNode;
         }
         var shouldOpen = group && !group.classList.contains('dropdown-open');
+        // 只收起同级与无关的展开分组：保留祖先（如外层「发现」），否则点开内层子分类会把外层一起关掉
+        function navIsAncestor(anc, node) { while (node) { if (node === anc) return true; node = node.parentNode; } return false; }
         document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
-          setDropdownOpen(openItem, false);
+          if (openItem !== group && !navIsAncestor(openItem, group)) setDropdownOpen(openItem, false);
         });
         if (group && shouldOpen) {
           setDropdownOpen(group, true);

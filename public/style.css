@@ -3443,3 +3443,42 @@ html[data-theme="dark"] body.scrolled .topbar {
 .author-info b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .author-count { font-size: 12.5px; color: var(--muted); }
 .meta-author { font-weight: 500; }
+
+/* ============================================================
+ * 「发现」下拉内的二级分组（分类下的自定义子分类）
+ * 就地展开的缩进子列表，不用绝对定位浮层，避免与外层菜单重叠。
+ * ============================================================ */
+.main-nav .sub-item-group { display: flex; flex-direction: column; }
+.main-nav .sub-item-row { position: relative; display: flex; align-items: center; }
+.main-nav .sub-menu .sub-item-row > a.nav-link { padding-right: 30px; }
+.main-nav .sub-item-row > .sub-caret {
+  position: absolute;
+  right: 0; top: 0; bottom: 0;
+  width: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0; border: 0;
+  background: transparent; color: inherit;
+  cursor: pointer;
+}
+.main-nav .sub-item-row > .sub-caret .nav-caret {
+  position: static;
+  transform: none;
+  transition: transform .15s ease;
+}
+.main-nav .sub-item-group.dropdown-open .sub-caret .nav-caret { transform: rotate(180deg); }
+.main-nav .sub-item-group.dropdown-open .sub-item-row > a.nav-link { color: var(--accent); }
+.main-nav .sub-sub-menu {
+  position: static;
+  display: none;
+  min-width: 0;
+  margin: 2px 0 4px;
+  padding: 0 0 0 12px;
+  border: 0;
+  border-left: 2px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 1;
+  transform: none;
+}
+.main-nav .sub-item-group.dropdown-open > .sub-sub-menu { display: flex; }
