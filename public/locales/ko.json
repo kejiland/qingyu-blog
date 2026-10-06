@@ -985,6 +985,7 @@
   "admin.webmentions.deleteFail": "삭제 실패: ",
   "admin.webmentions.deleteConfirm": "이 인용을 삭제할까요?",
   "nav.authors": "작성자",
+  "nav.all": "전체",
   "authors.title": "작성자",
   "authors.empty": "작성자가 없습니다",
   "authors.count": "글 {n}개",

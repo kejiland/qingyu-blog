@@ -985,6 +985,7 @@
   "admin.webmentions.deleteFail": "删除失败：",
   "admin.webmentions.deleteConfirm": "确定删除这条引用？",
   "nav.authors": "作者",
+  "nav.all": "全部",
   "authors.title": "作者",
   "authors.empty": "暂无作者信息",
   "authors.count": "{n} 篇文章",

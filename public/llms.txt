@@ -1,7 +1,7 @@
 # Qingyu'Blog
 
-> 零框架 / 零构建的轻量博客系统（原生 HTML/CSS/JS + Cloudflare Workers·D1·KV·R2）。当前版本 v2.10.79。
-> A lightweight, framework-free blog system — vanilla HTML/CSS/JS plus Cloudflare Workers/D1/KV/R2. Current version v2.10.79.
+> 零框架 / 零构建的轻量博客系统（原生 HTML/CSS/JS + Cloudflare Workers·D1·KV·R2）。当前版本 v2.10.80。
+> A lightweight, framework-free blog system — vanilla HTML/CSS/JS plus Cloudflare Workers/D1/KV/R2. Current version v2.10.80.
 
 ## 关键页面 / Key pages
 

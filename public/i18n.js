@@ -32,6 +32,7 @@
     "nav.home": "首页",
     "nav.tags": "标签",
     "nav.authors": "作者",
+    "nav.all": "全部",
     "authors.title": "作者",
     "authors.empty": "暂无作者信息",
     "authors.count": "{n} 篇文章",

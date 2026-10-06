@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.79';
+var BLOG_VERSION = '2.10.80';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -2225,15 +2225,18 @@ function app() { return document.querySelector('#app'); }
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'nav-link active' : 'nav-link';
     if (n.children && n.children.length) {
+      var allLink = '<a href="' + esc(url) + '" class="nav-link nav-all-link">' + esc(t('nav.all')) + '</a>';
       var kids = n.children.map(function (c) {
         var cRaw = c.url || '/';
         var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
         var cTgt = cUrl && /^https?:|^\/\//.test(cUrl) ? ' target="_blank" rel="noopener"' : '';
         return '<a href="' + esc(cUrl) + '" class="nav-link"' + cTgt + ' role="menuitem">' + esc(c.text || '') + '</a>';
       }).join('');
+      kids = allLink + kids;
       // 主链接保留跳转能力（点标题直达该页），右侧箭头单独负责展开下拉
       return '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>' +
-        '<a href="' + esc(url) + '" class="' + cls + '"' + extOf(url) + '>' + esc(n.text || '') + '</a>' +
+        '<a href="' + esc(url) + '" class="' + cls + '"' + extOf(url)
+        + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false">' + esc(n.text || '') + '</a>' +
         '<button type="button" class="nav-sub-caret" data-nav-dropdown-trigger="true"' +
         ' aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">' +
         '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>' +
@@ -2289,9 +2292,11 @@ function app() { return document.querySelector('#app'); }
         var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
         return '<a href="' + esc(cUrl) + '" class="sidebar-link sidebar-child"' + extOf(cUrl) + '>' + esc(c.text || '') + '</a>';
       }).join('');
+      kids = '<a href="' + esc(url) + '" class="sidebar-link sidebar-child nav-all-link">' + esc(t('nav.all')) + '</a>' + kids;
       return '<div class="sidebar-nav-group" data-nav-dropdown>' +
         '<div class="sidebar-link-row">' +
-        '<a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a>' +
+        '<a href="' + esc(url) + '" class="' + cls + '"' + ext
+        + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false">' + esc(n.text || '') + '</a>' +
         '<button type="button" class="sidebar-sub-caret" data-nav-dropdown-trigger="true"' +
         ' aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">' +
         '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>' +
@@ -2312,9 +2317,11 @@ function app() { return document.querySelector('#app'); }
         var cCls = (cTxt && cTxt === activeCategory) ? 'sidebar-link sidebar-child active' : 'sidebar-link sidebar-child';
         return '<a href="' + esc(cUrl) + '" class="' + cCls + '">' + esc(c.text || '') + '</a>';
       }).join('');
+      kids = '<a href="' + esc(url) + '" class="sidebar-link sidebar-child nav-all-link">' + esc(t('nav.all')) + '</a>' + kids;
       return '<div class="sidebar-nav-group" data-nav-dropdown>'
         + '<div class="sidebar-link-row">'
-        + '<a href="' + esc(url) + '" class="' + cls + '">' + esc(n.text || '') + '</a>'
+        + '<a href="' + esc(url) + '" class="' + cls + '"'
+        + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false">' + esc(n.text || '') + '</a>'
         + '<button type="button" class="sidebar-sub-caret" data-nav-dropdown-trigger="true" aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">'
         + '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
         + '</div><div class="sidebar-submenu">' + kids + '</div></div>';

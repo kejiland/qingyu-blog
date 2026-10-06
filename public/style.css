@@ -3482,3 +3482,16 @@ html[data-theme="dark"] body.scrolled .topbar {
   transform: none;
 }
 .main-nav .sub-item-group.dropdown-open > .sub-sub-menu { display: flex; }
+
+/* 二级菜单「全部」入口：与其它二级项同风格，仅用字重与浅底色区分层次 */
+.main-nav .sub-menu a.nav-link.nav-all-link {
+  font-weight: 600;
+  color: var(--fg);
+  background: var(--bg-soft);
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 8px 8px 0 0;
+}
+.main-nav .sub-menu a.nav-link.nav-all-link:hover { color: var(--accent); }
+.main-nav .sub-sub-menu a.nav-link.nav-all-link { padding-bottom: 8px; }
+.sidebar-link.nav-all-link { font-weight: 600; }

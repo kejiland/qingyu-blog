@@ -985,6 +985,7 @@
   "admin.webmentions.deleteFail": "हटाना विफल: ",
   "admin.webmentions.deleteConfirm": "यह उद्धरण हटाएँ?",
   "nav.authors": "लेखक",
+  "nav.all": "सभी",
   "authors.title": "लेखक",
   "authors.empty": "कोई लेखक नहीं",
   "authors.count": "{n} पोस्ट",

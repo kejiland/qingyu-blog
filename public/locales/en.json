@@ -985,6 +985,7 @@
   "admin.webmentions.deleteFail": "Delete failed: ",
   "admin.webmentions.deleteConfirm": "Delete this mention?",
   "nav.authors": "Authors",
+  "nav.all": "All",
   "authors.title": "Authors",
   "authors.empty": "No authors yet",
   "authors.count": "{n} posts",
