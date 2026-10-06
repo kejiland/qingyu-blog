@@ -8,7 +8,7 @@
  * ============================================================ */
 'use strict';
 
-var CACHE_VERSION = '2.10.75';
+var CACHE_VERSION = '2.10.76';
 var SHELL_CACHE = 'qingyu-shell-' + CACHE_VERSION;
 var RUNTIME_CACHE = 'qingyu-runtime-' + CACHE_VERSION;
 // 只预缓存「首屏必需」资源：后台编辑器 / 音乐播放器 / 背景动画体积大且用不到，

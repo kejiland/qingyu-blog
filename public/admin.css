@@ -700,6 +700,19 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-link-row .ab-btn-icon, .ab-nav-row .ab-btn-icon { flex: 0 0 auto; }
 .ab-link-text, .ab-nav-text { flex: 1; min-width: 100px; }
 .ab-link-url, .ab-nav-url { flex: 1.5; min-width: 120px; }
+/* 导航编辑器：改用固定列网格，保证一级行与二级子行的输入框宽度完全一致 */
+.ab-nav-row {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) minmax(0, 1.5fr) 38px 38px 38px;
+  align-items: center;
+  gap: 6px;
+}
+.ab-nav-row .ab-nav-text, .ab-nav-row .ab-nav-url { min-width: 0; }
+.ab-nav-discover { position: relative; display: flex; align-items: center; justify-content: center; height: 38px; }
+.ab-nav-discover .ab-nav-badge { position: absolute; right: calc(100% + 4px); top: 50%; transform: translateY(-50%); white-space: nowrap; }
+.ab-nav-slot { display: block; width: 38px; height: 38px; }
+/* 子级行不再左缩进，改用底色区分层级，保证输入框与一级行等宽 */
+.ab-nav-row.child { padding-left: 0; background: var(--ab-hover); border-radius: 8px; }
 
 /* 顶部导航编辑器：拖拽排序 + 「发现 · 二级」标记 */
 .ab-nav-tip {
