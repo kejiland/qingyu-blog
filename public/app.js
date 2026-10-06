@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.68';
+var BLOG_VERSION = '2.10.70';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -198,6 +198,9 @@ function svgIcon(name, size) {
     top: '<svg ' + s + ' ' + c + '><path d="M12 20V6"/><path d="M6 11.5 12 5.5l6 6"/></svg>',
     'arrow-left': '<svg ' + s + ' ' + c + '><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
     chevron: '<svg ' + s + ' ' + c + '><path d="M6 9.5l6 6 6-6"/></svg>',
+    plus: '<svg ' + s + ' ' + c + '><path d="M12 5.2v13.6M5.2 12h13.6"/></svg>',
+    grip: '<svg ' + s + ' ' + c + '><circle cx="9" cy="6" r="1.4"/><circle cx="15" cy="6" r="1.4"/><circle cx="9" cy="12" r="1.4"/><circle cx="15" cy="12" r="1.4"/><circle cx="9" cy="18" r="1.4"/><circle cx="15" cy="18" r="1.4"/></svg>',
+    layers: '<svg ' + s + ' ' + c + '><path d="M12 3.2l8.6 4.6-8.6 4.6-8.6-4.6L12 3.2z"/><path d="M3.4 12.4l8.6 4.6 8.6-4.6"/><path d="M3.4 16.6l8.6 4.6 8.6-4.6"/></svg>',
     pen: '<svg ' + s + ' ' + c + '><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     logout: '<svg ' + s + ' ' + c + '><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
     trash: '<svg ' + s + ' ' + c + '><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/><path d="M6 7l1 13a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1l1-13M10 11v6M14 11v6"/></svg>',
@@ -2030,32 +2033,43 @@ function app() { return document.querySelector('#app'); }
     return items;
   }
 
-  // 一级导航中移出五个固定入口，改由「发现」按钮点击展开。
+  // 是否归入「发现」二级下拉：内置五项（按路径识别，兼容旧数据）+ 后台手动标记的项。
+  function isDiscoverItem(it) {
+    return !!SECONDARY_NAV_KEYS[navUrlKey(it)] || !!(it && it.discover);
+  }
+  // 一级导航中移出「发现」下拉里的入口，改由「发现」按钮点击展开。
   function primaryNavItems() {
-    return navItems().filter(function (it) { return !SECONDARY_NAV_KEYS[navUrlKey(it)]; });
+    return navItems().filter(function (it) { return !isDiscoverItem(it); });
   }
 
-  // 始终返回完整的二级菜单；自定义文案可覆盖，但删除/隐藏不会让入口消失。
+  // 「发现」下拉内容：严格按后台配置里的顺序输出。
+  // 后台拖拽排序即下拉顺序；后台删除的入口不再自动补回；也可加入自定义项（discover:true）。
   function secondaryNavItems() {
-    var configured = navItems();
-    return SECONDARY_NAV.map(function (def) {
-      var key = navUrlKey(def);
-      var match = null;
-      for (var i = 0; i < configured.length; i++) {
-        if (navUrlKey(configured[i]) === key) { match = configured[i]; break; }
+    var out = [];
+    navItems().forEach(function (it) {
+      if (!isDiscoverItem(it)) return;
+      var key = navUrlKey(it);
+      var def = null;
+      for (var i = 0; i < SECONDARY_NAV.length; i++) {
+        if (navUrlKey(SECONDARY_NAV[i]) === key) { def = SECONDARY_NAV[i]; break; }
       }
-      if (!match) return def;
-      var out = {};
-      Object.keys(def).forEach(function (k) { out[k] = def[k]; });
-      if (match.path) out.path = match.path;
-      if (match.i18n) {
-        out.i18n = match.i18n;
-      } else if (match.text) {
-        delete out.i18n;
-        out.text = match.text;
+      if (!def) {
+        // 自定义放进「发现」的项：直接沿用后台配置
+        out.push({ text: it.text || '', url: it.url, path: it.path, i18n: it.i18n });
+        return;
       }
-      return out;
+      var item = {};
+      Object.keys(def).forEach(function (k) { item[k] = def[k]; });
+      if (it.path) item.path = it.path;
+      if (it.i18n) {
+        item.i18n = it.i18n;
+      } else if (it.text) {
+        delete item.i18n;
+        item.text = it.text;
+      }
+      out.push(item);
     });
+    return out;
   }
 
   // 旧后台保存数据里的默认中文文案：路径命中内置项时，仅当文本为空或等于当初的
@@ -2117,6 +2131,10 @@ function app() { return document.querySelector('#app'); }
     });
   }
 
+  // 外链自动补 target="_blank" rel="noopener"
+  function extOf(url) {
+    return url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
+  }
   function renderNav(active) {
   var navs = resolveNav(primaryNavItems());
   var secondaryNavs = resolveNav(secondaryNavItems());
@@ -2132,7 +2150,8 @@ function app() { return document.querySelector('#app'); }
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'nav-link active' : 'nav-link';
-    return '<a href="' + esc(url) + '" class="' + cls + '" role="menuitem">' + esc(n.text || '') + '</a>';
+    var tgt = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
+    return '<a href="' + esc(url) + '" class="' + cls + '" role="menuitem"' + tgt + '>' + esc(n.text || '') + '</a>';
   }).join('');
 
   var links = navs.map(function (n) {
@@ -2140,33 +2159,38 @@ function app() { return document.querySelector('#app'); }
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'nav-link active' : 'nav-link';
-    var isChildPath = n.children && n.children.length;
-    if (isChildPath) {
+    if (n.children && n.children.length) {
       var kids = n.children.map(function (c) {
         var cRaw = c.url || '/';
         var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
-        var tgt = cUrl && /^https?:|^\/\//.test(cUrl) ? ' target="_blank" rel="noopener"' : '';
-        return '<a href="' + esc(cUrl) + '" class="nav-link"' + tgt + '>' + esc(c.text || '') + '</a>';
+        var cTgt = cUrl && /^https?:|^\/\//.test(cUrl) ? ' target="_blank" rel="noopener"' : '';
+        return '<a href="' + esc(cUrl) + '" class="nav-link"' + cTgt + ' role="menuitem">' + esc(c.text || '') + '</a>';
       }).join('');
-      return '<div class="nav-item has-sub"><a href="' + esc(url) + '" class="' + cls + '">' + esc(n.text || '') + '</a><div class="sub-menu">' + kids + '</div></div>';
+      // 主链接保留跳转能力（点标题直达该页），右侧箭头单独负责展开下拉
+      return '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>' +
+        '<a href="' + esc(url) + '" class="' + cls + '"' + extOf(url) + '>' + esc(n.text || '') + '</a>' +
+        '<button type="button" class="nav-sub-caret" data-nav-dropdown-trigger="true"' +
+        ' aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">' +
+        '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>' +
+        '<div class="sub-menu" role="menu">' + kids + '</div></div>';
     }
     var ext = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
     return '<div class="nav-item"><a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a></div>';
   });
 
   // 「发现」入口：button 负责点击展开/收起，本身不触发页面跳转
-  var dropdownHtml = '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>'
+  var dropdownHtml = secondaryNavs.length ? '<div class="nav-item has-sub click-dropdown" data-nav-dropdown>'
     + '<button type="button" class="nav-link nav-dropdown-trigger' + (secondaryActive ? ' active' : '') + '"'
     + ' data-nav-dropdown-trigger="true" aria-haspopup="true" aria-expanded="false" aria-controls="navExploreMenu">'
     + esc(t('nav.explore')) + '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>'
-    + '<div class="sub-menu" id="navExploreMenu" role="menu">' + secondaryLinks + '</div></div>';
+    + '<div class="sub-menu" id="navExploreMenu" role="menu">' + secondaryLinks + '</div></div>' : '';
   var insertAt = 0;
   for (var pi = 0; pi < navs.length; pi++) {
     var pRaw = navs[pi].url || '/';
     var pKey = navs[pi].path || (/^#\//.test(pRaw) ? pRaw.slice(1) : (/^\//.test(pRaw) ? pRaw : null));
     if (pKey === '/') { insertAt = pi + 1; break; }
   }
-  links.splice(insertAt, 0, dropdownHtml);
+  if (dropdownHtml) links.splice(insertAt, 0, dropdownHtml);
 
   var langSwitch = '<div class="lang-wrap" id="langWrap" role="group" aria-label="' + langTitle() + '">'
     + '<button class="icon-btn" id="langToggle" aria-label="' + langTitle() + '" title="' + langTitle() + '" aria-haspopup="listbox" aria-controls="langPop" aria-expanded="false">' + svgIcon('globe', 18) + '</button>'
@@ -2193,7 +2217,21 @@ function app() { return document.querySelector('#app'); }
     var pathKey = n.path || (/^#\//.test(raw) ? raw.slice(1) : (/^\//.test(raw) ? raw : null));
     var url = (/^#\//.test(raw)) ? href(raw.slice(1)) : (/^\//.test(raw) ? href(raw) : raw);
     var cls = (pathKey && pathKey === active) ? 'sidebar-link active' : 'sidebar-link';
-    var ext = url && /^https?:|^\/\//.test(url) ? ' target="_blank" rel="noopener"' : '';
+    var ext = extOf(url);
+    if (n.children && n.children.length) {
+      var kids = n.children.map(function (c) {
+        var cRaw = c.url || '/';
+        var cUrl = (/^#\//.test(cRaw)) ? href(cRaw.slice(1)) : (/^\//.test(cRaw) ? href(cRaw) : cRaw);
+        return '<a href="' + esc(cUrl) + '" class="sidebar-link sidebar-child"' + extOf(cUrl) + '>' + esc(c.text || '') + '</a>';
+      }).join('');
+      return '<div class="sidebar-nav-group" data-nav-dropdown>' +
+        '<div class="sidebar-link-row">' +
+        '<a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a>' +
+        '<button type="button" class="sidebar-sub-caret" data-nav-dropdown-trigger="true"' +
+        ' aria-label="' + esc(n.text || '') + '" aria-haspopup="true" aria-expanded="false">' +
+        '<span class="nav-caret" aria-hidden="true">' + svgIcon('chevron', 15) + '</span></button>' +
+        '</div><div class="sidebar-submenu">' + kids + '</div></div>';
+    }
     return '<a href="' + esc(url) + '" class="' + cls + '"' + ext + '>' + esc(n.text || '') + '</a>';
   });
   var sidebarSecondary = secondaryNavs.map(function (n) {

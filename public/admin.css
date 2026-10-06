@@ -701,6 +701,56 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-link-text, .ab-nav-text { flex: 1; min-width: 100px; }
 .ab-link-url, .ab-nav-url { flex: 1.5; min-width: 120px; }
 
+/* 顶部导航编辑器：拖拽排序 + 「发现 · 二级」标记 */
+.ab-nav-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--ab-muted);
+  background: var(--ab-hover);
+  border-radius: 8px;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+}
+.ab-nav-tip svg { flex: none; opacity: .8; }
+.ab-nav-drag {
+  flex: none;
+  display: flex;
+  align-items: center;
+  color: var(--ab-muted);
+  opacity: .5;
+  cursor: grab;
+  padding: 4px 1px;
+  border-radius: 5px;
+  transition: opacity .15s ease, background .15s ease;
+}
+.ab-nav-drag:hover { opacity: 1; background: var(--ab-hover); }
+.ab-nav-drag:active { cursor: grabbing; }
+.ab-nav-row.dragging { opacity: .45; }
+.ab-nav-row.drop-before { box-shadow: inset 0 2px 0 var(--ab-primary); }
+.ab-nav-row.drop-after { box-shadow: inset 0 -2px 0 var(--ab-primary); }
+.ab-nav-row.drop-into {
+  background: var(--ab-primary-weak);
+  border-radius: 8px;
+}
+.ab-nav-badge {
+  flex: none;
+  font-size: 11.5px;
+  line-height: 1;
+  padding: 5px 8px;
+  border-radius: 999px;
+  color: var(--ab-primary);
+  background: var(--ab-primary-weak);
+  white-space: nowrap;
+  user-select: none;
+}
+.ab-btn-icon.is-on {
+  color: var(--ab-primary);
+  background: var(--ab-primary-weak);
+}
+
 /* ---------- 响应式 ---------- */
 @media (max-width: 1100px) {
   .ab-grid.cols-5 { grid-template-columns: repeat(3, 1fr); }

@@ -2755,21 +2755,87 @@ tests.push(['导航渲染：一级导航 + 「发现」点击下拉 + resolveNav
   assert.ok(hiddenNav.some(function (x) { return x.url === 'https://status.example'; }), '关闭新增导航开关不影响自定义链接');
 }]);
 
-tests.push(['「发现」下拉：后台删掉/隐藏入口后五个二级项仍然存在', async () => {
+tests.push(['「发现」下拉：严格按后台配置输出（尊重删除、顺序与自定义项）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   b.ctx._siteSettings = {
     nav_defaults_version: String(b.ctx.NAV_DEFAULT_VERSION),
-    nav_menu: JSON.stringify([{ i18n: 'nav.home', url: '/', path: '/' }]),
-    features: JSON.stringify({ navExtras: false })
+    // 后台只留下「历史 / 热门」，并把一个自定义链接放进「发现」
+    nav_menu: JSON.stringify([
+      { i18n: 'nav.home', url: '/', path: '/' },
+      { i18n: 'nav.history', url: '/history', path: '/history' },
+      { text: '随手记', url: '/notes', path: '/notes', discover: true },
+      { i18n: 'nav.popular', url: '/popular', path: '/popular' },
+      { i18n: 'nav.about', url: '/about', path: '/about' }
+    ])
   };
   await b.ctx.route();
   const html = b.ctx.document.querySelector('#app').innerHTML;
   const mainNav = (html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
-  assert.strictEqual(b.ctx.secondaryNavItems().length, 5, '二级菜单固定 5 项');
-  ['标签', '分类', '历史', '系列', '热门'].forEach((t) => assert.ok(mainNav.includes('>' + t + '<'), '删除/隐藏后「' + t + '」仍在下拉里'));
+  const items = b.ctx.secondaryNavItems();
+  assert.strictEqual(items.length, 3, '下拉只输出后台保留的 2 个内置项 + 1 个自定义项');
+  assert.strictEqual(JSON.stringify(b.ctx.resolveNav(items).map((x) => x.text)), JSON.stringify(['历史', '随手记', '热门']), '下拉顺序 = 后台配置顺序');
+  assert.ok(!mainNav.includes('>标签<') && !mainNav.includes('>分类<') && !mainNav.includes('>系列<'), '后台删掉的内置入口不再自动补回');
+  assert.ok(mainNav.includes('href="/notes"'), '自定义项进入「发现」下拉');
   assert.ok(mainNav.includes('data-nav-dropdown-trigger') && mainNav.includes('id="navExploreMenu"'), '下拉结构仍在');
-  assert.ok(mainNav.includes('href="/history"'), '历史入口指向 /history');
   assert.ok(!mainNav.includes('>留言<'), '一级导航只渲染配置里的项');
+}]);
+
+tests.push(['「发现」下拉：全部移除后不再渲染「发现」按钮', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.ctx._siteSettings = {
+    nav_defaults_version: String(b.ctx.NAV_DEFAULT_VERSION),
+    nav_menu: JSON.stringify([
+      { i18n: 'nav.home', url: '/', path: '/' },
+      { i18n: 'nav.about', url: '/about', path: '/about' }
+    ])
+  };
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  const mainNav = (html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
+  assert.ok(!mainNav.includes('navExploreMenu'), '下拉为空时不渲染「发现」按钮');
+  assert.ok(mainNav.includes('href="/about"'), '一级导航照常渲染');
+}]);
+
+tests.push(['自定义二级下拉：顶栏与手机侧栏都能展开一级项的子菜单', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.ctx._siteSettings = {
+    nav_defaults_version: String(b.ctx.NAV_DEFAULT_VERSION),
+    nav_menu: JSON.stringify([
+      { i18n: 'nav.home', url: '/', path: '/' },
+      {
+        text: '专栏', url: '/columns', path: '/columns',
+        children: [
+          { text: '前端', url: '/columns/fe' },
+          { text: '后端', url: '/columns/be' }
+        ]
+      },
+      { i18n: 'nav.about', url: '/about', path: '/about' }
+    ])
+  };
+  await b.ctx.route();
+  const html = b.ctx.document.querySelector('#app').innerHTML;
+  const mainNav = (html.match(/<nav class="main-nav">.*?<\/nav>/s) || [''])[0];
+  assert.ok(mainNav.includes('href="/columns"'), '主链接保留，可直接跳转');
+  assert.ok(mainNav.includes('class="nav-sub-caret"'), '顶栏出现独立的展开箭头');
+  assert.ok(mainNav.includes('href="/columns/fe"') && mainNav.includes('href="/columns/be"'), '子菜单项已渲染');
+  assert.ok(/class="nav-item has-sub click-dropdown"/.test(mainNav), '带二级的一级项走点击展开');
+  assert.ok(html.includes('class="sidebar-link-row"') && html.includes('class="sidebar-sub-caret"'), '手机侧栏同样支持自定义二级');
+  assert.ok(html.includes('href="/columns/be"'), '侧栏也渲染了子菜单项');
+}]);
+
+tests.push(['后台导航编辑器：拖拽排序 + 「发现」标记 + 自定义二级', async () => {
+  const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(adminSrc.includes('data-toggle-discover'), '提供「放入/移出发现下拉」开关');
+  assert.ok(adminSrc.includes('admin.settings.navDiscoverBadge'), '内置二级项显示「发现 · 二级」标记');
+  assert.ok(adminSrc.includes('ab-nav-drag') && adminSrc.includes("'dragstart'") && adminSrc.includes("'drop'"), '提供拖拽排序');
+  assert.ok(/function applyDrop/.test(adminSrc) && adminSrc.includes('drop-after') && adminSrc.includes('drop-into'), '拖拽支持前插/后插/拖进子级');
+  assert.ok(adminSrc.includes('data-addchild') && adminSrc.includes('data-rmchild'), '可增删自定义二级项');
+  const css = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
+  assert.ok(css.includes('.ab-nav-drag') && css.includes('.ab-nav-badge') && css.includes('.drop-into'), '拖拽手柄 / 标记 / 落点样式齐备');
+  // 五个内置二级路径需与前台保持一致
+  ['/tags', '/categories', '/history', '/series', '/popular'].forEach((u) => {
+    assert.ok(new RegExp("'" + u + "': 1").test(adminSrc), '后台内置发现路径含 ' + u);
+  });
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {

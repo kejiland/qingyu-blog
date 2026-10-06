@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.68** (2026-10-07).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.70** (2026-10-07).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -208,6 +208,8 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.66 | Unified all dropdown carets
 | 2026-10-07 | v2.10.67 | Fixed the active state of the top-bar "Discover" item looking offset to the right: the caret is now absolutely positioned inside the right padding so the button is no longer wider than its siblings, and the active underline covers only the label width |
 | 2026-10-07 | v2.10.68 | Fix 「发现」 dropdown item alignment: dropdown entries no longer inherit the top-nav underline style; now a left-aligned list with left accent bar + soft highlight for the active item. |
+| 2026-10-07 | v2.10.69 | Admin nav editor supports custom dropdowns: any top-level item can host a submenu, submenus can be toggled into the 「发现」 group, and nav entries are freely drag-and-drop reorderable across levels |
+| 2026-10-07 | v2.10.70 | Unify dropdown styling globally: the built-in 「发现」 menu and custom top-level dropdowns share one set of caret position, size, color and expanded-state rules, so any new dropdown added in the admin matches automatically |
 
 ---
 

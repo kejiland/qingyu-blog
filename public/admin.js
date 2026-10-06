@@ -4686,28 +4686,33 @@
     if (content.querySelector('#abFooterNavVisual')) collectLinksFromDom(content, 'footerNav', '#abFooterNavVisual');
     if (content.querySelector('#abFriendsVisual')) collectLinksFromDom(content, 'links', '#abFriendsVisual');
   }
-  /** 从顶部导航可视化 DOM 收集当前编辑结果到 settingsDraft.nav 并持久化草稿 */
+  /** 从顶部导航可视化 DOM 收集当前编辑结果到 settingsDraft.nav 并持久化草稿。
+   *  保留每项的 i18n / path / discover 等元信息，只覆盖用户可见的文案与链接。 */
   function collectNavFromDom(content) {
     var wrap = content.querySelector('#abNavVisual');
     if (!wrap) return;
     var newItems = [];
-    wrap.querySelectorAll('.ab-nav-row').forEach(function (row) {
-      if (row.classList.contains('child')) return; // 子项在父项中处理
-      var idx = parseInt(row.querySelector('[data-idx]').getAttribute('data-idx'), 10);
+    wrap.querySelectorAll('.ab-nav-row:not(.child)').forEach(function (row) {
+      var idx = parseInt(row.getAttribute('data-idx'), 10);
       var text = (row.querySelector('.ab-nav-text') || {}).value || '';
       var url = (row.querySelector('.ab-nav-url') || {}).value || '';
-      var children = [];
-      wrap.querySelectorAll('.ab-nav-row.child[data-idx="' + idx + '"]').forEach(function (cr) {
-        children.push({ text: (cr.querySelector('.ab-nav-text') || {}).value || '', url: (cr.querySelector('.ab-nav-url') || {}).value || '' });
-      });
       var old = settingsDraft.nav[idx] || {};
       var item = { text: text, url: url };
-      if (old.i18n) item.i18n = old.i18n;
-      if (children.length) {
-        item.children = children.map(function (c, ci) {
-          var childOld = (old.children && old.children[ci]) || {};
-          if (childOld.i18n) c.i18n = childOld.i18n;
-          return c;
+      ['i18n', 'path', 'discover'].forEach(function (k) {
+        if (old[k] !== undefined && old[k] !== null && old[k] !== '') item[k] = old[k];
+      });
+      if (row.getAttribute('data-discover') === '1') item.discover = true;
+      var childRows = wrap.querySelectorAll('.ab-nav-row.child[data-idx="' + idx + '"]');
+      if (childRows.length) {
+        item.children = [];
+        childRows.forEach(function (cr, ci) {
+          var c = {
+            text: (cr.querySelector('.ab-nav-text') || {}).value || '',
+            url: (cr.querySelector('.ab-nav-url') || {}).value || ''
+          };
+          var cOld = (old.children && old.children[ci]) || {};
+          if (cOld.i18n) c.i18n = cOld.i18n;
+          item.children.push(c);
         });
       }
       newItems.push(item);
@@ -4930,6 +4935,17 @@
     try { var v = JSON.parse(localStorage.getItem(navDraftKey()) || 'null'); if (Array.isArray(v)) return v; } catch (e) {}
     return null;
   }
+  /* 内置「发现」二级入口（按路径识别，兼容旧数据）：这几个始终出现在「发现」下拉里 */
+  var NAV_DISCOVER_PATHS = { '/tags': 1, '/categories': 1, '/history': 1, '/series': 1, '/popular': 1 };
+  function navKeyOf(u) {
+    var v = String(u == null ? '/' : u).replace(/^#/, '');
+    if (v.charAt(0) !== '/') return v;
+    return v.replace(/\/+$/, '') || '/';
+  }
+  function isDiscoverNav(it) {
+    return !!NAV_DISCOVER_PATHS[navKeyOf(it && it.url)] || !!(it && it.discover);
+  }
+
   function renderNavVisual(content) {
     var wrap = content.querySelector('#abNavVisual');
     if (!wrap) return;
@@ -4938,44 +4954,67 @@
     if (!Array.isArray(items) || !items.length) items = defaultNavItems();
     settingsDraft.nav = items;
 
-    wrap.innerHTML = (items.length ? '<div class="ab-nav-list">' + items.map(function (it, i) {
-      var children = (it.children || []).map(function (ch, ci) {
-        return '<div class="ab-nav-row child">' +
-          '<span class="ab-nav-ico">└</span>' +
+    var dragSrc = null;
+
+    function persist() { try { localStorage.setItem(navDraftKey(), JSON.stringify(settingsDraft.nav)); } catch (e) {} }
+    function refresh() { persist(); renderNavVisual(content); }
+
+    function childRowsHtml(it, i) {
+      return (it.children || []).map(function (ch, ci) {
+        return '<div class="ab-nav-row child" data-idx="' + i + '" data-cidx="' + ci + '">' +
+          '<span class="ab-nav-drag" draggable="true" data-idx="' + i + '" data-cidx="' + ci + '" title="' + t('admin.settings.navDragHandle') + '">' + icon('grip', 14) + '</span>' +
           '<input class="ab-input ab-nav-text" data-idx="' + i + '" data-cidx="' + ci + '" value="' + esc(ch.text || '') + '" placeholder="' + t('admin.settings.subMenu') + '">' +
           '<input class="ab-input ab-nav-url" data-idx="' + i + '" data-cidx="' + ci + '" value="' + esc(ch.url || '') + '" placeholder="/path">' +
           '<button class="ab-btn-icon danger" data-rmchild="' + i + '-' + ci + '" title="' + t('admin.comments.delete') + '">' + icon('trash', 14) + '</button>' +
         '</div>';
       }).join('');
-      return '<div class="ab-nav-row">' +
-        '<span class="ab-nav-ico">' + icon('list', 14) + '</span>' +
-        '<input class="ab-input ab-nav-text" data-idx="' + i + '" value="' + esc(it.text || '') + '" placeholder="' + t('admin.settings.newMenu') + '">' +
-        '<input class="ab-input ab-nav-url" data-idx="' + i + '" value="' + esc(it.url || '') + '" placeholder="/path">' +
-        '<button class="ab-btn-icon" data-addchild="' + i + '" title="' + t('admin.settings.subMenu') + '">' + icon('plus', 14) + '</button>' +
-        '<button class="ab-btn-icon danger" data-rmitem="' + i + '" title="' + t('admin.comments.delete') + '">' + icon('trash', 14) + '</button>' +
-      '</div>' + children;
-    }).join('') + '</div>' : '<div class="ab-hint">' + t('admin.settings.navEmpty') + '</div>');
+    }
+
+    wrap.innerHTML = '<div class="ab-nav-tip">' + icon('grip', 13) + ' ' + t('admin.settings.navDragHint') + '</div>' +
+      (items.length ? '<div class="ab-nav-list">' + items.map(function (it, i) {
+        var builtin = !!NAV_DISCOVER_PATHS[navKeyOf(it.url)];
+        var inDiscover = isDiscoverNav(it);
+        var toggle = builtin
+          ? '<span class="ab-nav-badge">' + t('admin.settings.navDiscoverBadge') + '</span>'
+          : '<button class="ab-btn-icon' + (it.discover ? ' is-on' : '') + '" data-toggle-discover="' + i + '" title="' + t('admin.settings.navDiscoverToggle') + '">' + icon('layers', 14) + '</button>';
+        return '<div class="ab-nav-row' + (inDiscover ? ' is-discover' : '') + '" data-idx="' + i + '"' + (inDiscover ? ' data-discover="1"' : '') + '>' +
+          '<span class="ab-nav-drag" draggable="true" data-idx="' + i + '" title="' + t('admin.settings.navDragHandle') + '">' + icon('grip', 14) + '</span>' +
+          '<input class="ab-input ab-nav-text" data-idx="' + i + '" value="' + esc(it.text || '') + '" placeholder="' + t('admin.settings.newMenu') + '">' +
+          '<input class="ab-input ab-nav-url" data-idx="' + i + '" value="' + esc(it.url || '') + '" placeholder="/path">' +
+          toggle +
+          '<button class="ab-btn-icon" data-addchild="' + i + '" title="' + t('admin.settings.subMenu') + '">' + icon('plus', 14) + '</button>' +
+          '<button class="ab-btn-icon danger" data-rmitem="' + i + '" title="' + t('admin.comments.delete') + '">' + icon('trash', 14) + '</button>' +
+        '</div>' + childRowsHtml(it, i);
+      }).join('') + '</div>' : '<div class="ab-hint">' + t('admin.settings.navEmpty') + '</div>');
 
     wrap.innerHTML += '<div class="ab-nav-actions" style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="ab-btn sm" id="abNavAddItem">' + icon('plus', 13) + ' ' + t('admin.settings.addMenuItem') + '</button>' +
       '<button class="ab-btn sm ghost" id="abNavReset">' + icon('refresh', 13) + ' ' + t('admin.settings.resetDefault') + '</button>' +
     '</div>';
 
-    function persist() { try { localStorage.setItem(navDraftKey(), JSON.stringify(settingsDraft.nav)); } catch (e) {} }
-
-    wrap.querySelectorAll('input').forEach(function (inp) { inp.addEventListener('input', debounce(function () { collectNavFromDom(content); }, 250)); });
+    wrap.querySelectorAll('input').forEach(function (inp) {
+      inp.addEventListener('input', debounce(function () { collectNavFromDom(content); }, 250));
+    });
 
     wrap.querySelector('#abNavAddItem').addEventListener('click', function () {
       settingsDraft.nav.push({ text: t('admin.settings.newMenu'), url: '/' });
-      persist();
-      renderNavVisual(content);
+      refresh();
     });
 
     var resetBtn = wrap.querySelector('#abNavReset');
     if (resetBtn) resetBtn.addEventListener('click', function () {
       settingsDraft.nav = defaultNavItems();
-      persist();
-      renderNavVisual(content);
+      refresh();
+    });
+
+    wrap.querySelectorAll('[data-toggle-discover]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = parseInt(btn.getAttribute('data-toggle-discover'), 10);
+        var it = settingsDraft.nav[idx];
+        if (!it) return;
+        if (it.discover) delete it.discover; else it.discover = true;
+        refresh();
+      });
     });
 
     wrap.querySelectorAll('[data-addchild]').forEach(function (btn) {
@@ -4984,8 +5023,7 @@
         if (!settingsDraft.nav[idx]) return;
         if (!settingsDraft.nav[idx].children) settingsDraft.nav[idx].children = [];
         settingsDraft.nav[idx].children.push({ text: t('admin.settings.subMenu'), url: '/' });
-        persist();
-        renderNavVisual(content);
+        refresh();
       });
     });
 
@@ -4993,8 +5031,7 @@
       btn.addEventListener('click', function () {
         var idx = parseInt(btn.getAttribute('data-rmitem'), 10);
         settingsDraft.nav.splice(idx, 1);
-        persist();
-        renderNavVisual(content);
+        refresh();
       });
     });
 
@@ -5003,13 +5040,115 @@
         var parts = btn.getAttribute('data-rmchild').split('-');
         var idx = parseInt(parts[0], 10), cidx = parseInt(parts[1], 10);
         if (settingsDraft.nav[idx] && settingsDraft.nav[idx].children) settingsDraft.nav[idx].children.splice(cidx, 1);
-        persist();
-        renderNavVisual(content);
+        refresh();
+      });
+    });
+
+    /* ---------- 拖拽排序：一级项之间、一级与二级之间、二级之间都可拖动 ---------- */
+    function clearMarks() {
+      wrap.querySelectorAll('.ab-nav-row').forEach(function (r) {
+        r.classList.remove('drop-before', 'drop-after', 'drop-into');
+      });
+    }
+    function applyDrop(src, row) {
+      if (!src || !row) return false;
+      var isChild = row.classList.contains('child');
+      var ridx = parseInt(row.getAttribute('data-idx'), 10);
+      if (src.kind === 'child') {
+        var parent = settingsDraft.nav[src.idx];
+        if (!parent || !parent.children || !parent.children[src.cidx]) return false;
+        var moving = parent.children.splice(src.cidx, 1)[0];
+        if (isChild && ridx === src.idx) {
+          var kids = settingsDraft.nav[src.idx].children;
+          var tc = parseInt(row.getAttribute('data-cidx'), 10);
+          var pos = tc + (row.classList.contains('drop-after') ? 1 : 0);
+          if (row.classList.contains('drop-into')) pos = kids.length;
+          kids.splice(Math.max(0, Math.min(pos, kids.length)), 0, moving);
+        } else if (isChild) {
+          var target = settingsDraft.nav[ridx];
+          if (!target) { parent.children.splice(src.cidx, 0, moving); return false; }
+          if (!target.children) target.children = [];
+          target.children.push(moving);
+        } else {
+          // 拖回一级：插到该行前面
+          var arr = settingsDraft.nav;
+          var pos2 = ridx + (row.classList.contains('drop-after') ? 1 : 0);
+          if (pos2 > arr.length) pos2 = arr.length;
+          arr.splice(pos2, 0, moving);
+        }
+        return true;
+      }
+      var list = settingsDraft.nav;
+      if (!list[src.idx]) return false;
+      var item = list.splice(src.idx, 1)[0];
+      if (isChild) {
+        var host = settingsDraft.nav[ridx];
+        if (!host) { list.splice(Math.min(src.idx, list.length), 0, item); return false; }
+        if (!host.children) host.children = [];
+        var cpos = host.children.length;
+        if (row.classList.contains('drop-after')) {
+          cpos = parseInt(row.getAttribute('data-cidx'), 10) + 1;
+        }
+        if (cpos > host.children.length) cpos = host.children.length;
+        host.children.splice(cpos, 0, item);
+      } else {
+        var pos = ridx + (row.classList.contains('drop-after') ? 1 : 0);
+        if (pos > list.length) pos = list.length;
+        list.splice(pos, 0, item);
+      }
+      return true;
+    }
+
+    wrap.querySelectorAll('.ab-nav-drag').forEach(function (h) {
+      h.addEventListener('dragstart', function (e) {
+        var idx = parseInt(h.getAttribute('data-idx'), 10);
+        var cidx = h.getAttribute('data-cidx');
+        dragSrc = cidx === null ? { kind: 'item', idx: idx } : { kind: 'child', idx: idx, cidx: parseInt(cidx, 10) };
+        var row = h.closest ? h.closest('.ab-nav-row') : null;
+        if (row) row.classList.add('dragging');
+        try {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', String(idx));
+        } catch (err) {}
+      });
+      h.addEventListener('dragend', function () {
+        dragSrc = null;
+        clearMarks();
+        wrap.querySelectorAll('.ab-nav-row').forEach(function (r) { r.classList.remove('dragging'); });
+      });
+    });
+
+    wrap.querySelectorAll('.ab-nav-row').forEach(function (row) {
+      row.addEventListener('dragover', function (e) {
+        if (!dragSrc) return;
+        e.preventDefault();
+        try { e.dataTransfer.dropEffect = 'move'; } catch (err) {}
+        clearMarks();
+        var r = row.getBoundingClientRect();
+        var ratio = (e.clientY - r.top) / (r.height || 1);
+        if (row.classList.contains('child')) {
+          // 子项行：靠上/靠中拖进该子项的父级，靠下插到它后面
+          if (ratio < 0.34) { row.classList.add('drop-into'); row.classList.remove('drop-after'); }
+          else { row.classList.add('drop-after'); row.classList.remove('drop-into'); }
+        } else if (ratio < 0.5) {
+          row.classList.add('drop-before');
+        } else {
+          row.classList.add('drop-after');
+        }
+      });
+      row.addEventListener('dragleave', function () {
+        row.classList.remove('drop-before', 'drop-after', 'drop-into');
+      });
+      row.addEventListener('drop', function (e) {
+        if (!dragSrc) return;
+        e.preventDefault();
+        e.stopPropagation();
+        clearMarks();
+        if (applyDrop(dragSrc, row)) { dragSrc = null; refresh(); }
+        else { dragSrc = null; }
       });
     });
   }
-
-
   /* ====================== 修改密码 ====================== */
   function openPasswordModal(onSuccess) {
     var mask = document.createElement('div');
