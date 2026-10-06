@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.81** (2026-10-07).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.82** (2026-10-07).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -221,6 +221,7 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.79 | Nav groups can now be dragged as a whole: dragging a top-level item moves its parent row and all sub-items together with a group-wide highlight and insertion line; also fixes a parent being dropped onto its own sub-item and turned into a child |
 | 2026-10-07 | v2.10.80 | Unified submenu interaction and styling: nav items with submenus (e.g. Categories) now open on title click just like Explore, no longer requiring the caret; a "All" entry at the top of each submenu links back to the parent page; desktop and mobile behave identically |
 | 2026-10-07 | v2.10.81 | Removed the "All" entry from submenus: a parent nav item is now purely a heading hint that only opens its submenu and no longer navigates to a parent page; cursor unified to pointer |
+| 2026-10-07 | v2.10.82 | Fixed submenus not closing: clicking the same nav item again now closes it (desktop / mobile / nested alike); mobile submenu carets are now aligned with the Explore caret in position, hit area and rotation |
 
 ---
 

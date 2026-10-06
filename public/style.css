@@ -3487,3 +3487,24 @@ html[data-theme="dark"] body.scrolled .topbar {
 .main-nav a.nav-link[data-nav-dropdown-trigger],
 .main-nav .sub-item-row > a[data-nav-dropdown-trigger],
 .sidebar-link[data-nav-dropdown-trigger] { cursor: pointer; }
+
+/* 手机端二级箭头统一定位：「发现」与后台自定义的二级导航共用同一条规则，
+   保证箭头横向位置、点击区域、旋转方向完全一致 */
+.sidebar-dropdown-trigger { position: relative; padding-right: 42px; }
+.sidebar-dropdown-trigger .nav-caret {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  margin-left: 0;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-nav-group.dropdown-open .sidebar-dropdown-trigger .nav-caret {
+  transform: translateY(-50%) rotate(180deg);
+}
+.sidebar-dropdown-trigger:hover .nav-caret { color: var(--fg); }
+.sidebar-nav-group.dropdown-open > .sidebar-dropdown-trigger { color: var(--accent); }

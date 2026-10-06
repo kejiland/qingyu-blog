@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.81';
+var BLOG_VERSION = '2.10.82';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -5942,9 +5942,10 @@ function bindNavClicks() {
         document.querySelectorAll('[data-nav-dropdown].dropdown-open').forEach(function (openItem) {
           if (openItem !== group && !navIsAncestor(openItem, group)) setDropdownOpen(openItem, false);
         });
-        if (group && shouldOpen) {
-          setDropdownOpen(group, true);
-          trigger.setAttribute('aria-expanded', 'true');
+        // 再次点击同一个触发器 = 收起（桌面顶栏 / 手机侧栏 / 嵌套子分类统一行为）
+        if (group) {
+          setDropdownOpen(group, shouldOpen);
+          trigger.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
         }
         return;
       }
