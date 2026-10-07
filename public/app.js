@@ -3142,9 +3142,7 @@ async function renderPost(id) {
     + '</div></div>';
   var printBtn = '<button class="btn" id="btnPrint" title="' + esc(t('post.print')) + '">' + svgIcon('file', 14) + ' ' + t('post.print') + '</button>';
   html += '<div class="article-footer"><div class="af-tags">' + (tags || '') + '</div><div class="af-actions">' + afEdit + printBtn + shareMenu + '</div></div>';
-  // 双向链接与相关文章（静态模式本地计算，云端异步拉取）
-  html += '<div class="relations-slot" id="postRelations"></div>';
-  html += '<div class="webmentions" id="postWebmentions" hidden></div>';
+  // 注：双向链接 / 相关文章移到「上一篇 · 下一篇」之后渲染（见下方 pn-nav 之后）
 
   // 系列内上一篇 / 下一篇
   if (post.series) {
@@ -3176,6 +3174,9 @@ async function renderPost(id) {
     html += '<a class="pn-item pn-single" href="' + esc(href(postUrl(next.id))) + '"><span class="pn-dir">' + t('post.next') + '</span><span class="pn-title">' + esc(next.title || '') + '</span></a>';
   }
   html += '</div>';
+  // 双向链接与相关文章（静态模式本地计算，云端异步拉取）：位于上下篇之后、评论区之前
+  html += '<div class="relations-slot" id="postRelations"></div>';
+  html += '<div class="webmentions" id="postWebmentions" hidden></div>';
 
   // comments
   html += '<div class="comments"><div class="comments-head"><h3>' + t('comment.title') + ' <span class="comment-count" id="commentCount">0</span></h3>' +
@@ -5136,6 +5137,26 @@ function href(path, query) {
 function postUrl(id) {
   return '/posts/' + encodeURIComponent(id) + '/';
 }
+/* ---------- 视图切换过渡 ----------
+ * 上一页 / 下一篇 等站内跳转时，先让当前内容轻微淡出，再渲染新页面并淡入。
+ * 纯透明度交叉淡入淡出，没有位移与翻转，避免出现「翻书」般的观感。
+ * 用户开启了「减少动态效果」时直接渲染，不做任何动画。 */
+var _viewBusy = false;
+function prefersReducedMotion() {
+  try { return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; }
+}
+function withViewTransition(run) {
+  if (_viewBusy || prefersReducedMotion() || typeof document === 'undefined') { run(); return; }
+  var host = app();
+  var leaving = host && host.querySelector ? host.querySelector('main.page-fade') : null;
+  if (!leaving) { run(); return; }
+  _viewBusy = true;
+  leaving.classList.add('page-leaving');
+  window.setTimeout(function () {
+    _viewBusy = false;
+    run();
+  }, 130);
+}
 /** 跳转：history 模式用 pushState，hash 模式用 hash 赋值 */
 function navigate(path, query) {
   // 去掉任何残留的 ?查询 / #片段，避免路径出现双重 ?（如 #/?page=2?）
@@ -5147,7 +5168,7 @@ function navigate(path, query) {
       history.pushState({}, '', appRoot() + path + (query ? serializeQuery(query) : ''));
     } catch (e) {}
   }
-  route();
+  withViewTransition(route);
 }
 function serializeQuery(query) {
   var kv = Object.keys(query || {}).map(function (k) { return encodeURIComponent(k) + '=' + encodeURIComponent(query[k]); });
@@ -6256,8 +6277,8 @@ window.__bootPromise = (async function () {
         + '<p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>';
     }
   }
-  window.addEventListener('hashchange', function () { route(); });
-  window.addEventListener('popstate', function () { route(); });
+  window.addEventListener('hashchange', function () { withViewTransition(route); });
+  window.addEventListener('popstate', function () { withViewTransition(route); });
 
   if (cfg.mode === 'api' || cfg.mode === 'auto') {
     // 首次渲染（上方 route()）会显示加载动画；探测完成（成功或失败）后置位并重渲染，

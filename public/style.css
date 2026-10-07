@@ -745,11 +745,20 @@ button.btn { font-family: inherit; }
 /* ---------- 主区（flex 撑开，保证页脚贴底） ---------- */
 main { flex: 1 0 auto; width: 100%; padding: 34px 0 60px; }
 
-/* 视图切换过渡 */
-.page-fade { animation: pageFade 0.22s ease; }
+/* 视图切换过渡：纯透明度交叉淡入淡出，无位移 / 翻转，观感自然不翻书 */
+.page-fade { animation: pageFade 0.26s cubic-bezier(0.22, 0.61, 0.36, 1) both; }
 @keyframes pageFade {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.page-leaving {
+  animation: none !important;
+  opacity: 0;
+  transition: opacity 0.13s cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-fade, .page-leaving { animation: none !important; transition: none !important; }
 }
 
 .page-title {
