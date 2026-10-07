@@ -2880,6 +2880,92 @@ tests.push(['博客设置 tab 恢复：真正走 pageSettings 渲染出上次那
   assert.strictEqual(c3._tabEls[0]._cls.has('active'), true, '失效记录回落到第一个标签');
 }]);
 
+tests.push(['导航编辑器：过期草稿不再抹掉服务端二级菜单', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.win._cloudOn = () => true;
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const nd = b.win.QingyuAdmin._navDraft;
+  assert.ok(nd && typeof nd.merge === 'function', '暴露导航草稿合并接口');
+  const server = [
+    { i18n: 'nav.home', text: '首页', url: '/' },
+    { i18n: 'nav.categories', text: '分类', url: '/categories', children: [{ text: '软件', url: '/categories/soft' }, { text: '服务器', url: '/categories/server' }] },
+    { i18n: 'nav.about', text: '关于', url: '/about', children: [{ text: '关于我', url: '/about/me' }] }
+  ];
+  // 曾经写进 localStorage 的过期草稿：默认 9 项平铺，既没有二级菜单，也没有「服务」
+  const staleDraft = [
+    { text: '首页', url: '/' }, { text: '标签', url: '/tags' }, { text: '分类', url: '/categories' },
+    { text: '归档', url: '/archive' }, { text: '留言板', url: '/guestbook' }, { text: '关于', url: '/about' }
+  ];
+  const merged = nd.merge(server, staleDraft);
+  const cat = merged.find((i) => i.url === '/categories');
+  assert.ok(cat && cat.children && cat.children.length === 2, '分类的二级菜单仍来自服务端');
+  assert.strictEqual(cat.children[0].text, '软件', '子菜单文案正确');
+  assert.ok(merged.find((i) => i.url === '/about').children.length === 1, '关于的二级菜单同样保留');
+  ['首页', '分类', '关于'].forEach((txt) => assert.ok(merged.some((i) => i.text === txt), '服务端菜单项「' + txt + '」未被过期草稿删除'));
+  assert.strictEqual(merged.length, 6, '服务端 3 项 + 草稿独有的 3 项（标签/归档/留言板）都保留');
+  // 草稿里用户自己加的项要保留
+  const withExtra = nd.merge(server, staleDraft.concat([{ text: '服务', url: '/services', children: [{ text: '主机', url: '/services/host' }] }]));
+  assert.ok(withExtra.some((i) => i.url === '/services'), '草稿新增的「服务」项不会被丢掉');
+  assert.strictEqual(withExtra.find((i) => i.url === '/services').children.length, 1, '「服务」的二级菜单也在');
+  // 草稿里的文案/地址编辑要生效
+  const edited = nd.merge(server, [{ text: '首页', url: '/' }, { text: '分类', url: '/categories' }, { text: '关于', url: '/about' }]);
+  assert.strictEqual(edited.find((i) => i.url === '/').text, '首页', '草稿文案覆盖服务端文案');
+  // 服务端没有 children、草稿里有（用户新加的子项）→ 用草稿的
+  const noKids = nd.merge([{ text: '关于', url: '/about' }], [{ text: '关于', url: '/about', children: [{ text: '留言', url: '/about/gb' }] }]);
+  assert.strictEqual(noKids[0].children.length, 1, '服务端没有时用草稿新增的子菜单');
+  // 没有草稿：原样返回服务端
+  assert.strictEqual(nd.merge(server, null).length, 3, '无草稿时直接用服务端数据');
+  assert.deepStrictEqual(nd.merge(server, []), server, '空草稿不改变服务端数据');
+  assert.strictEqual(nd.merge(null, null).length, 0, '空输入不报错');
+}]);
+
+tests.push(['导航编辑器：服务端数据回来前不写草稿，返回后重画一次编辑器', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.win._cloudOn = () => true;
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const src = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(src.includes('function persist() { if (!settingsServerLoaded) return;'), '服务端未就绪时不把默认值写进草稿');
+  assert.ok(src.includes("if (content.querySelector('#abNavVisual') && !navUserEdited) renderNavVisual(content);"), '数据回来后重画导航编辑器');
+  assert.ok(src.includes('} else if (old.children && old.children.length) {'), 'DOM 无子行时保留原有 children，防止静默抹除');
+  const nd = b.win.QingyuAdmin._navDraft;
+  assert.strictEqual(typeof nd.state, 'function', '暴露加载状态供观测');
+  assert.strictEqual(nd.state().serverLoaded, false, '初始状态：服务端数据尚未到达');
+  assert.strictEqual(nd.state().edited, false, '初始状态：用户尚未编辑');
+}]);
+
+tests.push(['导航编辑器：真实取数逻辑 —— 服务端未就绪忽略草稿，就绪后以服务端为底', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.win._cloudOn = () => true;
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const nd = b.win.QingyuAdmin._navDraft;
+  // 浏览器里遗留的过期草稿：默认 9 项平铺，没有二级菜单，也没有「服务」
+  b.ctx.localStorage.setItem(nd.key(), JSON.stringify([
+    { text: '首页', url: '/' }, { text: '标签', url: '/tags' }, { text: '分类', url: '/categories' },
+    { text: '归档', url: '/archive' }, { text: '留言板', url: '/guestbook' }, { text: '关于', url: '/about' }
+  ]));
+  // 场景一：服务端数据还没回来（settingsDraft 还是默认值）→ 不该被草稿带偏，也不该显示旧草稿
+  nd.setDraft([{ text: '首页', url: '/' }]);
+  assert.deepStrictEqual(nd.resolve(), [{ text: '首页', url: '/' }], '服务端未就绪时直接用当前草稿，不读本地旧草稿');
+  // 场景二：服务端数据回来后 → 以服务端为底合并，二级菜单与自定义项都回来了
+  const server = [
+    { text: '首页', url: '/' },
+    { text: '分类', url: '/categories', children: [{ text: '软件', url: '/categories/soft' }, { text: '服务器', url: '/categories/server' }] },
+    { text: '服务', url: '/services', children: [{ text: '主机', url: '/services/host' }] }
+  ];
+  nd.setServerLoaded(true);
+  nd.setDraft(server);
+  const out = nd.resolve();
+  assert.ok(out.some((i) => i.url === '/'), '首页在');
+  assert.ok(out.some((i) => i.url === '/categories'), '分类在');
+  assert.ok(out.some((i) => i.url === '/services'), '服务在（服务端自定义项，不再丢失）');
+  assert.strictEqual(out.length, 7, '服务端 3 项 + 草稿独有的 标签/归档/留言板/关于 共 7 项：' + out.map((i) => i.url).join(','));
+  assert.strictEqual(out.find((i) => i.url === '/categories').children.length, 2, '分类二级菜单回来了');
+  assert.strictEqual(out.find((i) => i.url === '/services').children.length, 1, '服务的二级菜单也回来了');
+  // 场景三：没有本地草稿时原样返回服务端
+  b.ctx.localStorage.removeItem(nd.key());
+  assert.deepStrictEqual(nd.resolve(), server, '无本地草稿时原样使用服务端数据');
+}]);
+
 tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });

@@ -4624,6 +4624,8 @@
     var navItems = parseArr(s.nav_menu, defaultNavItems());
     if (Number(s.nav_defaults_version || 0) < NAV_DEFAULTS_VERSION) navItems = mergeDefaultNavItems(navItems);
     settingsDraft.nav = navItems;
+    settingsServerLoaded = true;
+    navUserEdited = false;
     settingsDraft.blocklist = String(s.comment_blocklist || '');
 
     settingsDraft.footerNav = parseArr(s.footer_nav, defaultFooterNav());
@@ -4781,10 +4783,14 @@
           if (cOld.i18n) c.i18n = cOld.i18n;
           item.children.push(c);
         });
+      } else if (old.children && old.children.length) {
+        // DOM 里没有子行不等于用户要删子菜单，保留原值防止二级菜单被静默抹掉
+        item.children = old.children;
       }
       newItems.push(item);
     });
     settingsDraft.nav = newItems;
+    navUserEdited = true;
     try { localStorage.setItem(navDraftKey(), JSON.stringify(settingsDraft.nav)); } catch (e) {}
   }
   /** 从底部导航/友情链接的可视化 DOM 收集当前编辑结果到草稿 */
@@ -4834,6 +4840,8 @@
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
     if (content.querySelector('#abProfileEmail')) content.querySelector('#abProfileEmail').value = prof.email || '';
+    // 服务端数据回来后重画一次导航编辑器，补上二级菜单与自定义项（用户已手动改过则不覆盖）
+    if (content.querySelector('#abNavVisual') && !navUserEdited) renderNavVisual(content);
   }
   function safeJson(v) { if (!v) return {}; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch (e) { return {}; } }
   /* ---------- 首页标签显示管理 ----------
@@ -5100,6 +5108,8 @@
   /* ---------- 可视化导航编辑器 ----------
    * 直接读写内存 settingsDraft.nav 数组，无需 JSON 中转，保存时由 saveSettings 统一取用。
    * 保留 localStorage 临时草稿，刷新/切页不丢失未保存的导航编辑。 */
+  var settingsServerLoaded = false;
+  var navUserEdited = false;
   function navDraftKey() { return 'qingyu.settingsNavDraft'; }
   function loadNavDraft() {
     try { var v = JSON.parse(localStorage.getItem(navDraftKey()) || 'null'); if (Array.isArray(v)) return v; } catch (e) {}
@@ -5112,6 +5122,43 @@
     if (v.charAt(0) !== '/') return v;
     return v.replace(/\/+$/, '') || '/';
   }
+  /** 合并导航草稿：以服务端 nav_menu 为底，草稿只覆盖文案/地址/发现开关与新增项；
+   *  二级菜单 children 以服务端为准（服务端没有时才用草稿里的），
+   *  避免一份过期草稿把整个二级菜单抹掉、或草稿新增的自定义项丢失。 */
+  function mergeNavDraft(base, draft) {
+    var b = Array.isArray(base) ? base : [];
+    var d = Array.isArray(draft) ? draft : null;
+    if (!d || !d.length) return b;
+    var out = b.map(function (it) {
+      var hit = null;
+      d.forEach(function (di) { if (!hit && navUrlKey(di) === navUrlKey(it)) hit = di; });
+      var merged = {};
+      Object.keys(it || {}).forEach(function (k) { merged[k] = it[k]; });
+      if (hit) {
+        if (hit.text !== undefined) merged.text = hit.text;
+        if (hit.url !== undefined) merged.url = hit.url;
+        if (hit.discover !== undefined) merged.discover = hit.discover;
+      }
+      var kids = (it && it.children && it.children.length) ? it.children : (hit && hit.children);
+      if (kids && kids.length) merged.children = kids;
+      else delete merged.children;
+      return merged;
+    });
+    d.forEach(function (di) {
+      var k = navUrlKey(di);
+      if (out.some(function (o) { return navUrlKey(o) === k; })) return;
+      var copy = {};
+      Object.keys(di || {}).forEach(function (key) { copy[key] = di[key]; });
+      out.push(copy);
+    });
+    return out;
+  }
+  /** 编辑器当前该显示哪份导航：服务端数据未回来之前不读草稿（否则默认值会被当成用户数据
+   *  写进草稿并永久遮蔽真实导航）；数据回来后以服务端为底合并本地草稿。 */
+  function resolveNavItems() {
+    var saved = settingsServerLoaded ? loadNavDraft() : null;
+    return mergeNavDraft(settingsDraft.nav, saved);
+  }
   function isDiscoverNav(it) {
     if (!it) return false;
     // 与前台保持一致：discover === false 表示用户明确移出「发现」，内置入口也不例外
@@ -5122,14 +5169,13 @@
   function renderNavVisual(content) {
     var wrap = content.querySelector('#abNavVisual');
     if (!wrap) return;
-    var saved = loadNavDraft();
-    var items = saved ? saved : settingsDraft.nav;
+    var items = resolveNavItems();
     if (!Array.isArray(items) || !items.length) items = defaultNavItems();
     settingsDraft.nav = items;
 
     var dragSrc = null;
 
-    function persist() { try { localStorage.setItem(navDraftKey(), JSON.stringify(settingsDraft.nav)); } catch (e) {} }
+    function persist() { if (!settingsServerLoaded) return; try { localStorage.setItem(navDraftKey(), JSON.stringify(settingsDraft.nav)); } catch (e) {} }
     function refresh() { persist(); renderNavVisual(content); }
 
     function childRowsHtml(it, i) {
@@ -5382,6 +5428,7 @@
     _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
     _list: { paginatePosts: paginatePosts },
     _settingsTab: { key: settingsTabKey, read: readSettingsTab, remember: rememberSettingsTab, page: pageSettings },
+    _navDraft: { key: navDraftKey, load: loadNavDraft, merge: mergeNavDraft, resolve: resolveNavItems, setServerLoaded: function (v) { settingsServerLoaded = !!v; }, setDraft: function (items) { settingsDraft.nav = items; }, state: function () { return { serverLoaded: settingsServerLoaded, edited: navUserEdited }; } },
     _staticExport: { rebase: staticRebase, page: staticPageFromTemplate, postDir: staticPostDir },
     _editor: {
       draft: { key: editorDraftKey, read: readEditorDraft, write: writeEditorDraft, clear: clearEditorDraft },
