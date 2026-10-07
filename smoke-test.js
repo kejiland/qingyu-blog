@@ -2823,6 +2823,84 @@ tests.push(['自定义二级下拉：顶栏与手机侧栏都能展开一级项�
   assert.ok(html.includes('href="/columns/be"'), '侧栏也渲染了子菜单项');
 }]);
 
+tests.push(['博客设置 tab 恢复：真正走 pageSettings 渲染出上次那个标签', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  b.win._cloudOn = () => true;
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const st = b.win.QingyuAdmin._settingsTab;
+  // 构造一个能反映 class 变化的 content 元素：pageSettings 会往 innerHTML 里塞 6 个 .ab-tab
+  function makeContent() {
+    const classes = {};
+    const TABS = ['site', 'features', 'profile', 'nav', 'footerNav', 'friends'];
+    const tabEls = TABS.map((key) => ({
+      _cls: new Set(),
+      get className() { return Array.from(this._cls).join(' '); },
+      classList: { add(c) { this.owner._cls.add(c); }, remove(c) { this.owner._cls.delete(c); } },
+      getAttribute: (a) => (a === 'data-tab' ? key : null),
+      addEventListener(evt, fn) { (this._h = this._h || {})[evt] = fn; },
+    }));
+    tabEls.forEach((e, i) => { e.owner = e; e.classList = { add: (c) => e._cls.add(c), remove: (c) => e._cls.delete(c) }; });
+    const body = { innerHTML: '' };
+    const saveBtn = { addEventListener() {}, disabled: false };
+    return {
+      innerHTML: '',
+      querySelectorAll: (sel) => (sel === '.ab-tab' ? tabEls : []),
+      querySelector: (sel) => {
+        if (sel === '#abSettingsBody') return body;
+        if (sel === '#abSaveSettings') return saveBtn;
+        return deepEl();
+      },
+      _tabEls: tabEls, _body: body, _classes: classes,
+    };
+  }
+  // renderNavVisual 等会对 innerHTML 里的元素再 querySelector，这里给一个可无限下探的桩
+  function deepEl() {
+    const el = stubEl();
+    el.querySelector = () => deepEl();
+    el.querySelectorAll = () => [];
+    return el;
+  }
+  // 无记录时：应回落到第一个标签（站点基础信息）
+  const c1 = makeContent();
+  st.page(c1);
+  assert.strictEqual(c1._tabEls[0]._cls.has('active'), true, '无记录时默认选中「站点基础信息」');
+  assert.strictEqual(c1._tabEls[1]._cls.has('active'), false, '其他标签默认不选中');
+  // 记录为 nav 时：pageSettings 应把 active 打在 nav 上，且渲染的是 nav 的内容
+  st.remember('nav');
+  const c2 = makeContent();
+  st.page(c2);
+  const active = c2._tabEls.filter((e) => e._cls.has('active'));
+  assert.strictEqual(active.length, 1, '有且仅有一个标签处于选中态');
+  assert.strictEqual(active[0].getAttribute('data-tab'), 'nav', '恢复为上次停留的「顶部导航」');
+  assert.ok(c2._body.innerHTML.includes('ab-nav'), '渲染的是「顶部导航」tab 的内容，而非站点基础信息');
+  // 记录了已不存在的标签（模拟后台以后增删 tab）：应安全回落到第一个，不报错
+  st.remember('some-removed-tab');
+  const c3 = makeContent();
+  st.page(c3);
+  assert.strictEqual(c3._tabEls[0]._cls.has('active'), true, '失效记录回落到第一个标签');
+}]);
+
+tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
+  const st = b.win.QingyuAdmin._settingsTab;
+  assert.ok(st && typeof st.remember === 'function' && typeof st.read === 'function', '暴露标签页记忆接口');
+  // 首次进入（无记录）应为空，由 pageSettings 回落到第一个 tab
+  assert.strictEqual(st.read(), '', '默认不记忆任何标签页');
+  // 切到「顶部导航」后应被记住
+  st.remember('nav');
+  assert.strictEqual(st.read(), 'nav', '切走的标签页被记住');
+  assert.strictEqual(b.ctx.localStorage.getItem(st.key()), 'nav', '写入 localStorage');
+  // 模拟刷新：新建一份 context 但共用同一 localStorage 记忆
+  assert.strictEqual(st.read(), 'nav', '刷新后仍能读回上次标签页');
+  // 空值不应污染记录
+  st.remember('');
+  assert.strictEqual(st.read(), 'nav', '忽略空标签页');
+  const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(!/class="ab-tab active" data-tab="site"/.test(adminSrc), 'site tab 不再硬编码为默认选中');
+  assert.ok(/rememberSettingsTab\(key\)/.test(adminSrc) && /readSettingsTab\(\)/.test(adminSrc), '进入设置时读取、点击时写入记忆');
+}]);
+
 tests.push(['后台导航编辑器：拖拽排序 + 「发现」标记 + 自定义二级', async () => {
   const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
   assert.ok(adminSrc.includes('data-toggle-discover'), '提供「放入/移出发现下拉」开关');

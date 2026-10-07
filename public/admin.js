@@ -4558,21 +4558,37 @@
       (cloudOn() ? '' : '<div class="ab-card"><div class="ab-empty"><div class="ab-empty-ico">⚙️</div><p>' + t('admin.settings.cloudOnly') + '</p></div></div>');
     if (!cloudOn()) return;
     content.innerHTML += '<div class="ab-tabs">' +
-      '<div class="ab-tab active" data-tab="site">' + t('admin.settings.siteInfo') + '</div>' +
+      '<div class="ab-tab" data-tab="site">' + t('admin.settings.siteInfo') + '</div>' +
       '<div class="ab-tab" data-tab="features">' + t('admin.settings.features') + '</div>' +
       '<div class="ab-tab" data-tab="profile">' + t('admin.settings.profile') + '</div>' +
       '<div class="ab-tab" data-tab="nav">' + t('admin.settings.navMenu') + '</div>' +
       '<div class="ab-tab" data-tab="footerNav">' + t('admin.settings.footerNav') + '</div>' +
       '<div class="ab-tab" data-tab="friends">' + t('admin.settings.friendLinks') + '</div>' +
       '</div><div id="abSettingsBody"></div>';
-    content.querySelectorAll('.ab-tab').forEach(function (t) { t.addEventListener('click', function () { saveTabToDraft(content); content.querySelectorAll('.ab-tab').forEach(function (x) { x.classList.remove('active'); }); t.classList.add('active'); renderSettingsTab(content, t.getAttribute('data-tab')); }); });
-    renderSettingsTab(content, 'site');
+    content.querySelectorAll('.ab-tab').forEach(function (t) { t.addEventListener('click', function () { saveTabToDraft(content); content.querySelectorAll('.ab-tab').forEach(function (x) { x.classList.remove('active'); }); t.classList.add('active'); var key = t.getAttribute('data-tab'); rememberSettingsTab(key); renderSettingsTab(content, key); }); });
+    // 恢复上次停留的标签页；记录里的标签已不存在（如后台改版增删了 tab）则回落到第一个
+    var tabsEl = content.querySelectorAll('.ab-tab');
+    var last = readSettingsTab();
+    var restored = null;
+    tabsEl.forEach(function (x) { if (x.getAttribute('data-tab') === last) restored = x; });
+    if (!restored) restored = tabsEl[0];
+    if (restored) restored.classList.add('active');
+    renderSettingsTab(content, restored ? restored.getAttribute('data-tab') : 'site');
     content.querySelector('#abSaveSettings').addEventListener('click', function () { saveSettings(content); });
     loadSettings(content);
   }
   var settingsCache = {};
   // 内存草稿：各 tab 未保存的输入在此暂存，切换 tab 不丢失数据
   var settingsDraft = { site: {}, features: { pageSize: 8, ads: {} }, profile: {}, nav: [], footerNav: [], links: [] };
+  // 记住「博客设置」上次停留的标签页，刷新页面后不再跳回「站点基础信息」
+  function settingsTabKey() { return 'qingyu.settingsTab'; }
+  function readSettingsTab() {
+    try { return String(localStorage.getItem(settingsTabKey()) || ''); } catch (e) { return ''; }
+  }
+  function rememberSettingsTab(tab) {
+    if (!tab) return;
+    try { localStorage.setItem(settingsTabKey(), String(tab)); } catch (e) {}
+  }
   async function loadSettings(content) {
     try { var d = await api('api/settings'); settingsCache = (d && d.settings) || {}; } catch (e) { settingsCache = {}; }
     // 同步到前台全局变量，确保前台渲染时读取到最新的站点设置
@@ -5365,6 +5381,7 @@
     },
     _offline: { read: readOfflineQueue, queue: queueOfflinePost, flush: flushOfflineQueue, isNetworkFailure: isNetworkFailure },
     _list: { paginatePosts: paginatePosts },
+    _settingsTab: { key: settingsTabKey, read: readSettingsTab, remember: rememberSettingsTab, page: pageSettings },
     _staticExport: { rebase: staticRebase, page: staticPageFromTemplate, postDir: staticPostDir },
     _editor: {
       draft: { key: editorDraftKey, read: readEditorDraft, write: writeEditorDraft, clear: clearEditorDraft },
