@@ -998,5 +998,13 @@
   "admin.dashboard.devDesktop": "桌面",
   "admin.dashboard.devMobile": "手机",
   "admin.dashboard.devTablet": "平板",
-  "admin.dashboard.devBot": "爬虫"
+  "admin.dashboard.devBot": "爬虫",
+  "admin.staticExport.cancelled": "已取消导出，未保存文件",
+  "admin.settings.featHomeTags": "首页显示的标签",
+  "admin.settings.featHomeTagsHint": "文章多了标签会堆积，这里勾选只希望在首页出现的标签；一个都不勾 = 全部显示。点标签名可切换选中，数字是该标签的文章数。",
+  "admin.settings.featHomeTagAdd": "标签名（可手动添加还没有文章使用的标签）",
+  "admin.settings.featHomeTagAddBtn": "添加",
+  "admin.settings.featHomeTagClear": "清空选择",
+  "admin.settings.featHomeTagsEmpty": "还没有任何标签，先去文章里添加标签吧",
+  "admin.settings.featHomeTagsLoading": "正在统计标签…"
 }

@@ -2749,7 +2749,7 @@ tests.push(['导航渲染：一级导航 + 「发现」点击下拉 + resolveNav
     { text: '关于', url: '/about' }, { text: '监控', url: 'https://status.example' }
   ]);
   const hiddenNav = b.ctx.navItems();
-  assert.ok(!hiddenNav.some(function (x) { return x.url === '/categories'; }), '关闭开关后隐藏分类导航');
+  assert.ok(hiddenNav.some(function (x) { return x.url === '/categories'; }), '分类已独立为一级导航，不受旧开关影响');
   assert.ok(!hiddenNav.some(function (x) { return x.url === '/history'; }), '关闭开关后隐藏历史导航');
   assert.ok(hiddenNav.some(function (x) { return x.url === '/tags'; }), '关闭新增导航开关不影响基础导航');
   assert.ok(hiddenNav.some(function (x) { return x.url === 'https://status.example'; }), '关闭新增导航开关不影响自定义链接');
@@ -2832,10 +2832,12 @@ tests.push(['后台导航编辑器：拖拽排序 + 「发现」标记 + 自定�
   assert.ok(adminSrc.includes('data-addchild') && adminSrc.includes('data-rmchild'), '可增删自定义二级项');
   const css = fs.readFileSync(path.join(PUB, 'admin.css'), 'utf8');
   assert.ok(css.includes('.ab-nav-drag') && css.includes('.ab-nav-badge') && css.includes('.drop-into'), '拖拽手柄 / 标记 / 落点样式齐备');
-  // 五个内置二级路径需与前台保持一致
-  ['/tags', '/categories', '/history', '/series', '/popular'].forEach((u) => {
+  // 内置二级路径需与前台保持一致：标签 / 历史 / 系列 / 热门 四项
+  ['/tags', '/history', '/series', '/popular'].forEach((u) => {
     assert.ok(new RegExp("'" + u + "': 1").test(adminSrc), '后台内置发现路径含 ' + u);
   });
+  // 「分类」已独立为一级导航，不应再被标为内置「发现」入口
+  assert.ok(!new RegExp("'\\/categories': 1").test(adminSrc), '后台内置发现路径不含 /categories');
 }]);
 
 tests.push(['导航翻译：旧后台自定义导航在切换语言后内置项自动翻译、自定义文本保留', async () => {
