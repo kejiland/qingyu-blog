@@ -998,5 +998,6 @@
   "admin.dashboard.devDesktop": "डेस्कटॉप",
   "admin.dashboard.devMobile": "मोबाइल",
   "admin.dashboard.devTablet": "टैबलेट",
-  "admin.dashboard.devBot": "बॉट"
+  "admin.dashboard.devBot": "बॉट",
+  "admin.staticExport.cancelled": "निर्यात रद्द कर दिया गया, कोई फ़ाइल सहेजी नहीं गई"
 }

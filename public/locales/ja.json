@@ -998,5 +998,6 @@
   "admin.dashboard.devDesktop": "デスクトップ",
   "admin.dashboard.devMobile": "スマホ",
   "admin.dashboard.devTablet": "タブレット",
-  "admin.dashboard.devBot": "ボット"
+  "admin.dashboard.devBot": "ボット",
+  "admin.staticExport.cancelled": "エクスポートをキャンセルしました。ファイルは保存されていません"
 }

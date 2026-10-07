@@ -998,5 +998,6 @@
   "admin.dashboard.devDesktop": "데스크톱",
   "admin.dashboard.devMobile": "모바일",
   "admin.dashboard.devTablet": "태블릿",
-  "admin.dashboard.devBot": "봇"
+  "admin.dashboard.devBot": "봇",
+  "admin.staticExport.cancelled": "내보내기를 취소했습니다. 파일이 저장되지 않았습니다"
 }

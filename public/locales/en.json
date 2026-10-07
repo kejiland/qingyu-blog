@@ -998,5 +998,6 @@
   "admin.dashboard.devDesktop": "Desktop",
   "admin.dashboard.devMobile": "Mobile",
   "admin.dashboard.devTablet": "Tablet",
-  "admin.dashboard.devBot": "Bot"
+  "admin.dashboard.devBot": "Bot",
+  "admin.staticExport.cancelled": "Export cancelled, no file was saved"
 }

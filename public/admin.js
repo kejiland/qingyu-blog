@@ -1745,6 +1745,34 @@
     }
     transferAnchorDownload(name, blob);
   }
+  /** 在「用户点击手势仍然有效」时先弹出另存为对话框，返回 Promise<FileSystemFileHandle>。
+   *  浏览器要求 showSaveFilePicker 必须在用户手势内调用；而导出过程是异步的（要抓资源、等接口），
+   *  等到打包完再调用会因丢失手势被浏览器拒绝，于是只剩下载没有「保存位置」这一步。 */
+  function transferPickSaveHandle(name) {
+    try {
+      if (typeof window.showSaveFilePicker !== 'function') return null;
+      return window.showSaveFilePicker({ suggestedName: name });
+    } catch (e) { return null; }
+  }
+  /** 把内容写入先前选定的位置；没有选过 / 被取消 / 权限不足时回退到默认下载目录。
+   *  返回 'saved' | 'cancelled' | 'downloaded' */
+  async function transferSaveAs(handlePromise, name, blob) {
+    var handle = null;
+    if (handlePromise) { try { handle = await handlePromise; } catch (e) { handle = null; } }
+    if (handle) {
+      try {
+        var writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return 'saved';
+      } catch (e) { /* 写入失败则回退到默认下载目录 */ }
+    } else if (handlePromise) {
+      // 用户主动取消「另存为」：尊重取消，不再偷偷下载
+      return 'cancelled';
+    }
+    transferAnchorDownload(name, blob);
+    return 'downloaded';
+  }
   function transferDownloadText(name, text, type) {
     transferDownload(name, new Blob([String(text || '')], { type: type || 'text/plain;charset=utf-8' }));
   }
@@ -2012,9 +2040,15 @@
   async function exportStaticSite(content, button) {
     var status = content ? content.querySelector('#abIeStatus') : null;
     var old = button ? button.innerHTML : '';
+    // 必须在用户手势内同步弹出「另存为」，否则打包结束再调会被浏览器拒绝（只剩下载、没有保存位置）
+    var suggestedName = 'qingyu-static-site-' + transferStamp() + '.zip';
+    var cached = (content && content.__iePosts) || null;
+    var lookEmpty = cached ? cached.filter(function (p) { return (p.status || 'published') === 'published'; }).length === 0 : false;
+    var saveHandle = lookEmpty ? null : transferPickSaveHandle(suggestedName);
+
     if (button) { button.disabled = true; button.innerHTML = icon('spinner', 12) + ' ' + t('admin.transfer.exporting'); }
     try {
-      var all = (content && content.__iePosts) || await listFullPosts();
+      var all = cached || await listFullPosts();
       var posts = (all || []).filter(function (p) { return (p.status || 'published') === 'published'; });
       if (!posts.length) { toast(t('admin.staticExport.empty'), 'err'); return; }
       if (status) status.textContent = t('admin.staticExport.building');
@@ -2082,8 +2116,9 @@
       try { if (window.buildSitemapClient) files.push({ name: 'sitemap.xml', text: window.buildSitemapClient() }); } catch (e) {}
       try { if (window.buildFeedXmlClient) files.push({ name: 'feed.xml', text: window.buildFeedXmlClient(data, 20) }); } catch (e) {}
       files.push({ name: 'README-静态站说明.txt', text: t('admin.staticExport.readme', { site: siteName, count: data.length }) });
-      transferDownload('qingyu-static-site-' + transferStamp() + '.zip', transferZip(files));
-      toast(t('admin.staticExport.done', { count: data.length, files: files.length }), 'ok');
+      var outcome = await transferSaveAs(saveHandle, suggestedName, transferZip(files));
+      if (outcome === 'cancelled') toast(t('admin.staticExport.cancelled'));
+      else toast(t('admin.staticExport.done', { count: data.length, files: files.length }), 'ok');
     } catch (e) {
       toast(t('admin.staticExport.fail') + (e.message || e), 'err');
     } finally {
