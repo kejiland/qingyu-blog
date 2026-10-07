@@ -770,6 +770,29 @@ function clearHighlights(root) {
 
 /* ---------- 阅读位置记忆（每篇文章各自记忆，最多保留 50 篇 / 30 天） ---------- */
 var READ_POS_KEY = 'qingyu.readPos';
+/* 站内路由（SPA）跳转标记：用于区分「刷新 / 直接打开」与「点击链接跳转」，
+ * 只有前者才恢复上次阅读位置，点「上一篇 / 下一篇」时一律从文章开头开始读。 */
+var _spaNav = false;
+/* toast：站内轻提示。全局兜底实现，避免任何调用点因 toast 未定义而中断页面渲染。 */
+if (typeof window.toast !== 'function') {
+  window.toast = function (msg, kind) {
+    try {
+      var wrap = document.querySelector('.toast-wrap');
+      if (!wrap) {
+        wrap = document.createElement('div');
+        wrap.className = 'toast-wrap';
+        document.body.appendChild(wrap);
+      }
+      var el = document.createElement('div');
+      el.className = 'toast-item' + (kind ? ' toast-' + kind : '');
+      el.textContent = String(msg == null ? '' : msg);
+      wrap.appendChild(el);
+      setTimeout(function () {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      }, 2200);
+    } catch (e) {}
+  };
+}
 var _readPosCurrent = null;
 var _readPosTimer = null;
 function readPositions() {
@@ -3462,6 +3485,9 @@ async function renderPost(id) {
   historyRecord(post);
   bindReadPos();
   (function restoreReadPos() {
+    // 站内点击跳转（含上一篇 / 下一篇）不恢复阅读位置，一律从文章开头开始；
+    // 只有刷新页面或直接打开链接时才回到上次读到的位置。
+    if (_spaNav) return;
     var y = getReadPos(post.id);
     if (y > 300 && window.scrollTo) {
       setTimeout(function () {
@@ -5168,6 +5194,7 @@ function navigate(path, query) {
       history.pushState({}, '', appRoot() + path + (query ? serializeQuery(query) : ''));
     } catch (e) {}
   }
+  _spaNav = true;
   withViewTransition(route);
 }
 function serializeQuery(query) {
@@ -5252,6 +5279,13 @@ async function route() {
     app().innerHTML = renderNav(path) + '<main class="container page-fade"><div class="empty"><div class="big">' + svgIcon('question', 36) + '</div><p>' + t('post.notFound') + '</p><p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>' + renderFooter();
   }
   updateSEO(path);
+  // 路由切换后回到页面顶部：否则从「上一篇 / 下一篇」跳转后仍停在新文章的同一滚动位置，
+  // 读者会以为没换页，而是直接落到文章中段 / 底部导航处。
+  if ('scrollRestoration' in history) { try { history.scrollRestoration = 'manual'; } catch (e) {} }
+  try { if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0); } catch (e) { try { window.scrollTo(0, 0); } catch (e2) {} }
+  // 部分浏览器在同一文档导航后会再恢复一次旧滚动位置，下一帧再归零一次兜底
+  try { requestAnimationFrame(function () { window.scrollTo(0, 0); }); } catch (e) {}
+  _spaNav = false;
   bindGlobal();
   /* 播放器等全站组件监听路由变化（如后台页隐藏播放器） */
   try { window.dispatchEvent(new CustomEvent('qy:route')); } catch (e) {}
@@ -6277,8 +6311,8 @@ window.__bootPromise = (async function () {
         + '<p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>';
     }
   }
-  window.addEventListener('hashchange', function () { withViewTransition(route); });
-  window.addEventListener('popstate', function () { withViewTransition(route); });
+  window.addEventListener('hashchange', function () { _spaNav = true; withViewTransition(route); });
+  window.addEventListener('popstate', function () { _spaNav = true; withViewTransition(route); });
 
   if (cfg.mode === 'api' || cfg.mode === 'auto') {
     // 首次渲染（上方 route()）会显示加载动画；探测完成（成功或失败）后置位并重渲染，
