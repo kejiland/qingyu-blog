@@ -999,5 +999,12 @@
   "admin.dashboard.devMobile": "모바일",
   "admin.dashboard.devTablet": "태블릿",
   "admin.dashboard.devBot": "봇",
-  "admin.staticExport.cancelled": "내보내기를 취소했습니다. 파일이 저장되지 않았습니다"
+  "admin.staticExport.cancelled": "내보내기를 취소했습니다. 파일이 저장되지 않았습니다",
+  "admin.settings.featHomeTags": "홈에 표시할 태그",
+  "admin.settings.featHomeTagsHint": "글이 늘어나면 태그도 늘어납니다. 홈에 보여줄 태그만 선택하세요. 아무것도 선택하지 않으면 전부 표시됩니다. 태그 이름을 클릭하면 전환됩니다. 숫자는 해당 태그의 글 수입니다.",
+  "admin.settings.featHomeTagAdd": "태그 이름 (아직 사용되지 않은 태그도 추가할 수 있음)",
+  "admin.settings.featHomeTagAddBtn": "추가",
+  "admin.settings.featHomeTagClear": "선택 지우기",
+  "admin.settings.featHomeTagsEmpty": "아직 태그가 없습니다. 먼저 글에 태그를 추가하세요",
+  "admin.settings.featHomeTagsLoading": "태그 집계 중…"
 }

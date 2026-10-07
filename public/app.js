@@ -1043,6 +1043,12 @@ function getConfig() {
     adminPwd: cfg.adminPwd || '',
     pageSize: (featPageSize != null) ? featPageSize : ((typeof cfg.pageSize === 'number' && cfg.pageSize >= 0) ? cfg.pageSize : 8),
     nav: parseArrSafe(s && s.nav_menu),
+    // 后台「功能开关 → 首页显示的标签」：站长自选标签白名单，为空则显示全部
+    homeTags: (function () {
+      var cloudTags = parseArrSafe(s && s.home_tags);
+      return (cloudTags.length ? cloudTags : parseArrSafe(cfg.homeTags))
+        .map(function (x) { return String(x).trim(); }).filter(Boolean);
+    })(),
     navDefaultsVersion: Number((s && s.nav_defaults_version) || 0),
     footerNav: parseArrSafe(s && s.footer_nav),
     friendLinks: parseArrSafe(s && s.friend_links),
@@ -2614,6 +2620,12 @@ function renderHomeTagRow(posts, activeTag) {
       counts[t]++;
     });
   });
+  // 标签堆积过多时，站长可在后台勾选「首页要显示的标签」；白名单为空 = 保持原样全显示。
+  var allow = (getConfig().homeTags || []);
+  if (allow.length) {
+    var allowSet = {}; allow.forEach(function (x) { allowSet[x] = 1; });
+    order = order.filter(function (x) { return allowSet[x] || x === activeTag; });
+  }
   if (!order.length) return '';
   var html = '<div class="home-tags">';
   html += '<span class="home-tags-label">' + t('home.categoryLabel') + '</span>';

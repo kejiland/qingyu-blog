@@ -999,5 +999,12 @@
   "admin.dashboard.devMobile": "मोबाइल",
   "admin.dashboard.devTablet": "टैबलेट",
   "admin.dashboard.devBot": "बॉट",
-  "admin.staticExport.cancelled": "निर्यात रद्द कर दिया गया, कोई फ़ाइल सहेजी नहीं गई"
+  "admin.staticExport.cancelled": "निर्यात रद्द कर दिया गया, कोई फ़ाइल सहेजी नहीं गई",
+  "admin.settings.featHomeTags": "होम पर दिखने वाले टैग",
+  "admin.settings.featHomeTagsHint": "पोस्ट बढ़ने पर टैग भी बढ़ते हैं। वही टैग चुनें जो आप होम पर दिखाना चाहते हैं; कुछ भी न चुनें तो सभी दिखेंगे। टैग नाम पर क्लिक करके चुनें। संख्या उस टैग की पोस्टों की है।",
+  "admin.settings.featHomeTagAdd": "टैग का नाम (अभी तक इस्तेमाल न हुआ टैग भी जोड़ सकते हैं)",
+  "admin.settings.featHomeTagAddBtn": "जोड़ें",
+  "admin.settings.featHomeTagClear": "चयन हटाएँ",
+  "admin.settings.featHomeTagsEmpty": "अभी कोई टैग नहीं — पहले पोस्ट में टैग जोड़ें",
+  "admin.settings.featHomeTagsLoading": "टैग गिने जा रहे हैं…"
 }

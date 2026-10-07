@@ -1025,3 +1025,12 @@ select.ab-select { cursor: pointer; padding-right: 30px; }
 .ab-nav-group.drop-before { box-shadow: inset 0 2px 0 var(--ab-primary); }
 .ab-nav-group.drop-after { box-shadow: inset 0 -2px 0 var(--ab-primary); }
 .ab-nav-group.drop-into { background: var(--ab-primary-weak); }
+/* ---------- 首页标签选择器（后台「功能开关」内） ---------- */
+.ab-tagpick{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;min-height:34px;align-items:center}
+.ab-tagchip{display:inline-flex;align-items:center;gap:6px;padding:5px 12px;border-radius:999px;
+  border:1px solid var(--ab-border,#e2e5ea);background:var(--ab-bg-soft,#f7f8fa);color:var(--ab-text,#333);
+  font-size:13px;line-height:1.5;cursor:pointer;transition:background .15s,border-color .15s,color .15s}
+.ab-tagchip:hover{border-color:var(--ab-primary,#3b82f6);color:var(--ab-primary,#3b82f6)}
+.ab-tagchip.on{background:var(--ab-primary,#3b82f6);border-color:var(--ab-primary,#3b82f6);color:#fff}
+.ab-tagchip-n{font-size:11px;opacity:.7}
+@media (prefers-reduced-motion: reduce){.ab-tagchip{transition:none}}

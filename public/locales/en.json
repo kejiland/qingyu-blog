@@ -999,5 +999,12 @@
   "admin.dashboard.devMobile": "Mobile",
   "admin.dashboard.devTablet": "Tablet",
   "admin.dashboard.devBot": "Bot",
-  "admin.staticExport.cancelled": "Export cancelled, no file was saved"
+  "admin.staticExport.cancelled": "Export cancelled, no file was saved",
+  "admin.settings.featHomeTags": "Tags shown on home",
+  "admin.settings.featHomeTagsHint": "As posts grow, tags pile up. Tick only the tags you want on the home page; tick none to show all. Click a tag name to toggle. The number is how many posts use it.",
+  "admin.settings.featHomeTagAdd": "Tag name (you can add one no post uses yet)",
+  "admin.settings.featHomeTagAddBtn": "Add",
+  "admin.settings.featHomeTagClear": "Clear selection",
+  "admin.settings.featHomeTagsEmpty": "No tags yet — add some to your posts first",
+  "admin.settings.featHomeTagsLoading": "Counting tags…"
 }

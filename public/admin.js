@@ -4611,6 +4611,7 @@
     settingsDraft.blocklist = String(s.comment_blocklist || '');
 
     settingsDraft.footerNav = parseArr(s.footer_nav, defaultFooterNav());
+    settingsDraft.homeTags = parseArr(s.home_tags, []).map(function (x) { return String(x).trim(); }).filter(Boolean);
     settingsDraft.links = parseArr(s.friend_links, defaultFriendLinks());
   }
   /** 默认顶部导航（与前台渲染兜底一致）：站点未自定义导航时作为基础项 */
@@ -4729,6 +4730,7 @@
         navExtras: content.querySelector('#abFeatNavExtras') ? content.querySelector('#abFeatNavExtras').checked : true
       };
     }
+    if (content.querySelector('#abHomeTags')) collectHomeTagsFromDom(content);
     if (content.querySelector('#abNavVisual')) collectNavFromDom(content);
     if (content.querySelector('#abFooterNavVisual')) collectLinksFromDom(content, 'footerNav', '#abFooterNavVisual');
     if (content.querySelector('#abFriendsVisual')) collectLinksFromDom(content, 'links', '#abFriendsVisual');
@@ -4818,6 +4820,99 @@
     if (content.querySelector('#abProfileEmail')) content.querySelector('#abProfileEmail').value = prof.email || '';
   }
   function safeJson(v) { if (!v) return {}; if (typeof v === 'object') return v; try { return JSON.parse(v); } catch (e) { return {}; } }
+  /* ---------- 首页标签显示管理 ----------
+   * 文章一多，标签会越堆越多，首页标签条会被拉得很长。这里让站长自己勾选
+   * 「首页要显示哪些标签」：白名单存site_settings.home_tags（JSON 数组），
+   * 为空 = 保持原样全部显示；前台 renderHomeTagRow 只渲染白名单内的标签。
+   * 支持手动补一个「暂时还没有文章使用」的标签，避免必须先发文章才能选它。 */
+  function homeTagCounts() {
+    // 优先用前台已渲染的标签统计（页面刚打开时同步可用），否则退回已加载的文章列表
+    var counts = {};
+    try {
+      var chips = document.querySelectorAll('.home-tag-text');
+      for (var i = 0; i < chips.length; i++) {
+        var n = String(chips[i].textContent || '').trim();
+        if (n) counts[n] = 0;
+      }
+    } catch (e) {}
+    return counts;
+  }
+  function mergeTagCounts(counts, list) {
+    (list || []).forEach(function (p) {
+      (p && p.tags ? p.tags : []).forEach(function (t) {
+        var k = String(t).trim(); if (k) counts[k] = (counts[k] || 0) + 1;
+      });
+    });
+    return counts;
+  }
+  function renderHomeTagPicker(content) {
+    var box = content.querySelector('#abHomeTags');
+    if (!box) return;
+    var counts = homeTagCounts();
+    var chosen = (settingsDraft.homeTags || []).slice();
+    box.innerHTML = '<span class="ab-hint">' + t('admin.settings.featHomeTagsLoading') + '</span>';
+    listFullPosts().then(function (list) {
+      mergeTagCounts(counts, list);
+      draw();
+    }).catch(function () { draw(); });
+    function draw() {
+      var names = Object.keys(counts).sort(function (a, b) {
+        var d = (counts[b] || 0) - (counts[a] || 0);
+        return d !== 0 ? d : a.localeCompare(b);
+      });
+      // 已选但当前没有文章的标签也要显示出来，否则选了就看不见、也删不掉
+      chosen.forEach(function (n) { if (names.indexOf(n) < 0) names.push(n); });
+      var html = '';
+      if (!names.length) {
+        html = '<span class="ab-hint">' + t('admin.settings.featHomeTagsEmpty') + '</span>';
+      } else {
+        html = names.map(function (n) {
+          var on = chosen.indexOf(n) >= 0;
+          var c = counts[n] || 0;
+          return '<button type="button" class="ab-tagchip' + (on ? ' on' : '') + '" data-tagpick="' + esc(n) + '">'
+            + esc(n) + (c ? '<span class="ab-tagchip-n">' + c + '</span>' : '') + '</button>';
+        }).join('');
+      }
+      box.innerHTML = html;
+      box.querySelectorAll('[data-tagpick]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var n = btn.getAttribute('data-tagpick');
+          var i = chosen.indexOf(n);
+          if (i >= 0) chosen.splice(i, 1); else chosen.push(n);
+          settingsDraft.homeTags = chosen.slice();
+          draw();
+        });
+      });
+    }
+    function addTag() {
+      var inp = content.querySelector('#abHomeTagInput');
+      var n = String((inp && inp.value) || '').trim();
+      if (!n) return;
+      if (chosen.indexOf(n) < 0) chosen.push(n);
+      counts[n] = counts[n] || 0;
+      settingsDraft.homeTags = chosen.slice();
+      if (inp) inp.value = '';
+      draw();
+    }
+    var addBtn = content.querySelector('#abHomeTagAdd');
+    if (addBtn) addBtn.addEventListener('click', addTag);
+    var clrBtn = content.querySelector('#abHomeTagClear');
+    if (clrBtn) clrBtn.addEventListener('click', function () {
+      chosen = []; settingsDraft.homeTags = []; draw();
+    });
+    var inp = content.querySelector('#abHomeTagInput');
+    if (inp) inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addTag(); } });
+    draw();
+  }
+  function collectHomeTagsFromDom(content) {
+    var box = content.querySelector('#abHomeTags');
+    if (!box) return;
+    var out = [];
+    box.querySelectorAll('[data-tagpick]').forEach(function (btn) {
+      if (btn.classList.contains('on')) out.push(btn.getAttribute('data-tagpick'));
+    });
+    settingsDraft.homeTags = out;
+  }
   function renderSettingsTab(content, tab) {
     var body = content.querySelector('#abSettingsBody');
     if (tab === 'site') {
@@ -4850,6 +4945,13 @@
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatErrReport"> ' + t('admin.settings.featErrReport') + '</label><label class="ab-hint">' + t('admin.settings.featErrReportHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('quote', 15) + ' ' + t('admin.settings.featAntiSpam') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatCommentGuard"> ' + t('admin.settings.featCommentGuard') + '</label><label class="ab-hint">' + t('admin.settings.featCommentGuardHint') + '</label></div>' +
+        '<div class="ab-section-title" style="margin-top:16px">' + icon('tag', 15) + ' ' + t('admin.settings.featHomeTags') + '</div>' +
+        '<div class="ab-field"><label class="ab-hint">' + t('admin.settings.featHomeTagsHint') + '</label>' +
+        '<div id="abHomeTags" class="ab-tagpick"></div>' +
+        '<div class="ab-row" style="gap:8px;margin-top:10px;flex-wrap:wrap">' +
+        '<input class="ab-input" id="abHomeTagInput" style="flex:1;min-width:160px" placeholder="' + t('admin.settings.featHomeTagAdd') + '">' +
+        '<button class="ab-btn" id="abHomeTagAdd">' + icon('plus', 14) + ' ' + t('admin.settings.featHomeTagAddBtn') + '</button>' +
+        '<button class="ab-btn" id="abHomeTagClear">' + t('admin.settings.featHomeTagClear') + '</button></div></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('spark', 15) + ' ' + t('admin.settings.featAds') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abAdsEnabled"> ' + t('admin.settings.featAdsEnable') + '</label><label class="ab-hint">' + t('admin.settings.featAdsEnableHint') + '</label></div>' +
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsClient') + '</label><input class="ab-input" id="abAdsClient" placeholder="ca-pub-xxxxxxxxxxxxxxxx"></div>' +
@@ -4859,6 +4961,7 @@
         '<div class="ab-field"><label class="ab-label">' + t('admin.settings.featAdsContent') + '</label><textarea class="ab-textarea" id="abAdsContent" style="min-height:80px"></textarea></div>' +
         '<label class="ab-hint">' + t('admin.settings.featAdsCodeHint') + '</label>' +
         '</div>';
+      renderHomeTagPicker(content);
     } else if (tab === 'profile') {
       body.innerHTML = '<div class="ab-card" style="max-width:620px">' +
         '<div class="ab-avatar-edit"><img class="ab-avatar-prev" id="abProfPrev" src=""><div><div class="ab-label" style="margin:0">' + t('admin.settings.profileAvatar') + '</div><div class="ab-hint">' + t('admin.settings.avatarUrl') + '</div></div></div>' +
@@ -4946,6 +5049,7 @@
       },
       nav_menu: JSON.stringify(Array.isArray(settingsDraft.nav) ? settingsDraft.nav : []),
       nav_defaults_version: String(NAV_DEFAULTS_VERSION),
+      home_tags: JSON.stringify(Array.isArray(settingsDraft.homeTags) ? settingsDraft.homeTags : []),
       footer_nav: JSON.stringify(Array.isArray(settingsDraft.footerNav) ? settingsDraft.footerNav : []),
       friend_links: JSON.stringify(Array.isArray(settingsDraft.links) ? settingsDraft.links : []),
       moderate_comments: site.moderate ? '1' : '0',
@@ -4966,6 +5070,7 @@
         site_info: JSON.stringify(payload.site_info), profile: JSON.stringify(payload.profile),
         nav_menu: payload.nav_menu, footer_nav: payload.footer_nav, friend_links: payload.friend_links,
         nav_defaults_version: payload.nav_defaults_version,
+        home_tags: payload.home_tags,
         moderate_comments: payload.moderate_comments, features: payload.features
       });
       // 同步到前台全局变量，使站点名称/导航/页脚/友链等设置立即生效（无需刷新整页）

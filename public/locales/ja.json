@@ -999,5 +999,12 @@
   "admin.dashboard.devMobile": "スマホ",
   "admin.dashboard.devTablet": "タブレット",
   "admin.dashboard.devBot": "ボット",
-  "admin.staticExport.cancelled": "エクスポートをキャンセルしました。ファイルは保存されていません"
+  "admin.staticExport.cancelled": "エクスポートをキャンセルしました。ファイルは保存されていません",
+  "admin.settings.featHomeTags": "ホームで表示するタグ",
+  "admin.settings.featHomeTagsHint": "記事が増えるとタグも増えます。ホームに出したいタグだけチェックしてください。チェックしない場合はすべて表示されます。タグ名をクリックすると切り替えられます。数字はそのタグの記事数です。",
+  "admin.settings.featHomeTagAdd": "タグ名（まだ使われていないタグも追加できます）",
+  "admin.settings.featHomeTagAddBtn": "追加",
+  "admin.settings.featHomeTagClear": "選択をクリア",
+  "admin.settings.featHomeTagsEmpty": "タグがまだありません。まず記事にタグを追加してください",
+  "admin.settings.featHomeTagsLoading": "タグを集計中…"
 }
