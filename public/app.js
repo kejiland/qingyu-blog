@@ -2006,16 +2006,16 @@ function app() { return document.querySelector('#app'); }
   // 导航默认项版本：老后台保存的 nav_menu 没有这个版本号时，说明它还是升级前
   // 的旧导航；首次加载自动补齐当时没有的新默认项，但不会在用户删除后反复加回。
   var NAV_DEFAULT_VERSION = 1;
-  var NAV_EXTRA_PATHS = { '/categories': 1, '/history': 1, '/series': 1, '/popular': 1 };
+  var NAV_EXTRA_PATHS = { '/history': 1, '/series': 1, '/popular': 1 };
   function hideExtraNav(items) {
     return items.filter(function (it) { return !NAV_EXTRA_PATHS[navUrlKey(it)]; });
   }
 
-  // 「发现」下拉菜单的固定内容：标签 / 分类 / 历史 / 系列 / 热门。
-  // 这里无视旧版 navExtras 隐藏开关：五个入口始终可从二级菜单打开。
+  // 「发现」下拉菜单的固定内容：标签 / 历史 / 系列 / 热门。
+  // 「分类」已独立为一级导航入口，不再收纳在这里。
+  // 这里无视旧版 navExtras 隐藏开关：这些入口始终可从二级菜单打开。
   var SECONDARY_NAV = [
     { i18n: 'nav.tags',       url: '/tags',       path: '/tags' },
-    { i18n: 'nav.categories', url: '/categories', path: '/categories' },
     { i18n: 'nav.history',    url: '/history',     path: '/history' },
     { i18n: 'nav.series',     url: '/series',     path: '/series' },
     { i18n: 'nav.popular',    url: '/popular',    path: '/popular' }
@@ -2062,7 +2062,7 @@ function app() { return document.querySelector('#app'); }
     return items;
   }
 
-  // 是否归入「发现」二级下拉：内置五项（按路径识别，兼容旧数据）+ 后台手动标记的项。
+  // 是否归入「发现」二级下拉：内置四项（按路径识别，兼容旧数据）+ 后台手动标记的项。
   function isDiscoverItem(it) {
     if (!it) return false;
     // 后台显式设为 false 的项（discover:false）一律移出一级导航，即使路径是内置入口

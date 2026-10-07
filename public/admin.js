@@ -5089,8 +5089,8 @@
     try { var v = JSON.parse(localStorage.getItem(navDraftKey()) || 'null'); if (Array.isArray(v)) return v; } catch (e) {}
     return null;
   }
-  /* 内置「发现」二级入口（按路径识别，兼容旧数据）：这几个始终出现在「发现」下拉里 */
-  var NAV_DISCOVER_PATHS = { '/tags': 1, '/categories': 1, '/history': 1, '/series': 1, '/popular': 1 };
+  /* 内置「发现」二级入口（按路径识别，兼容旧数据）：这几个默认出现在「发现」下拉里；「分类」已独立为一级导航，不在此列表。 */
+  var NAV_DISCOVER_PATHS = { '/tags': 1, '/history': 1, '/series': 1, '/popular': 1 };
   function navKeyOf(u) {
     var v = String(u == null ? '/' : u).replace(/^#/, '');
     if (v.charAt(0) !== '/') return v;
@@ -5173,7 +5173,7 @@
         var idx = parseInt(btn.getAttribute('data-toggle-discover'), 10);
         var it = settingsDraft.nav[idx];
         if (!it) return;
-        // 再次点击即取消：内置入口（标签/分类/历史/系列/热门）也能移出「发现」，回到一级导航
+        // 再次点击即取消：内置入口（标签/历史/系列/热门）也能移出「发现」，回到一级导航
         it.discover = isDiscoverNav(it) ? false : true;
         refresh();
       });
