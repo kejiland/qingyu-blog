@@ -2966,6 +2966,66 @@ tests.push(['导航编辑器：真实取数逻辑 —— 服务端未就绪忽�
   assert.deepStrictEqual(nd.resolve(), server, '无本地草稿时原样使用服务端数据');
 }]);
 
+tests.push(['首屏弱网兜底：预加载关键资源 + 加载超时提示重试', async () => {
+  const html = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  // 1) 首屏关键资源都提前声明预加载
+  ['config.min.js', 'posts.min.js', 'i18n.min.js', 'app.min.js'].forEach((f) => {
+    assert.ok(html.includes('<link rel="preload" href="' + f + '?v='), f + ' 已预加载');
+  });
+  assert.ok(html.includes('<link rel="preload" href="style.min.css?v='), '主样式已预加载');
+  // 2) 8 秒未渲染则给出「网络较慢」提示与重试按钮，30 秒升级为明确的失败文案
+  assert.ok(html.includes("setTimeout(showSlowTip, 8000)"), '8 秒后弹出慢网提示');
+  assert.ok(html.includes('网络较慢，页面还在加载'), '慢网提示有文案');
+  assert.ok(html.includes('网络连接不稳定，页面没能加载出来'), '30 秒后提示升级为加载失败');
+  assert.ok(html.includes('location.reload()'), '提示里有重新加载按钮');
+  assert.ok(html.includes("document.getElementById('bootSlowTip')"), '同一时刻只显示一个提示');
+  // 3) app.js 渲染完成后不再提示
+  assert.ok(appSrc.includes('window.__qingyuBooted = true;'), 'app.js 渲染完成会标记已启动');
+  const bootIdx = appSrc.indexOf('// 首屏渲染兜底：route()');
+  const idx = appSrc.indexOf('window.__qingyuBooted = true;');
+  assert.ok(bootIdx > 0 && idx > bootIdx, '标记发生在首次渲染之后');
+  // 4) 真实跑一遍计时逻辑：模拟 app.js 迟迟不来（8 秒）时是否出现提示
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
+  const m = html.match(/<script>\s*\/\/ 首屏兜底[\s\S]*?<\/script>/);
+  assert.ok(m, '能取出兜底脚本');
+  const els = {};
+  const mkEl = (id) => ({
+    id, style: {}, children: [], textContent: '', _html: '',
+    set innerHTML(v) { this._html = v; }, get innerHTML() { return this._html; },
+    appendChild(c) { this.children.push(c); if (c && c.id) els[c.id] = c; return c; },
+    addEventListener() {},
+  });
+  els.bootLoad = mkEl('bootLoad');
+  const realDoc = b.ctx.document;
+  // 未注册的 id 必须返回 null（默认桩会返回假元素，会让兜底脚本误判提示已存在）
+  realDoc.getElementById = (id) => els[id] || null;
+  realDoc.createElement = (tag) => mkEl(tag);
+  const timers = [];
+  b.ctx.setTimeout = (fn, ms) => { timers.push({ fn, ms }); return timers.length; };
+  b.win.setTimeout = b.ctx.setTimeout;
+  b.win.__qingyuBooted = false;
+  vm.runInContext(m[0].replace(/^<script>/, '').replace(/<\/script>$/, ''), b.ctx);
+  const slow = timers.find((x) => x.ms === 8000);
+  const late = timers.find((x) => x.ms === 30000);
+  assert.ok(slow && late, '注册了 8 秒与 30 秒两个计时器');
+  slow.fn();
+  assert.strictEqual(els.bootLoad.children.length, 1, '8 秒后提示已插入加载动画');
+  const tip = els.bootSlowTip;
+  assert.ok(tip, '提示节点已创建');
+  assert.strictEqual(tip.children.length, 2, '提示里是「网络较慢」文案 + 重新加载按钮');
+  assert.strictEqual(tip.children[1].textContent, '重新加载', '提供了重新加载按钮');
+  slow.fn();
+  assert.strictEqual(els.bootLoad.children.length, 1, '重复触发不会插入第二个提示');
+  late.fn();
+  assert.ok(String(tip.innerHTML).includes('网络连接不稳定'), '30 秒后提示升级为明确的加载失败');
+  // app.js 已启动就不再打扰
+  const before = els.bootLoad.children.length;
+  b.win.__qingyuBooted = true;
+  slow.fn();
+  assert.strictEqual(els.bootLoad.children.length, before, 'app.js 已启动就不再提示');
+}]);
+
 tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });

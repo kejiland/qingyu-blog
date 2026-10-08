@@ -6323,6 +6323,8 @@ window.__bootPromise = (async function () {
         + '<p><a href="' + esc(href('/')) + '">' + t('post.backHome') + '</a></p></div></main>';
     }
   }
+  // 首屏已渲染（成功或走了兜底）：关闭 index.html 里的「网络较慢」提示计时器
+  try { window.__qingyuBooted = true; } catch (e) {}
   window.addEventListener('hashchange', function () { _spaNav = true; withViewTransition(route); });
   window.addEventListener('popstate', function () { _spaNav = true; withViewTransition(route); });
 
