@@ -130,6 +130,7 @@
   "comment.contentPlaceholder": "说点什么…",
   "comment.submit": "发表评论",
   "comment.noComments": "暂无评论",
+  "comment.loadFail": "评论加载失败，请稍后重试",
   "comment.delete": "删除",
   "comment.fillBoth": "请填写昵称和内容",
   "comment.posted": "✓ 已发表",

@@ -130,6 +130,8 @@
   "comment.contentPlaceholder": "コメントを書く…",
   "comment.submit": "コメントを投稿",
   "comment.noComments": "まだコメントがありません",
+
+  "comment.loadFail": "コメントの読み込みに失敗しました。後でもう一度お試しください。",
   "comment.delete": "削除",
   "comment.fillBoth": "名前とコメントの両方を入力してください",
   "comment.posted": "✓ 投稿しました",

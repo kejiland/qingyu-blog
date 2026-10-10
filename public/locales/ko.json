@@ -130,6 +130,8 @@
   "comment.contentPlaceholder": "메시지를 입력하세요…",
   "comment.submit": "댓글 작성",
   "comment.noComments": "아직 댓글이 없습니다",
+
+  "comment.loadFail": "댓글을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.",
   "comment.delete": "삭제",
   "comment.fillBoth": "이름과 댓글을 모두 입력해주세요",
   "comment.posted": "✓ 게시됨",

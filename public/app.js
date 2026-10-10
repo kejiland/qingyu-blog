@@ -3511,11 +3511,23 @@ async function renderPost(id) {
 
   // load comments（顶层 + 嵌套回复统一渲染；支持「最热 / 最新」排序与分页）
   var CMT_PAGE = 8;
-  var _cmtState = { sort: 'hot', shown: CMT_PAGE, list: [], serverPaged: false, serverPage: 0, serverPages: 1 };
+  var _cmtState = { sort: 'hot', shown: CMT_PAGE, list: [], serverPaged: false, serverPage: 0, serverPages: 1, loading: false };
   function refreshComments(list) {
     _cmtState.list = Array.isArray(list) ? list : [];
     _cmtState.shown = CMT_PAGE;
     renderCommentView();
+  }
+  // 评论切换中的骨架：行数跟随当前已加载条数，形状与真实评论一致，切换时视觉连贯
+  function cmtLoadingSkeleton(n) {
+    n = Math.max(1, Math.min(n, 6));
+    var out = '';
+    for (var i = 0; i < n; i++) {
+      out += '<li class="comment comment-skeleton" aria-hidden="true"><div class="comment-head">'
+        + '<span class="comment-avatar cs-avatar"></span><span class="cs-line w25"></span>'
+        + '</div><div class="comment-main"><div class="cs-line w95"></div><div class="cs-line w60"></div>'
+        + '<div class="cs-line w35"></div></div></li>';
+    }
+    return out;
   }
   function renderCommentView() {
     var ul = document.querySelector('#commentList');
@@ -3524,6 +3536,12 @@ async function renderPost(id) {
     if (!ul) return;
     var list = _cmtState.list;
     if (cnt) cnt.textContent = String(list.length);
+    if (_cmtState.loading) {
+      // 排序切换中：保留原有评论的骨架占位，避免出现「空白 / 无数据」再突然刷出内容
+      ul.innerHTML = cmtLoadingSkeleton(list.length || 3);
+      if (moreWrap) moreWrap.style.display = 'none';
+      return;
+    }
     if (!list.length) {
       ul.innerHTML = '<li class="comment-empty">' + t('comment.noComments') + '</li>';
       if (moreWrap) moreWrap.style.display = 'none';
@@ -3593,25 +3611,34 @@ async function renderPost(id) {
     sortWrap.querySelectorAll('[data-sort]').forEach(function (b) {
       b.addEventListener('click', function () {
         var v = b.getAttribute('data-sort');
-        if (v === _cmtState.sort) return;
+        if (v === _cmtState.sort || _cmtState.loading) return;
         _cmtState.sort = v;
         _cmtState.shown = CMT_PAGE;
-        if (_cmtState.serverPaged) {
-          _cmtState.list = [];
-          _cmtState.serverPage = 0;
-          cloudCommentPage(1, v).then(function (res) {
-            _cmtState.serverPage = 1;
-            _cmtState.serverPages = Number(res && res.pages) || 1;
-            refreshComments((res && res.comments) || []);
-          });
-          renderCommentView();
-          return;
-        }
+        // 立刻给出选中反馈（选中态 / 按钮按下态），再去取数据
         sortWrap.querySelectorAll('[data-sort]').forEach(function (x) {
           var on = x === b;
           x.classList.toggle('active', on);
           x.setAttribute('aria-selected', on ? 'true' : 'false');
         });
+        b.classList.add('pressed');
+        setTimeout(function () { b.classList.remove('pressed'); }, 220);
+        if (_cmtState.serverPaged) {
+          // 旧列表留在原地做骨架占位，数据回来后再整块替换，过渡不闪空
+          _cmtState.loading = true;
+          renderCommentView();
+          cloudCommentPage(1, v).then(function (res) {
+            _cmtState.serverPage = 1;
+            _cmtState.serverPages = Number(res && res.pages) || 1;
+            _cmtState.list = (res && res.comments) || [];
+          }).catch(function () {
+            toast(t('comment.loadFail'), 'err');
+          }).then(function () {
+            _cmtState.loading = false;
+            _cmtState.shown = CMT_PAGE;
+            renderCommentView();
+          });
+          return;
+        }
         renderCommentView();
       });
     });

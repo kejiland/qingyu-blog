@@ -130,6 +130,8 @@
   "comment.contentPlaceholder": "Say something…",
   "comment.submit": "Post Comment",
   "comment.noComments": "No comments yet",
+
+  "comment.loadFail": "Failed to load comments, please try again",
   "comment.delete": "Delete",
   "comment.fillBoth": "Please enter both name and comment",
   "comment.posted": "✓ Posted",

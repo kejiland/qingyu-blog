@@ -130,6 +130,8 @@
   "comment.contentPlaceholder": "कुछ कहें…",
   "comment.submit": "टिप्पणी पोस्ट करें",
   "comment.noComments": "अभी कोई टिप्पणी नहीं",
+
+  "comment.loadFail": "टिप्पणियाँ लोड नहीं हो सकीं, कृपया बाद में पुनः प्रयास करें",
   "comment.delete": "हटाएं",
   "comment.fillBoth": "कृपया नाम और टिप्पणी दोनों दर्ज करें",
   "comment.posted": "✓ पोस्ट हो गया",

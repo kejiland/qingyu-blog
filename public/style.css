@@ -1888,6 +1888,19 @@ kbd {
 /* “回复了某人”小标签：标明该评论是对谁的回复，直观呈现回复层级 */
 .comment-reply-to { display: inline-block; margin: 6px 0 0; font-size: 12px; color: var(--accent); background: var(--accent-soft); padding: 1px 8px; border-radius: 999px; line-height: 1.5; }
 .comment-empty { color: var(--muted); font-size: 13px; padding: 8px 0; }
+/* 评论排序切换：按钮按下反馈 + 骨架占位，避免切换瞬间出现空白 */
+.cs-btn.pressed { background: color-mix(in srgb, var(--accent) 14%, transparent); transform: scale(.96); }
+.comment-skeleton { pointer-events: none; }
+.comment-skeleton .comment-avatar { color: transparent; }
+.cs-line { display: block; height: 10px; border-radius: 6px; background: color-mix(in srgb, var(--muted) 16%, transparent); animation: csPulse 1.1s ease-in-out infinite; }
+.cs-line.w25 { width: 25%; height: 12px; }
+.cs-line.w35 { width: 35%; }
+.cs-line.w60 { width: 60%; }
+.cs-line.w90 { width: 90%; }
+.cs-line.w95 { width: 95%; }
+.cs-avatar { background: color-mix(in srgb, var(--muted) 18%, transparent); animation: csPulse 1.1s ease-in-out infinite; }
+@keyframes csPulse { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .cs-line, .cs-avatar { animation: none; } }
 /* 评论回复 */
 .comment-children { list-style: none; margin: 8px 0 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 6px; }
 .comment-children .comment {

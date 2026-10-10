@@ -3026,6 +3026,35 @@ tests.push(['首屏弱网兜底：预加载关键资源 + 加载超时提示重�
   assert.strictEqual(els.bootLoad.children.length, before, 'app.js 已启动就不再提示');
 }]);
 
+tests.push(['评论区：切换最热/最新有反馈、过渡连贯不闪空白', async () => {
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  // 1) 点击立刻有选中与按下反馈，不再等数据回来才变
+  assert.ok(/\.cs-btn\.pressed/.test(css), '排序按钮有按下态样式');
+  assert.ok(appSrc.includes("b.classList.add('pressed')"), '点击时立即给出按下反馈');
+  assert.ok(appSrc.indexOf("b.classList.add('pressed')") < appSrc.indexOf('cloudCommentPage(1, v)'), '按下反馈早于请求发出');
+  // 2) 切换期间用骨架占位，绝不出现「暂无评论」的空白帧
+  const ldIdx = appSrc.indexOf('if (_cmtState.loading) {');
+  assert.ok(ldIdx > 0 && appSrc.slice(ldIdx, ldIdx + 400).includes('cmtLoadingSkeleton'), '加载中渲染骨架占位');
+  const emptyIdx = appSrc.indexOf("ul.innerHTML = '<li class=\"comment-empty\">'");
+  assert.ok(emptyIdx > ldIdx, '骨架分支排在「暂无评论」之前，切换不会先闪空');
+  const sk = appSrc.match(/function cmtLoadingSkeleton\(n\) \{[\s\S]*?\n  \}/);
+  assert.ok(sk, '骨架渲染函数存在');
+  const skel = vm.runInNewContext('(' + sk[0].replace('function cmtLoadingSkeleton', 'function') + ')');
+  const html3 = skel(3);
+  assert.strictEqual((html3.match(/comment-skeleton/g) || []).length, 3, '骨架行数跟随已加载条数');
+  assert.strictEqual((skel(99).match(/comment-skeleton/g) || []).length, 6, '骨架行数有上限，不会刷屏');
+  assert.ok(!/comment-empty/.test(html3), '骨架不出现「暂无评论」字样');
+  // 3) 加载中去抖，旧列表留在原地；失败有明确提示且恢复可点
+  assert.ok(/if \(v === _cmtState\.sort \|\| _cmtState\.loading\) return;/.test(appSrc), '加载中忽略重复点击');
+  assert.ok(appSrc.includes("toast(t('comment.loadFail'), 'err')"), '加载失败有错误提示');
+  assert.ok(appSrc.includes('_cmtState.loading = false;'), '结束后恢复可交互');
+  ['zh-CN', 'en', 'ja', 'ko', 'hi'].forEach((loc) => {
+    const j = JSON.parse(fs.readFileSync(path.join(PUB, 'locales', loc + '.json'), 'utf8'));
+    assert.ok(j['comment.loadFail'], loc + ' 有加载失败文案');
+  });
+}]);
+
 tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
