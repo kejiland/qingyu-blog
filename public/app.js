@@ -1282,7 +1282,7 @@ async function fetchCloudSearchPage(query, page) {
 }
 function searchResultHtml(post, query) {
   var snip = searchSnippet(post, query);
-  var tags = Array.isArray(post.tags) ? post.tags.join(' · ') : String(post.tags || '');
+  var tags = Array.isArray(post.tags) ? post.tags.join(' / ') : String(post.tags || '');
   var qLow = String(query || '').toLowerCase();
   var tagLine = tags && tags.toLowerCase().indexOf(qLow) >= 0
     ? '<div class="sh-tags">' + highlightQuery(tags, query) + '</div>'
@@ -1580,7 +1580,7 @@ function loadFeaturedPosts(excludeId) {
     grid.innerHTML = items.map(function (p, idx) {
       return '<div class="featured-card" data-idx="' + idx + '">'
         + '<div class="featured-card-title">' + esc(p.title) + '</div>'
-        + '<div class="featured-card-meta">' + svgIcon('eye', 12) + ' ' + p.views + ' · ' + svgIcon('heart', 12) + ' ' + p.likes + ' · ' + svgIcon('quote', 12) + ' ' + p.comments
+        + '<div class="featured-card-meta">' + svgIcon('eye', 12) + ' ' + p.views + svgIcon('heart', 12) + ' ' + p.likes + svgIcon('quote', 12) + ' ' + p.comments
         + '</div></div>';
     }).join('');
     // 用 div + click 直接跳转
@@ -1618,7 +1618,7 @@ function renderPopularList(items) {
     return;
   }
   box.innerHTML = items.map(function (p, index) {
-    var tags = normalizeTags(p).slice(0, 3).join(' · ');
+    var tags = normalizeTags(p).slice(0, 3).join(' / ');
     return '<a class="popular-card" href="' + esc(href(postUrl(p.id))) + '">'
       + '<span class="popular-rank">' + (index + 1) + '</span>'
       + '<div class="popular-main"><div class="popular-card-title">' + esc(p.title || t('post.untitled')) + '</div>'
@@ -2464,14 +2464,15 @@ function renderFooter() {
     else if (/^\//.test(u)) u = href(u);
     return '<a href="' + esc(u) + '"' + ext + '>' + esc(x.text || '') + '</a>';
   }
-  var navHtml = nav.map(l).join('<span class="footer-dot">·</span>');
+  // 导航项之间不再插入小圆点，只靠间距分隔
+  var navHtml = nav.map(l).join('');
   // RSS：仅非管理员显示（管理员有写作后台入口）。云端模式指向动态
   // /api/feed.xml（含全部云端文章、自动取站点域名）；file:// 直开时同目录；
   // 其余静态托管用根路径 feed.xml
   if (!adminOk()) {
     var rssHref = _cloudOn() ? '/api/feed.xml' : (useHashMode() ? 'feed.xml' : '/feed.xml');
-    navHtml += '<span class="footer-dot footer-rss">·</span><a class="footer-rss" href="' + esc(rssHref) + '">RSS</a>';
-    navHtml += '<span class="footer-dot">·</span><a href="' + esc(href('/subscribe')) + '">' + esc(t('subscribe.title')) + '</a>';
+    navHtml += '<a class="footer-rss" href="' + esc(rssHref) + '">RSS</a>';
+    navHtml += '<a href="' + esc(href('/subscribe')) + '">' + esc(t('subscribe.title')) + '</a>';
   }
   // 电脑端专属区块：自定义文字 / 站点声明 / 联系方式 / 友情链接
   var extra = '';
@@ -3005,7 +3006,7 @@ function renderRelationsHtml(relations) {
   if (related.length) {
     html += '<section class="relations-section related-posts"><div class="relations-title">' + svgIcon('link', 15) + ' ' + esc(t('post.related')) + '</div><div class="related-grid">';
     related.forEach(function (p) {
-      var tags = normalizeTags(p).slice(0, 2).join(' · ');
+      var tags = normalizeTags(p).slice(0, 2).join(' / ');
       html += '<a class="related-card" href="' + esc(href(postUrl(p.id))) + '"><div class="related-card-title">' + esc(p.title || t('post.untitled')) + '</div><div class="related-card-meta">' + esc(tags || p.date || '') + '</div></a>';
     });
     html += '</div></section>';
@@ -3127,7 +3128,7 @@ async function renderPost(id) {
   var tags = normalizeTags(post).map(function (t) { return '<a href="' + esc(href('/', { tag: t })) + '" data-tag-link>' + esc(t) + '</a>'; }).join('');
   var minutes = Math.max(1, Math.ceil((stripMd(content || '').length / 400)));
   var seriesMeta = post.series ? '<a class="pin" href="' + esc(href(seriesUrl(post.series))) + '">' + svgIcon('list', 13) + ' ' + esc(post.series) + '</a>' : '';
-  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.author ? '<span class="meta-dot">·</span><span class="meta-author">' + esc(post.author) + '</span>' : '') + '<span class="meta-dot">·</span><span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-dot">·</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
+  html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.author ? '<span class="meta-author">' + esc(post.author) + '</span>' : '') + '<span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
   html += '<div class="reading-tools"><span class="rt-label">' + t('post.fontSize') + '</span>' +
     '<button type="button" class="rt-btn" data-rs="-1" aria-label="' + t('post.fontSmaller') + '" title="' + t('post.fontSmaller') + '">A−</button>' +
     '<button type="button" class="rt-btn" data-rs="0" aria-label="' + t('post.fontReset') + '" title="' + t('post.fontReset') + '">A</button>' +
@@ -3855,8 +3856,8 @@ async function renderPreviewPage(token) {
     var tocRes = buildToc(bodyHtml);
     var html = renderNav('/');
     html += '<main class="container page-fade"><div class="post-body">';
-    html += '<div class="preview-banner">' + svgIcon('eye', 14) + ' ' + t('preview.banner') + ' · ' + esc(post.title || t('post.untitled')) + '</div>';
-    html += '<div class="post-header"><h1>' + esc(post.title || t('post.untitled')) + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.tags && post.tags.length ? '<span class="meta-dot">·</span><span>' + post.tags.map(function (x) { return esc(x); }).join(' / ') + '</span>' : '') + '</div></div>';
+    html += '<div class="preview-banner">' + svgIcon('eye', 14) + ' ' + t('preview.banner') + ' ' + esc(post.title || t('post.untitled')) + '</div>';
+    html += '<div class="post-header"><h1>' + esc(post.title || t('post.untitled')) + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.tags && post.tags.length ? '<span>' + post.tags.map(function (x) { return esc(x); }).join(' / ') + '</span>' : '') + '</div></div>';
     html += tocRes.html;
     if (post.enc) {
       html += '<div class="post-lock"><div class="post-lock-ico">' + svgIcon('lock', 26) + '</div><p class="post-lock-title">' + t('post.lockedTitle') + '</p><p class="post-lock-desc">' + t('post.lockedDesc') + '</p></div>';
@@ -4024,7 +4025,7 @@ function renderSeriesList() {
       var first = g.posts[0] || {};
       html += '<a class="post-card" href="' + esc(href(seriesUrl(g.name))) + '"><div class="post-card-main">' +
         '<div class="meta"><span class="date">' + esc(t('series.count', { count: g.posts.length })) + '</span><span class="pin">' + svgIcon('list', 13) + ' ' + esc(t('series.label')) + '</span></div>' +
-        '<h2>' + esc(g.name) + '</h2><div class="excerpt">' + esc(g.posts.slice(0, 4).map(function (p) { return p.title || ''; }).join(' · ')) + '</div>' +
+        '<h2>' + esc(g.name) + '</h2><div class="excerpt">' + esc(g.posts.slice(0, 4).map(function (p) { return p.title || ''; }).join('、')) + '</div>' +
         '<div class="mini-tags"><span>' + esc(t('series.part')) + '</span></div></div>' + renderPostThumb(first, idx) + '</a>';
     });
     html += '</div>';
@@ -4498,7 +4499,7 @@ function renderEditorBody() {
     + '<button class="btn btn-outline-danger btn-logout" id="btnClearData" title="' + t('editor.clearDataTitle') + '">' + svgIcon('trash', 14) + ' ' + t('editor.cleanData') + '</button>'
     + '<button class="btn btn-ghost btn-logout" id="btnLogout">' + svgIcon('logout', 15) + ' ' + t('editor.exitLogin') + '</button></span>'
     + '</div>';
-  body += '<p class="keys-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> ' + t('editor.saveDraft') + ' · <kbd>Ctrl</kbd>+<kbd>Enter</kbd> ' + t('editor.savePost') + '</p>';
+  body += '<p class="keys-hint"><kbd>Ctrl</kbd>+<kbd>S</kbd> ' + t('editor.saveDraft') + ' <kbd>Ctrl</kbd>+<kbd>Enter</kbd> ' + t('editor.savePost') + '</p>';
   body += '<h3 class="draft-hint"><b>' + t('editor.exportAll') + ':</b> ' + t('editor.exportHint') + '</h3>';
   return body;
 }
@@ -5541,7 +5542,8 @@ function aiFillSlots() {
             var el = document.getElementById('aiSummarySlot');
             if (!el) return;
             if (d && d.summary) {
-              el.innerHTML = aiSummaryCardHTML(d.summary, slug, !!d.cached || adminOk(), !!d.cached);
+              // 「重新生成」仅登录管理员可见：命中缓存 ≠ 管理员，不能拿 cached 当权限
+              el.innerHTML = aiSummaryCardHTML(d.summary, slug, adminOk(), !!d.cached);
             } else {
               el.innerHTML = aiSummaryBtnHTML(slug);
             }

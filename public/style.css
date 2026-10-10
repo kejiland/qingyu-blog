@@ -1583,9 +1583,9 @@ footer { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--
   line-height: 1.7;
   letter-spacing: 0.3px;
 }
+.footer-nav { column-gap: 16px; row-gap: 2px; }   /* 项与项之间只留间距，不再插入小圆点 */
 .footer-nav a { color: var(--muted); text-decoration: none; transition: color 0.15s ease; padding: 1px 5px; }
 .footer-nav a:hover { color: var(--accent); }
-.footer-dot { color: var(--border); margin: 0 1px; }
 .footer-rss { color: var(--accent); }
 /* 电脑端专属：站点声明 / 联系方式 / 友情链接（行距与其余行统一） */
 .footer-extra {
@@ -1689,7 +1689,6 @@ kbd {
 
 /* ---------- 详情页 meta ---------- */
 .post-header .meta .meta-date { letter-spacing: 0.3px; }
-.post-header .meta .meta-dot { opacity: 0.5; }
 
 /* ---------- 归档页 ---------- */
 .archive-year {
@@ -1985,7 +1984,7 @@ kbd {
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 12px;   /* 各项之间只留间距，不再插小圆点 */
 }
 .featured-card-meta svg { flex-shrink: 0; }
 .featured-loading {

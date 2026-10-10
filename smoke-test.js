@@ -3055,6 +3055,38 @@ tests.push(['评论区：切换最热/最新有反馈、过渡连贯不闪空白
   });
 }]);
 
+tests.push(['AI 摘要：游客不显示「重新生成」；页脚导航无间隔圆点', async () => {
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  // 1) 重新生成只认登录态：命中缓存不等于有权限
+  assert.ok(!appSrc.includes('!!d.cached || adminOk()'), '不再把「命中缓存」当成管理员权限');
+  assert.ok(/aiSummaryCardHTML\(d\.summary, slug, adminOk\(\), !!d\.cached\)/.test(appSrc), '卡片按登录态决定是否给重新生成');
+  const cardFn = appSrc.match(/function aiSummaryCardHTML[\s\S]*?\n\}/)[0];
+  assert.ok(/isAdmin \? '<div class="ai-card-foot">/.test(cardFn), '底部按钮区仅在管理员时渲染');
+  assert.ok(cardFn.includes("t('ai.regenerate')"), '管理员看到的是重新生成');
+  // 游客（未登录）渲染：不带任何生成/重生成入口
+  const render = vm.runInNewContext('(function(t,esc,svgIcon){' + cardFn + '; return aiSummaryCardHTML;})')(
+    (k) => k, (v) => String(v), () => '');
+  const guest = render('一段摘要', 'p1', false, true);
+  assert.ok(guest.includes('一段摘要'), '游客仍能看到摘要正文');
+  assert.ok(!guest.includes('ai-card-foot') && !guest.includes('重新生成') && !guest.includes('ai.regenerate'), '游客看不到重新生成');
+  const admin = render('一段摘要', 'p1', true, true);
+  assert.ok(admin.includes('ai-card-foot') && admin.includes('ai.regenerate'), '管理员才看到重新生成');
+  assert.ok(!guest.includes('ai.regenerate'), '游客 DOM 里完全没有重新生成入口');
+  // 服务端：强制重生成必须登录
+  const sum = fs.readFileSync(path.join(dir, 'functions', 'api', 'ai', 'summary.js'), 'utf8');
+  assert.ok(/if \(force && !\(await isWriteAuthed\(request, env\)\)\) return unauthorized/.test(sum), '接口层也拦住了未登录的强制重生成');
+  // 2) 页脚导航不再有间隔圆点
+  assert.ok(!appSrc.includes('footer-dot'), '页脚不再插入小圆点');
+  assert.ok(appSrc.includes("var navHtml = nav.map(l).join('');"), '导航项直接拼接，不再用圆点分隔');
+  // 文章标题下的信息行同样不再出现小圆点
+  assert.ok(!appSrc.includes('meta-dot'), '文章标题下的信息行不再插圆点');
+  assert.ok(!css.includes('meta-dot'), '圆点样式一并移除');
+  assert.ok(!/post\.tags[^\n]*join\(' · '\)/.test(appSrc), '标签之间不再用圆点分隔');
+  assert.ok(!css.includes('.footer-dot'), '小圆点样式一并移除');
+  assert.ok(/\.footer-nav \{[^}]*column-gap: 16px/.test(css), '改用间距分隔');
+}]);
+
 tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
