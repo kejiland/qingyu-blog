@@ -47,13 +47,10 @@ jobs:
         env:
           RL_BINDING: ${{ secrets.BLOG_RATE_LIMIT_BINDING }}
         run: |
-          if [ -n "$RL_BINDING" ]; then
-            npm install -g 'wrangler@^4.36.0'
-            echo "✅ 已启用边缘限流绑定 → 使用 wrangler 4.x（该绑定要求 4.36.0+）"
-          else
-            npm install -g wrangler@3.90.0
-            echo "✅ 使用 wrangler 3.90.0（未启用边缘限流绑定）"
-          fi
+          # 统一使用 wrangler 4.x：静态资源 run_worker_first（让 worker.js 自己的长缓存/安全响应头生效）
+          # 与可选的边缘限流绑定（ratelimits）都要求 4.x
+          npm install -g 'wrangler@^4.36.0'
+          echo "✅ 使用 wrangler 4.36+（run_worker_first 需3.94+，统一到 4.x 以兼容限流绑定）"
 
       # 部署前跑本地测试（纯 Node 模拟环境，无网络/无凭据依赖；失败即中止，不部署）
       - name: Run tests (smoke + verify)

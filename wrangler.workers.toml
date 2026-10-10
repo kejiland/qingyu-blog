@@ -16,6 +16,11 @@ main = "worker.js"
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
+# 关键：让所有静态请求先经过 Worker，worker.js 里「版本化资源一年强缓存 + 安全响应头」
+# 的那段逻辑才会真正执行（默认静态资源在 Worker 之前就被直接返回，那段代码等于死代码，
+# 线上一直是 max-age=0，每次访问都要重下约 600KB）。
+# 需要 wrangler >= 3.94（CI 已升到 4.x）。
+run_worker_first = true
 html_handling = "auto-trailing-slash"
 
 # KV 命名空间（文章数据存储 + 管理员密码哈希）

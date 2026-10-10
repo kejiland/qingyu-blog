@@ -387,6 +387,33 @@ tests.push(['云端模式引导：数据来自 API，写页显示发布按钮', 
   assert.ok(win.BLOG_POSTS.length >= 3, '捆绑示例仍在（作为静态兜底）');
 }]);
 
+/* 回归：弱网/丢包首屏兜底 —— 云端快照应让首页先出内容，而不是一直转圈 */
+tests.push(['云端快照兜底：接口失败时先用上次快照渲染，不卡在加载态', async () => {
+  const mem = {};
+  const store = {
+    getItem: (k) => (k in mem ? mem[k] : null),
+    setItem: (k, v) => { mem[k] = String(v); },
+    removeItem: (k) => { delete mem[k]; },
+  };
+  const goodFetch = async () => ({
+    ok: true, status: 200,
+    json: async () => ({ ok: true, posts: [{ id: 'sw1', title: '快照演示文章', date: '2025-01-05', tags: ['技术'], content: '' }] })
+  });
+  // 第一次正常访问：拉到云端文章并写入快照
+  await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: goodFetch, localStorage: store }, '/');
+  assert.ok(mem['qingyu.snap.posts'], '成功访问后写入云端文章快照');
+  // 第二次访问：接口全部失败（模拟丢包/超时），仍应立刻用快照渲染出文章
+  const badFetch = async () => { throw new Error('network down'); };
+  const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: badFetch, localStorage: store }, '/');
+  assert.ok(b.html.includes('快照演示文章'), '接口不可用时用快照渲染出文章列表');
+}]);
+/* 回归：静态资源必须先过 Worker，否则 worker.js 的长缓存/安全响应头形同虚设（线上曾一直是 max-age=0） */
+tests.push(['部署配置：静态资源run_worker_first + CI 使用 wrangler 4.x', () => {
+  const w = fs.readFileSync(path.join(dir, 'wrangler.workers.toml'), 'utf8');
+  assert.ok(/run_worker_first\s*=\s*true/.test(w), 'wrangler.workers.toml 开启 run_worker_first');
+  const ci = fs.readFileSync(path.join(dir, '.github', 'workflows', 'deploy.yml'), 'utf8');
+  assert.ok(!/wrangler@3\./.test(ci), 'CI 不再使用 wrangler 3.x（run_worker_first 需 3.94+）');
+}]);
 tests.push(['parseMdFile：frontmatter 与无 frontmatter', async () => {
   const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   const r = ctx.parseMdFile('---\ntitle: 导入的标题\ndate: 2025-02-01\ntags: a, b\nexcerpt: 摘要\n---\n正文内容', 'import.md');

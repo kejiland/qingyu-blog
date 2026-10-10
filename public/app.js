@@ -6365,7 +6365,56 @@ window.__bootPromise = (async function () {
   window.addEventListener('hashchange', function () { _spaNav = true; withViewTransition(route); });
   window.addEventListener('popstate', function () { _spaNav = true; withViewTransition(route); });
 
+/* ---------- 弱网/丢包兜底：云端快照（SWR） ----------
+ * 现象：到 Cloudflare 的线路丢包时 /api/posts 迟迟不回，首页与文章页就一直转圈。
+ * 做法：每次成功拉到云端文章/设置后写一份快照到 localStorage；下次打开先用快照立即渲染，
+ *      同时后台并行刷新真实数据（拿到后再覆盖重渲染）。快照只是「首屏秒开」，不影响数据准确性。
+ */
+var POSTS_SNAP_KEY = 'qingyu.snap.posts';
+var SETTINGS_SNAP_KEY = 'qingyu.snap.settings';
+var SNAP_MAX_AGE = 12 * 3600 * 1000;   // 快照最长用于首屏兜底（12 小时），后台始终会刷新
+function readSnapshot(k) {
+  try {
+    var raw = localStorage.getItem(k);
+    if (!raw) return null;
+    var o = JSON.parse(raw);
+    if (!o || !o.at || Date.now() - o.at > SNAP_MAX_AGE) return null;
+    return o.data || null;
+  } catch (e) { return null; }
+}
+function writeSnapshot(k, data) {
+  try { if (data) localStorage.setItem(k, JSON.stringify({ at: Date.now(), data: data })); } catch (e) {}
+}
+/* 合并云端文章摘要到 window.BLOG_POSTS：云端返回的字段覆盖，本地静态正文/摘要保留 */
+function applyPostsSnapshot(data) {
+  if (!data || !Array.isArray(data.posts)) return false;
+  var existing = (Array.isArray(window.BLOG_POSTS) ? window.BLOG_POSTS : []);
+  var byId = {};
+  existing.forEach(function (p) { byId[p.id] = p; });
+  data.posts.forEach(function (p) {
+    var old = byId[p.id];
+    if (old) {
+      var merged = {};
+      Object.keys(p).forEach(function (k) { if (p[k] !== undefined) merged[k] = p[k]; });
+      byId[p.id] = Object.assign({}, old, merged);
+    } else {
+      byId[p.id] = p;
+    }
+  });
+  window.BLOG_POSTS = Object.keys(byId).map(function (k) { return byId[k]; });
+  return true;
+}
   if (cfg.mode === 'api' || cfg.mode === 'auto') {
+    // ① 先用上次成功的云端快照立即出内容（接口慢/丢包时不再一直转圈）
+    var snapHit = false;
+    var snapPosts = readSnapshot(POSTS_SNAP_KEY);
+    if (snapPosts) snapHit = applyPostsSnapshot(snapPosts) || snapHit;
+    var snapSettings = readSnapshot(SETTINGS_SNAP_KEY);
+    if (snapSettings && snapSettings.settings) { _siteSettings = snapSettings.settings; snapHit = true; }
+    // 只补内容、不提前宣告「云端已就绪」：探测完成前仍走原有懒加载路径，
+    // 避免文章详情在拿到正文前就误判为「不存在」。
+    if (snapHit) { try { route(); } catch (e) {} }
+    // ② 再并行拉真实数据（拿到后会覆盖快照并重渲染）
     // 首次渲染（上方 route()）会显示加载动画；探测完成（成功或失败）后置位并重渲染，
     // 否则首页会一直停在「正在拉取文章…」
     // posts 与 settings 并行拉取：串行叠加等待（各约 0.5~1.5s 冷启动）会拖慢首屏。
@@ -6385,24 +6434,10 @@ window.__bootPromise = (async function () {
         // 合并云端列表与本地静态列表：云端摘要覆盖已返回字段，保留静态正文与摘要
         // （content/enc 等）；未在云端列表中的静态文章仍保留作兜底。
         // 已删除文章的兜底隐患由 renderPost 的 404 处理兜底：访问时即移除并显示不存在。
-        var existing = (Array.isArray(window.BLOG_POSTS) ? window.BLOG_POSTS : []);
-        var byId = {};
-        existing.forEach(function (p) { byId[p.id] = p; });
-        data.posts.forEach(function (p) {
-          var old = byId[p.id];
-          if (old) {
-            // 云端列表是摘要（不含 content/enc）：仅覆盖已返回字段，保留静态正文与摘要，
-            // 避免首页卡片摘要被清空、全文搜索失效
-            var merged = {};
-            Object.keys(p).forEach(function (k) { if (p[k] !== undefined) merged[k] = p[k]; });
-            byId[p.id] = Object.assign({}, old, merged);
-          } else {
-            byId[p.id] = p;
-          }
-        });
-        window.BLOG_POSTS = Object.keys(byId).map(function (k) { return byId[k]; });
+        applyPostsSnapshot(data);
         // 探测成功：模式或数据有变化则重渲染一次（切换云端 UI、刷新列表数据；
         // 0 篇也用 !wasCloud 重渲染 → 从加载动画变为「你还未发布文章」空态）
+        writeSnapshot(POSTS_SNAP_KEY, data);
         if (!wasCloud || data.posts.length) route();
       } else {
         _cloudReady = true;
@@ -6419,6 +6454,7 @@ window.__bootPromise = (async function () {
       if (sResp && sResp.settings) {
         var firstLoad = !_siteSettings;
         _siteSettings = sResp.settings;
+        writeSnapshot(SETTINGS_SNAP_KEY, sResp);
         if (firstLoad) route();   // 首次加载设置后重渲染：导航/页脚/关于页生效
       }
     } catch (e) { /* 设置获取失败 → 使用静态配置 */ }
