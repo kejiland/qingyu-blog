@@ -221,6 +221,8 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # 必须 >= 3.94（run_worker_first 依赖），统一 4.36+
+          wranglerVersion: 4.36.0
           command: >-
             deploy
             --config wrangler.workers.ci.toml

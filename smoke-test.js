@@ -413,6 +413,7 @@ tests.push(['部署配置：静态资源run_worker_first + CI 使用 wrangler 4.
   assert.ok(/run_worker_first\s*=\s*true/.test(w), 'wrangler.workers.toml 开启 run_worker_first');
   const ci = fs.readFileSync(path.join(dir, '.github', 'workflows', 'deploy.yml'), 'utf8');
   assert.ok(!/wrangler@3\./.test(ci), 'CI 不再使用 wrangler 3.x（run_worker_first 需 3.94+）');
+  assert.ok(/wranglerVersion:\s*4\./.test(ci), 'wrangler-action 固定使用 wrangler 4.x（默认 3.x 无法识别 run_worker_first）');
 }]);
 tests.push(['parseMdFile：frontmatter 与无 frontmatter', async () => {
   const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
