@@ -2,7 +2,7 @@
 
 # Development Guide
 
-> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.83** (2026-10-07).
+> For secondary development, maintenance and deployment troubleshooting. Current version: **v2.10.100** (2026-10-10).
 >
 > This document lives in `docs/`; unless stated otherwise, run every command from the **repository root**.
 
@@ -99,7 +99,7 @@ Use `wrangler.toml` when validating Pages Functions. Use `wrangler.workers.toml`
 ### 4.3 Required tests
 
 ```bash
-node smoke-test.js      # 158 cases
+node smoke-test.js      # 178 cases
 node gb-verify.js       # 18 cases
 node search-verify.js   # 25 cases
 ```
@@ -149,7 +149,7 @@ The script calls terser / clean-css-cli through `npx` as needed and writes `publ
 | Error log | `POST /api/errors`, `GET/DELETE /api/admin/errors` | Public rate-limited reporting; admin read / clear |
 | AI | `/api/ai/ping`, `summary`, `assist`, `comments` | Requires the Workers AI binding; can be disabled by `BLOG_AI_ENABLED` / `BLOG_AI_PUBLIC` |
 | Admin operations | `/api/admin/health`, `/api/admin/audit`, `/api/admin/backups/*`, `/api/admin/tags` | Admin session; writes are audited |
-| Authentication | `POST /api/admin/setup`, `login`, `logout`, `password` | `setup` may require `X-Setup-Key`; the rest use session tokens |
+| Authentication | `POST /api/admin/setup`, `login`, `logout`, `password`; `GET /api/admin/session` | `setup` may require `X-Setup-Key`; the rest use session tokens. `session` is a lightweight self-check — it also returns 200 when signed out (just `authed:false`) so the front end can decide whether to show admin-only buttons. Not an authorization endpoint |
 
 ---
 
@@ -223,6 +223,23 @@ See the [README runtime environment variable table](README_EN.md#full-table-of-r
 | 2026-10-07 | v2.10.81 | Removed the "All" entry from submenus: a parent nav item is now purely a heading hint that only opens its submenu and no longer navigates to a parent page; cursor unified to pointer |
 | 2026-10-07 | v2.10.82 | Fixed submenus not closing: clicking the same nav item again now closes it (desktop / mobile / nested alike); mobile submenu carets are now aligned with the Explore caret in position, hit area and rotation |
 | 2026-10-07 | v2.10.83 | Empty lists under category / tag submenus no longer show the "write a post" button, so visitors cannot discover the admin editor; it only appears when the site truly has no posts, and filtered-empty views now use neutral wording |
+| 2026-10-10 | v2.10.84 | Moved related posts below the prev / next navigation; prev / next switching changed from a page-flip to a cross-fade, so the scroll position no longer jumps |
+| 2026-10-10 | v2.10.85 | Fixed prev / next links landing mid-article: reading-position memory now only applies on reload, navigation always starts at the top; also restored the missing toast implementation |
+| 2026-10-10 | v2.10.86 | Static-site export now opens the Save As dialog inside the user gesture so you pick the save location instead of silently using the browser default folder |
+| 2026-10-10 | v2.10.88 | Feature switches gained "Tags shown on the home page", so you can pick which tags appear instead of letting them pile up |
+| 2026-10-10 | v2.10.89 | Categories are now a top-level nav item instead of being tucked inside the "Discover" dropdown |
+| 2026-10-10 | v2.10.90 | Filled in 8 missing zh-CN locale keys (missed in v2.10.86 / v2.10.88) and updated nav assertions for the standalone category |
+| 2026-10-10 | v2.10.91 | Blog settings now remember the tab you were on; refreshing no longer snaps back to Site basics |
+| 2026-10-10 | v2.10.92 | Fixed the admin nav editor hiding sub-items and custom entries (a stale draft was masking server data) |
+| 2026-10-10 | v2.10.93 | Slow-network fallback for first paint: preload critical assets, an 8s retryable notice, and a clear failure message at 30s |
+| 2026-10-10 | v2.10.94 | Comment sort switching (hottest / newest): instant press feedback plus a skeleton transition, no more blank flash or late pop-in |
+| 2026-10-10 | v2.10.95 | AI summary "Regenerate" is now admin-only; removed the stray separator dots across the page (footer nav, post meta row, tags, featured cards) |
+| 2026-10-10 | v2.10.96 | Feature switches gained "Reading font size" to hide / show the A− / A / A+ body text buttons |
+| 2026-10-10 | v2.10.97 | Cloud snapshot fallback so first paint shows content immediately; attempted to make long-lived static asset caching actually take effect (run_worker_first) |
+| 2026-10-10 | v2.10.98 | Fixed the version string stuck at v2.10.83 on the About page and in the admin; now synced to the current version, with a guard test keeping the three copies in sync |
+| 2026-10-10 | v2.10.99 | Filled in the missing feature switches: "Highlight tools" (summary / clear / export / import) and "Bookmark (read later)". Turning them off only hides the UI — saved records are kept |
+| 2026-10-10 | v2.10.100 | AI summary "Regenerate" now verifies the session server-side (new GET /api/admin/session), so a stale local token no longer shows visitors an admin button; added breathing room between the comments section and the footer nav |
+| 2026-10-10 | v2.10.100 | Docs synced to the current version: filled in the v2.10.84-v2.10.100 changelog, updated the feature-switch and test-count listings, documented the new session self-check endpoint; plus a "docs dont go stale" guard test that blocks the deploy when the documented version or test count drifts from the code |
 
 ---
 

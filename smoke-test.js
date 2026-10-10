@@ -12,6 +12,8 @@ const path = require('path');
 
 const dir = __dirname;
 const PUB = path.join(dir, 'public');
+// 需要随版本同步的文档（版本号 / 测试例数）
+const DOC_FILES = ['README.md', 'README_EN.md', 'DEVELOPMENT.md', 'DEVELOPMENT_EN.md'];
 
 /* ---------- 构造最小浏览器环境 ---------- */
 const stubEl = () => ({
@@ -419,6 +421,16 @@ tests.push(['版本号一致：app.js BLOG_VERSION = sw.js CACHE_VERSION = index
   assert.ok(av, 'app.js 能解析出 BLOG_VERSION');
   assert.strictEqual(av, sv, 'BLOG_VERSION 与 CACHE_VERSION 一致');
   assert.strictEqual(av, hv, 'BLOG_VERSION 与 index.html 的 ?v= 一致');
+}]);
+tests.push(['文档不过期：文档标的版本与代码一致', () => {
+  const DOCS = path.join(dir, 'docs');
+  const app = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const ver = (app.match(/var BLOG_VERSION = '([^']+)'/) || [])[1];
+  assert.ok(ver, 'app.js 能解析出 BLOG_VERSION');
+  DOC_FILES.forEach((f) => {
+    const doc = fs.readFileSync(path.join(DOCS, f), 'utf8');
+    assert.ok(doc.includes(ver), f + ' 标的版本与代码一致（' + ver + '）');
+  });
 }]);
 tests.push(['部署配置：wrangler 固定 3.90.0（4.x 部署失败）', () => {
   const ci = fs.readFileSync(path.join(dir, '.github', 'workflows', 'deploy.yml'), 'utf8');
@@ -4579,6 +4591,17 @@ tests.push(['i18n 缺失兜底：app.js 仍能启动（不再 t is not defined�
     try { await fn(); passed++; console.log('  ✅ ' + name); }
     catch (e) { failed++; console.log('  ❌ ' + name + '\n     ' + (e && e.stack ? e.message : e)); }
   }
+  // 文档里写的测试例数不得与实际不一致（README / 开发文档都有）
+  const total = passed + failed;
+  const strTotal = String(total);
+  DOC_FILES.forEach((f) => {
+    const doc = fs.readFileSync(path.join(dir, 'docs', f), 'utf8');
+    const stale = doc.match(/(?:\u5192\u70df|\u6d4b\u8bd5|Smoke tests)[^\n]{0,24}?(\d{2,4}) (\u4f8b|cases)/g) || [];
+    stale.forEach((m) => {
+      const num = /(\d{2,4}) (\u4f8b|cases)/.exec(m)[1];
+      if (num !== strTotal) { failed++; console.log('  ❌ 文档测试例数过期：' + f + ' 写的 ' + num + ' 实际 ' + total); }
+    });
+  });
   console.log(`\n结果：${passed} 通过 / ${failed} 失败`);
   process.exit(failed ? 1 : 0);
 })();
