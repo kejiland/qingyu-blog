@@ -16,9 +16,10 @@ main = "worker.js"
 directory = "./public"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
-# 关键：让所有静态请求先经过 Worker，worker.js 里「版本化资源一年强缓存 + 安全响应头」
-# 的那段逻辑才会真正执行（默认静态资源在 Worker 之前就被直接返回，那段代码等于死代码，
-# 线上一直是 max-age=0，每次访问都要重下约 600KB）。
+# 注意：静态资源默认在 Worker 之前被 Cloudflare 直接返回，因此 worker.js 里
+# 「版本化资源一年强缓存 + 安全响应头」那段逻辑不会执行（线上一直是 max-age=0）。
+# 修复需要 run_worker_first = true，但它要求 wrangler >= 3.94，而 4.x 在本项目下部署失败，
+# 故暂未开启；现阶段靠 public/_headers（Pages 路径）与 Service Worker 缓存兜底。
 # 需要 wrangler >= 3.94（CI 已升到 4.x）。
 html_handling = "auto-trailing-slash"
 

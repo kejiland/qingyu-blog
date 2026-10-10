@@ -47,10 +47,15 @@ jobs:
         env:
           RL_BINDING: ${{ secrets.BLOG_RATE_LIMIT_BINDING }}
         run: |
-          # 统一使用 wrangler 4.x：静态资源 run_worker_first（让 worker.js 自己的长缓存/安全响应头生效）
-          # 与可选的边缘限流绑定（ratelimits）都要求 4.x
-          npm install -g 'wrangler@^4.36.0'
-          echo "✅ 使用 wrangler 4.36+（run_worker_first 需3.94+，统一到 4.x 以兼容限流绑定）"
+          # 固定 wrangler 3.90.0：实测 4.x 在本项目配置下部署失败（Deploy Worker 步骤报错），
+          # 暂不升级；run_worker_first（静态资源先过 Worker）因此也无法启用，见 wrangler.workers.toml 注释
+          if [ -n "$RL_BINDING" ]; then
+            npm install -g 'wrangler@^4.36.0'
+            echo "✅ 已启用边缘限流绑定 → 使用 wrangler 4.x（该绑定要求 4.36.0+）"
+          else
+            npm install -g wrangler@3.90.0
+            echo "✅ 使用 wrangler 3.90.0（未启用边缘限流绑定）"
+          fi
 
       # 部署前跑本地测试（纯 Node 模拟环境，无网络/无凭据依赖；失败即中止，不部署）
       - name: Run tests (smoke + verify)
@@ -222,7 +227,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           NAME_ARG: ${{ secrets.PAGES_PROJECT_NAME != '' && format('--name {0}', secrets.PAGES_PROJECT_NAME) || '' }}
         run: |
-          # 直接调用上面安装的 wrangler 4.x（官方 action 组件自带 3.x，识别不了 run_worker_first）
+          # 直接调用上面安装的 wrangler（版本与「Setup wrangler CLI」保持一致）
           wrangler deploy --config wrangler.workers.ci.toml $NAME_ARG
 
       # 部署后写入运行时 secret（独立 step：secret 经 env 传入，shell 内用 $VAR 引用，

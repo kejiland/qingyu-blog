@@ -407,14 +407,13 @@ tests.push(['云端快照兜底：接口失败时先用上次快照渲染，不�
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'api' }, fetch: badFetch, localStorage: store }, '/');
   assert.ok(b.html.includes('快照演示文章'), '接口不可用时用快照渲染出文章列表');
 }]);
-/* 回归：静态资源必须先过 Worker，否则 worker.js 的长缓存/安全响应头形同虚设（线上曾一直是 max-age=0） */
-tests.push(['部署配置：静态资源run_worker_first + CI 使用 wrangler 4.x', () => {
-  const w = fs.readFileSync(path.join(dir, 'wrangler.workers.toml'), 'utf8');
-  // 临时：run_worker_first 关闭（AB 验证中）
+/* 部署链路守卫：wrangler 版本固定为 3.90.0（4.x 实测部署失败），且不得出现 run_worker_first */
+tests.push(['部署配置：wrangler 固定 3.90.0（4.x 部署失败）', () => {
   const ci = fs.readFileSync(path.join(dir, '.github', 'workflows', 'deploy.yml'), 'utf8');
-  assert.ok(!/wrangler@3\./.test(ci), 'CI 不再使用 wrangler 3.x（run_worker_first 需 3.94+）');
-  assert.ok(/wrangler deploy --config wrangler\.workers\.ci\.toml/.test(ci), '部署步骤直接调用 wrangler 4.x（wrangler-action 默认 3.x，不识别 run_worker_first）');
-  assert.ok(!/wrangler-action/.test(ci), '不再使用 wrangler-action（它自带 3.x）');
+  assert.ok(/npm install -g wrangler@3\.90\.0/.test(ci), 'CI 默认安装 wrangler 3.90.0');
+  assert.ok(/wrangler deploy --config wrangler\.workers\.ci\.toml/.test(ci), '部署步骤直接调用 wrangler CLI（与安装版本一致）');
+  const w = fs.readFileSync(path.join(dir, 'wrangler.workers.toml'), 'utf8');
+  assert.ok(!/run_worker_first/.test(w.split('# 注意：')[0]), '未开启 run_worker_first（3.90 不支持，会导致部署失败）');
 }]);
 tests.push(['parseMdFile：frontmatter 与无 frontmatter', async () => {
   const { ctx } = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
