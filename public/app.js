@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.98';
+var BLOG_VERSION = '2.10.99';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -1060,10 +1060,19 @@ function getConfig() {
   };
 }
 
-// 正文字号调节开关：后台「功能开关 → 阅读字号」。未设置时默认开启（向后兼容）。
+// 阅读工具栏开关：后台「功能开关」可分别隐藏 正文字号 / 划线高亮 / 收藏（稍后读）。
+// 未设置时默认全部开启（向后兼容）。
 function readingFontEnabled() {
   var f = getConfig().features || {};
   return f.readingFont !== false;
+}
+function highlightToolsEnabled() {
+  var f = getConfig().features || {};
+  return f.highlight !== false;
+}
+function bookmarkEnabled() {
+  var f = getConfig().features || {};
+  return f.bookmark !== false;
 }
 // 站点名称：优先使用云端「站点基础信息 → 站点名称」，其次页脚版权署名，
 // 最后回退到 i18n 默认（site.title）。改完站点名称后，左上角品牌、
@@ -3372,11 +3381,14 @@ async function renderPost(id) {
   (function initHighlight() {
     var article = document.querySelector('.article');
     if (!article || !document.createElement) return;
-    applyHighlights(article, hlList(post.id));
+    // 后台「功能开关」可分别关闭：划线高亮（汇总/清除/导出/导入）与收藏（稍后读）
+    var hlOn = highlightToolsEnabled();
+    var bmOn = bookmarkEnabled();
+    if (hlOn) applyHighlights(article, hlList(post.id));
 
     var tools = document.querySelector('.reading-tools');
     var clearBtn = null, sumBtn = null;
-    if (tools && tools.appendChild) {
+    if (tools && tools.appendChild && hlOn) {
       sumBtn = document.createElement('button');
       sumBtn.type = 'button'; sumBtn.className = 'rt-btn'; sumBtn.id = 'btnHlSummary';
       sumBtn.textContent = t('post.hlSummary');
@@ -3385,12 +3397,14 @@ async function renderPost(id) {
       clearBtn.type = 'button'; clearBtn.className = 'rt-btn'; clearBtn.id = 'btnClearHl';
       clearBtn.textContent = t('post.clearHl');
       tools.appendChild(clearBtn);
-      var lb = document.createElement('button');
-      lb.type = 'button'; lb.className = 'rt-btn'; lb.id = 'btnLater';
-      function _laterLabel() { if (isLater(post.id)) { lb.textContent = t('post.removeLater'); } else { lb.textContent = t('post.saveLater'); } }
-      _laterLabel();
-      lb.addEventListener('click', function () { toggleLater(post); _laterLabel(); });
-      tools.appendChild(lb);
+      if (bmOn) {
+        var lb = document.createElement('button');
+        lb.type = 'button'; lb.className = 'rt-btn'; lb.id = 'btnLater';
+        function _laterLabel() { if (isLater(post.id)) { lb.textContent = t('post.removeLater'); } else { lb.textContent = t('post.saveLater'); } }
+        _laterLabel();
+        lb.addEventListener('click', function () { toggleLater(post); _laterLabel(); });
+        tools.appendChild(lb);
+      }
       // 高亮导出 / 导入（JSON，便于跨设备迁移）
       var expBtn = document.createElement('button');
       expBtn.type = 'button'; expBtn.className = 'rt-btn'; expBtn.id = 'btnHlExport';
@@ -3429,6 +3443,7 @@ async function renderPost(id) {
       tools.appendChild(impBtn);
       if (document.body && document.body.appendChild) document.body.appendChild(impFile);
     }
+    if (!hlOn) return;
     var panel = document.createElement('div');
     panel.className = 'hl-panel'; panel.id = 'hlPanel'; panel.hidden = true;
     if (document.body && document.body.appendChild) document.body.appendChild(panel);

@@ -4704,7 +4704,9 @@
       commentGuard: !(feat && feat.commentGuard === false),
       richContent: !(feat && feat.richContent === false),
       navExtras: !(feat && feat.navExtras === false),
-      readingFont: !(feat && feat.readingFont === false)
+      readingFont: !(feat && feat.readingFont === false),
+      highlight: !(feat && feat.highlight === false),
+      bookmark: !(feat && feat.bookmark === false)
     };
   }
   function saveTabToDraft(content) {
@@ -4747,7 +4749,9 @@
         commentGuard: content.querySelector('#abFeatCommentGuard') ? content.querySelector('#abFeatCommentGuard').checked : true,
         richContent: content.querySelector('#abFeatRichContent') ? content.querySelector('#abFeatRichContent').checked : true,
         navExtras: content.querySelector('#abFeatNavExtras') ? content.querySelector('#abFeatNavExtras').checked : true,
-        readingFont: content.querySelector('#abFeatReadingFont') ? content.querySelector('#abFeatReadingFont').checked : true
+        readingFont: content.querySelector('#abFeatReadingFont') ? content.querySelector('#abFeatReadingFont').checked : true,
+        highlight: content.querySelector('#abFeatHighlight') ? content.querySelector('#abFeatHighlight').checked : true,
+        bookmark: content.querySelector('#abFeatBookmark') ? content.querySelector('#abFeatBookmark').checked : true
       };
     }
     if (content.querySelector('#abHomeTags')) collectHomeTagsFromDom(content);
@@ -4839,6 +4843,8 @@
     if (content.querySelector('#abFeatRichContent')) content.querySelector('#abFeatRichContent').checked = (feat.richContent !== false);
     if (content.querySelector('#abFeatNavExtras')) content.querySelector('#abFeatNavExtras').checked = (feat.navExtras !== false);
     if (content.querySelector('#abFeatReadingFont')) content.querySelector('#abFeatReadingFont').checked = (feat.readingFont !== false);
+    if (content.querySelector('#abFeatHighlight')) content.querySelector('#abFeatHighlight').checked = (feat.highlight !== false);
+    if (content.querySelector('#abFeatBookmark')) content.querySelector('#abFeatBookmark').checked = (feat.bookmark !== false);
     if (content.querySelector('#abProfileName')) content.querySelector('#abProfileName').value = prof.name || '';
     if (content.querySelector('#abProfileBio')) content.querySelector('#abProfileBio').value = prof.bio || '';
     if (content.querySelector('#abProfileAvatar')) content.querySelector('#abProfileAvatar').value = prof.avatar || '';
@@ -4968,6 +4974,8 @@
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatNavExtras"> ' + t('admin.settings.featNavExtras') + '</label><label class="ab-hint">' + t('admin.settings.featNavExtrasHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('doc', 15) + ' ' + t('admin.settings.featReading') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatReadingFont"> ' + t('admin.settings.featReadingFont') + '</label><label class="ab-hint">' + t('admin.settings.featReadingFontHint') + '</label></div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatHighlight"> ' + t('admin.settings.featHighlight') + '</label><label class="ab-hint">' + t('admin.settings.featHighlightHint') + '</label></div>' +
+        '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatBookmark"> ' + t('admin.settings.featBookmark') + '</label><label class="ab-hint">' + t('admin.settings.featBookmarkHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('image', 15) + ' ' + t('admin.settings.featRich') + '</div>' +
         '<div class="ab-field"><label style="display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer"><input type="checkbox" id="abFeatRichContent"> ' + t('admin.settings.featRichContent') + '</label><label class="ab-hint">' + t('admin.settings.featRichContentHint') + '</label></div>' +
         '<div class="ab-section-title" style="margin-top:16px">' + icon('bug', 15) + ' ' + t('admin.settings.featDiag') + '</div>' +
@@ -5090,7 +5098,9 @@
         commentGuard: !(settingsDraft.features && settingsDraft.features.commentGuard === false),
         richContent: !(settingsDraft.features && settingsDraft.features.richContent === false),
         navExtras: !(settingsDraft.features && settingsDraft.features.navExtras === false),
-        readingFont: !(settingsDraft.features && settingsDraft.features.readingFont === false)
+        readingFont: !(settingsDraft.features && settingsDraft.features.readingFont === false),
+        highlight: !(settingsDraft.features && settingsDraft.features.highlight === false),
+        bookmark: !(settingsDraft.features && settingsDraft.features.bookmark === false)
       })
     };
     try {

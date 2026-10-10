@@ -3127,6 +3127,32 @@ tests.push(['AI 摘要：游客不显示「重新生成」；页脚导航无间�
   assert.ok(/\.footer-nav \{[^}]*column-gap: 16px/.test(css), '改用间距分隔');
 }]);
 
+tests.push(['功能开关：划线高亮与收藏可分别关闭', async () => {
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  assert.ok(/function highlightToolsEnabled\(\) \{[\s\S]*?\.highlight !== false/.test(appSrc), '读取「划线高亮」开关，未设置时默认开启');
+  assert.ok(/function bookmarkEnabled\(\) \{[\s\S]*?\.bookmark !== false/.test(appSrc), '读取「收藏」开关，未设置时默认开启');
+  // 默认开启：四个高亮按钮与收藏按钮都创建；一个关掉一个就不应输出
+  const mk = appSrc.match(/\(function initHighlight\(\) \{[\s\S]*?\n  \}\)\(\);/);
+  assert.ok(mk, '找到 initHighlight 实现');
+  var ids = ['btnHlSummary', 'btnClearHl', 'btnHlExport', 'btnHlImport', 'btnLater'];
+  ['hlOn', 'bmOn'].forEach((flag) => {
+    assert.ok(new RegExp('if \\(' + flag + '\\)').test(mk[0]) || mk[0].includes('if (!hlOn) return;'), flag + ' 真正影响渲染');
+  });
+  assert.ok(mk[0].includes('if (tools && tools.appendChild && hlOn) {'), '高亮按钮由 hlOn 决定是否创建');
+  assert.ok(mk[0].includes('if (bmOn) {'), '收藏按钮由 bmOn 决定是否创建');
+  assert.ok(mk[0].includes('if (!hlOn) return;'), '关闭高亮后不再创建高亮面板与划线气泡');
+  ids.forEach((id) => { assert.ok(mk[0].includes("id = '" + id + "'") || mk[0].includes("'" + id + "'"), '查找定位锚点 ' + id); });
+  // 后台：两个勾选框 + 读取 / 回填 / 保存三处
+  assert.ok(adminSrc.includes('id="abFeatHighlight"') && adminSrc.includes('id="abFeatBookmark"'), '功能开关里有两个勾选框');
+  assert.ok(adminSrc.includes("querySelector('#abFeatHighlight').checked") && adminSrc.includes("querySelector('#abFeatBookmark').checked"), '勾选框状态被读入草稿并回填');
+  assert.ok(/highlight: !\(feat && feat\.highlight === false\)/.test(adminSrc), '从服务端配置初始化草稿');
+  assert.ok(/highlight: !\(settingsDraft\.features && settingsDraft\.features\.highlight === false\)/.test(adminSrc), '保存时写回开关值');
+  ['zh-CN', 'en', 'ja', 'ko', 'hi'].forEach((loc) => {
+    const j = JSON.parse(fs.readFileSync(path.join(PUB, 'locales', loc + '.json'), 'utf8'));
+    assert.ok(j['admin.settings.featHighlight'] && j['admin.settings.featHighlightHint'] && j['admin.settings.featBookmark'] && j['admin.settings.featBookmarkHint'], loc + ' 有对应文案');
+  });
+}]);
 tests.push(['阅读字号：后台开关可隐藏/显示正文字号调节', async () => {
   const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
   const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
