@@ -217,16 +217,13 @@ jobs:
           echo "✅ D1 schema 应用完成"
 
       - name: Deploy Worker
-        uses: cloudflare/wrangler-action@v3
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          # 必须 >= 3.94（run_worker_first 依赖），统一 4.36+
-          wranglerVersion: 4.36.0
-          command: >-
-            deploy
-            --config wrangler.workers.ci.toml
-            ${{ secrets.PAGES_PROJECT_NAME != '' && format('--name {0}', secrets.PAGES_PROJECT_NAME) || '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          NAME_ARG: ${{ secrets.PAGES_PROJECT_NAME != '' && format('--name {0}', secrets.PAGES_PROJECT_NAME) || '' }}
+        run: |
+          # 直接调用上面安装的 wrangler 4.x（官方 action 组件自带 3.x，识别不了 run_worker_first）
+          wrangler deploy --config wrangler.workers.ci.toml $NAME_ARG
 
       # 部署后写入运行时 secret（独立 step：secret 经 env 传入，shell 内用 $VAR 引用，
       # 不直接把 secret 值拼进脚本，避免值里含换行/特殊字符时破坏语法）
