@@ -408,6 +408,18 @@ tests.push(['云端快照兜底：接口失败时先用上次快照渲染，不�
   assert.ok(b.html.includes('快照演示文章'), '接口不可用时用快照渲染出文章列表');
 }]);
 /* 部署链路守卫：wrangler 版本固定为 3.90.0（4.x 实测部署失败），且不得出现 run_worker_first */
+/* 回归：版本号三处必须一致（关于页/后台显示、SW 缓存、index.html 的 ?v=），否则关于页会显示旧版本 */
+tests.push(['版本号一致：app.js BLOG_VERSION = sw.js CACHE_VERSION = index.html ?v=', () => {
+  const app = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const sw = fs.readFileSync(path.join(PUB, 'sw.js'), 'utf8');
+  const html = fs.readFileSync(path.join(PUB, 'index.html'), 'utf8');
+  const av = (app.match(/var BLOG_VERSION = '([^']+)'/) || [])[1];
+  const sv = (sw.match(/var CACHE_VERSION = '([^']+)'/) || [])[1];
+  const hv = (html.match(/\?v=(\d+\.\d+\.\d+)/) || [])[1];
+  assert.ok(av, 'app.js 能解析出 BLOG_VERSION');
+  assert.strictEqual(av, sv, 'BLOG_VERSION 与 CACHE_VERSION 一致');
+  assert.strictEqual(av, hv, 'BLOG_VERSION 与 index.html 的 ?v= 一致');
+}]);
 tests.push(['部署配置：wrangler 固定 3.90.0（4.x 部署失败）', () => {
   const ci = fs.readFileSync(path.join(dir, '.github', 'workflows', 'deploy.yml'), 'utf8');
   assert.ok(/npm install -g wrangler@3\.90\.0/.test(ci), 'CI 默认安装 wrangler 3.90.0');
