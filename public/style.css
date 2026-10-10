@@ -1572,7 +1572,7 @@ footer { flex-shrink: 0; border-top: 1px solid var(--border); background: var(--
   flex-direction: column;
   align-items: flex-start;   /* 左对齐，不居中 */
   gap: 10px;                 /* 所有行之间距统一 */
-  padding: 20px 20px 24px;
+  padding: 26px 20px 24px;
 }
 /* 页脚导航行（电脑端含 RSS；移动端隐藏 RSS 与下方声明区块） */
 .footer-nav {
@@ -1815,6 +1815,8 @@ kbd {
 
 /* ---------- 评论区 ---------- */
 .comments { margin-top: 34px; padding-top: 22px; border-top: 1px solid var(--border); position: relative; }
+/* 评论区与页脚导航之间留出呼吸感：评论表单与最后一条评论下方不再紧向页脚 */
+.comments { padding-bottom: 18px; margin-bottom: 26px; }
 .comments::before {
   content: ""; position: absolute; top: -2px; left: 0; width: 42px; height: 3px; border-radius: 999px;
   background: linear-gradient(90deg, var(--accent), var(--accent-2)); opacity: .7;

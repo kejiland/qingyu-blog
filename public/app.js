@@ -6,7 +6,7 @@
  * ============================================================================ */
 'use strict';
 
-var BLOG_VERSION = '2.10.99';
+var BLOG_VERSION = '2.10.100';
 
 /* i18n 兜底：万一 i18n.js 没加载成功（网络抖动 / 缓存缺失 / 被拦截），
  * 也必须保证 t() 可用 —— 否则整页会在第一个 t(...) 处抛 “t is not defined” 而白屏。 */
@@ -1171,6 +1171,7 @@ async function apiFetch(url, opts) {
  * 仅当本地确实持有会话时才处理，避免「未登录访问公开接口被 401」误触发。 */
 function handleSessionExpired(err) {
   var had = !!_sessionToken();
+  resetAdminVerified();
   _setSessionToken('');
   _setAdminSession(false);
   _setMustChange(false);
@@ -1728,6 +1729,29 @@ var _cloudReady = false;      // 云端探测是否已完成（成功或失败�
 function needAdminSetup() {
   return !_cfgPwd() && !_localPwd();
 }
+/* 管理员身份“服务端确认”结果（含未请求时的未知）。
+ * adminOk() 只看 localStorage 里有没有 token，token 过期/被撤销后依然返回 true，
+ * 会让游客看到「重新生成」等管理员按钮。这里让服务端真正校验一次。
+ * 结果会记在 sessionStorage，同一会话内只请求一次。 */
+var _adminVerified = null;
+function adminVerified() {
+  if (_adminVerified !== null) return Promise.resolve(_adminVerified);
+  // 本地模式（静态部署且无云端）：只能信本地会话标志
+  if (!_cloudOn()) { _adminVerified = Promise.resolve(_adminSession()); return _adminVerified; }
+  var cached = null;
+  try { var raw = sessionStorage.getItem('qingyu.admin.ok'); if (raw) { var ps = String(raw).split('|'); if (Number(ps[1]) + 600000 > Date.now()) cached = ps[0] === '1'; } } catch (e) {}
+  if (cached !== null) { _adminVerified = Promise.resolve(cached); return _adminVerified; }
+  _adminVerified = apiFetch('api/admin/session', { method: 'GET' })
+    .then(function (d) { return !!(d && d.authed); })
+    .catch(function () { return false; })
+    .then(function (ok) {
+      _adminVerified = Promise.resolve(ok);
+      try { sessionStorage.setItem('qingyu.admin.ok', (ok ? '1' : '0') + '|' + Date.now()); } catch (e) {}
+      return ok;
+    });
+  return _adminVerified;
+}
+function resetAdminVerified() { _adminVerified = null; try { sessionStorage.removeItem('qingyu.admin.ok'); } catch (e) {} }
 function adminOk() {
   // 云端：有会话 token 即视为已登录（有效性由服务端鉴权兜底）
   if (_cloudOn()) return !!_sessionToken();
@@ -1771,6 +1795,7 @@ async function cloudLogin(pwd, setupKey) {
     });
     if (!data || !data.token) return { ok: false, status: 0, message: (data && data.error) || t('admin.loginFail') };
     _setSessionToken(data.token);
+    resetAdminVerified();
     _setAdminSession(true);
     _setMustChange(!!data.mustChange);
     if (data.mustChange && data.defaultPassword) _setInitialAdminPwd(data.defaultPassword);
@@ -1788,6 +1813,7 @@ async function cloudLogin(pwd, setupKey) {
 async function cloudLogout() {
   var t = _sessionToken();
   _setSessionToken('');
+  resetAdminVerified();
   _setAdminSession(false);
   _setMustChange(false);
   _setInitialAdminPwd('');
@@ -1812,6 +1838,7 @@ async function cloudSetupAdmin(pwd, setupKey) {
   }
 }
 function adminLogout() {
+  resetAdminVerified();
   if (_cloudOn()) { cloudLogout(); }
   else { _setAdminSession(false); }
 }
@@ -5565,8 +5592,11 @@ function aiFillSlots() {
             var el = document.getElementById('aiSummarySlot');
             if (!el) return;
             if (d && d.summary) {
-              // 「重新生成」仅登录管理员可见：命中缓存 ≠ 管理员，不能拿 cached 当权限
-              el.innerHTML = aiSummaryCardHTML(d.summary, slug, adminOk(), !!d.cached);
+              // 「重新生成」仅登录管理员可见。adminOk() 只看本地还在不，
+              // 过期/已撤销的 token 会误导致游客看到管理员按钮，故这里等服务端确认。
+              adminVerified().then(function (ok) {
+                if (el.isConnected) el.innerHTML = aiSummaryCardHTML(d.summary, slug, ok, !!d.cached);
+              });
             } else {
               el.innerHTML = aiSummaryBtnHTML(slug);
             }
@@ -5621,7 +5651,12 @@ function aiDoSummary(btn) {
   btn.innerHTML = svgIcon('spinner', 13) + ' ' + esc(t('site.loading'));
   apiFetch('api/ai/summary', { method: 'POST', body: JSON.stringify({ slug: slug, lang: aiLang(), force: force }) })
     .then(function (d) {
-      if (slot) slot.innerHTML = aiSummaryCardHTML(d.summary || '', slug, adminOk());
+      if (slot) {
+        var cur = slot;
+        adminVerified().then(function (ok) {
+          if (cur.isConnected) cur.innerHTML = aiSummaryCardHTML(d.summary || '', slug, ok);
+        });
+      }
     })
     .catch(function (e) {
       btn.disabled = false;

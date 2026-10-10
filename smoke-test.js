@@ -3100,7 +3100,7 @@ tests.push(['AI 摘要：游客不显示「重新生成」；页脚导航无间�
   const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
   // 1) 重新生成只认登录态：命中缓存不等于有权限
   assert.ok(!appSrc.includes('!!d.cached || adminOk()'), '不再把「命中缓存」当成管理员权限');
-  assert.ok(/aiSummaryCardHTML\(d\.summary, slug, adminOk\(\), !!d\.cached\)/.test(appSrc), '卡片按登录态决定是否给重新生成');
+  assert.ok(/adminVerified\(\)\.then\(function \(ok\)/.test(appSrc), '卡片按服务端确认的管理员身份决定是否给重新生成');
   const cardFn = appSrc.match(/function aiSummaryCardHTML[\s\S]*?\n\}/)[0];
   assert.ok(/isAdmin \? '<div class="ai-card-foot">/.test(cardFn), '底部按钮区仅在管理员时渲染');
   assert.ok(cardFn.includes("t('ai.regenerate')"), '管理员看到的是重新生成');
@@ -3127,6 +3127,39 @@ tests.push(['AI 摘要：游客不显示「重新生成」；页脚导航无间�
   assert.ok(/\.footer-nav \{[^}]*column-gap: 16px/.test(css), '改用间距分隔');
 }]);
 
+tests.push(['评论区与页脚导航保持间距', async () => {
+  const css = fs.readFileSync(path.join(PUB, 'style.css'), 'utf8');
+  const cm = css.match(/\.comments \{[^}]*\}/g).join('\n');
+  assert.ok(/\.comments \{[^}]*padding-bottom: \d+px/.test(cm), '评论区下方有内边距');
+  assert.ok(/\.comments \{[^}]*margin-bottom: (2[0-9]|[3-9][0-9])px/.test(cm), '评论区与页脚之间有外边距');
+  assert.ok(/\.footer-inner \{[^}]*padding: 2[0-9]px/.test(css), '页脚导航行上方也留了一段间距');
+}]);
+tests.push(['AI 摘要：重新生成按钮仅登录管理员可见', async () => {
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const coreSrc = fs.readFileSync(path.join(dir, 'functions', '_lib', 'api-core.js'), 'utf8');
+  const workerSrc = fs.readFileSync(path.join(dir, 'worker.js'), 'utf8');
+  // 1) 不能再只凭本地 token 就认定管理员（过期/已撤销的 token 会误导致游客看到按钮）
+  assert.ok(/function adminOk()/.test(appSrc), '保留 adminOk 供其他场景使用');
+  assert.ok(/function adminVerified()/.test(appSrc), '新增服务端确认的管理员身份判定');
+  assert.ok(appSrc.includes("apiFetch('api/admin/session'"), '前端向服务端确认会话而非只看本地');
+  assert.ok(/resetAdminVerified()/.test(appSrc), '登录/登出/会话失效时清掉确认结果');
+  // 2) 摘要卡片的「重新生成」按钮必须走确认后的结果
+  const card = appSrc.match(/function aiSummaryCardHTML\([\s\S]*?\n\}/)[0];
+  assert.ok(/isAdmin \?/.test(card), '按钮由 isAdmin 决定是否渲染');
+  const fill = appSrc.match(/function aiFillSlots\(\) \{[\s\S]*?\n\}/)[0];
+  assert.ok(fill.includes('adminVerified().then(function (ok)'), '摘要卡片等服务端确认后再渲染');
+  assert.ok(!/aiSummaryCardHTML\(d\.summary, slug, adminOk\(\)/.test(fill), '不再直接用本地 token 判断');
+  const doS = appSrc.match(/function aiDoSummary\([\s\S]*?\n\}/)[0];
+  assert.ok(!/aiSummaryCardHTML\(d\.summary \|\| '', slug, adminOk\(\)\)/.test(doS), '生成完成后重绘卡片也用确认后的身份');
+  // 3) 服务端提供轻量会话自检接口，且未登录也返 200（不触发 401 清理会话）
+  assert.ok(/export async function handleAdminSession\(request, env\)/.test(coreSrc), '服务端有会话自检处理函数');
+  assert.ok(/authed: !!\(state\.authed && !state\.mustChange\)/.test(coreSrc), '强制改密中的会话不算管理员');
+  assert.ok(/'Cache-Control': 'no-store'/.test(coreSrc.match(/handleAdminSession[\s\S]*?\n\}/)[0]), '自检结果不被缓存');
+  assert.ok(workerSrc.includes("'/api/admin/session'") && workerSrc.includes('handleAdminSession(request, env)'), 'Worker 已路由该接口');
+  // 4) 未登录时 force 仍由服务端拒绝（前端只是不显示，不是唯一保护）
+  const sum = fs.readFileSync(path.join(dir, 'functions', 'api', 'ai', 'summary.js'), 'utf8');
+  assert.ok(sum.includes('if (force && !(await isWriteAuthed(request, env))) return unauthorized(request, env);'), '服务端对强制重生仍做鉴权');
+}]);
 tests.push(['功能开关：划线高亮与收藏可分别关闭', async () => {
   const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
   const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');

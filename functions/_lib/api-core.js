@@ -1531,6 +1531,18 @@ export async function handleAdminLogin(request, env) {
   return json({ ok: true, token, expiresIn: ADMIN_SESSION_TTL, mustChange: !!auth.mustChange }, 200, request, env);
 }
 
+/** GET /api/admin/session — 轻量会话自检（不返回任何素材）
+ * 前端不能只凭 localStorage 里的 token 就认定自己是管理员：
+ * token 可能已过期或被撤销，会误把「重新生成」等管理员按钮暴露给游客。
+ * 这里让服务端真正校验一次，前端再决定是否渲染管理员按钮。 */
+export async function handleAdminSession(request, env) {
+  if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);
+  if (request.method === 'OPTIONS') return corsPreflight(request, env);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405, request, env);
+  const state = await adminAuthState(request, env);
+  // 未登录也返回 200，前端才不会被 apiFetch 的 401 清理会话并跳登录
+  return json({ ok: true, authed: !!(state.authed && !state.mustChange), mustChange: !!state.mustChange }, 200, request, env, { 'Cache-Control': 'no-store' });
+}
 /** POST /api/admin/logout — 撤销当前会话 token */
 export async function handleAdminLogout(request, env) {
   if (!env || !env.DB) return json({ error: DB_ERR }, 500, request, env);

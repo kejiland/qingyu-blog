@@ -75,9 +75,9 @@
       } catch (e) {}
     })();
   </script>
-  <link rel="manifest" href="/manifest.webmanifest?v=2.10.99">
-  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=2.10.99">
-  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=2.10.99">
+  <link rel="manifest" href="/manifest.webmanifest?v=2.10.100">
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png?v=2.10.100">
+  <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png?v=2.10.100">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1024 1024'><path d='M73.44768 958.112526S286.575881 57.38067 917.281057 2.410953c0 0-20.734192 341.390875-202.03782 479.297358 0 0-33.753335 45.808098 73.292956 31.824573 0 0-12.536953 153.336579-201.555629 192.8762 0 0-28.93143 28.93143 54.969717 31.824573 0 0-88.723052 137.424293-311.977254 63.649146 0 0 89.687433-216.985725 165.391341-289.3143a2209.396876 2209.396876 0 0 0-385.7524 431.078308s-15.430096 35.199907-36.164288 14.465715z' fill='%239B9A9A'/></svg>">
   <style>
     /* 首屏加载动画：在 app.js 接管前显示，主题色与暖色调一致 */
@@ -111,17 +111,17 @@
   </style>
   <!-- 首屏关键资源预加载：defer 脚本虽会被预加载扫描器发现，但显式 preload 可让浏览器
        更早发起请求，弱网/高延迟下少等一个往返。同一 URL 只会下载一次。 -->
-  <link rel="preload" href="config.min.js?v=2.10.99" as="script">
-  <link rel="preload" href="posts.min.js?v=2.10.99" as="script">
-  <link rel="preload" href="i18n.min.js?v=2.10.99" as="script">
-  <link rel="preload" href="app.min.js?v=2.10.99" as="script">
-  <link rel="preload" href="style.min.css?v=2.10.99" as="style">
-  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.10.99" media="print" onload="this.media='all'">
-  <noscript><link rel="stylesheet" href="style.min.css?v=2.10.99"></noscript>
+  <link rel="preload" href="config.min.js?v=2.10.100" as="script">
+  <link rel="preload" href="posts.min.js?v=2.10.100" as="script">
+  <link rel="preload" href="i18n.min.js?v=2.10.100" as="script">
+  <link rel="preload" href="app.min.js?v=2.10.100" as="script">
+  <link rel="preload" href="style.min.css?v=2.10.100" as="style">
+  <link id="global-style" rel="stylesheet" href="style.min.css?v=2.10.100" media="print" onload="this.media='all'">
+  <noscript><link rel="stylesheet" href="style.min.css?v=2.10.100"></noscript>
   <!-- 字体策略：前台全部改走系统宋体/仿宋栈，不再加载任何 webfont，PageSpeed 网络负载大幅下降 -->
-  <script defer src="config.min.js?v=2.10.99"></script>
-  <script defer src="posts.min.js?v=2.10.99"></script>
-  <script defer src="i18n.min.js?v=2.10.99"></script>
+  <script defer src="config.min.js?v=2.10.100"></script>
+  <script defer src="posts.min.js?v=2.10.100"></script>
+  <script defer src="i18n.min.js?v=2.10.100"></script>
 </head>
 <body>
   <div id="app">
@@ -131,7 +131,7 @@
       <div class="boot-name">Qingyu'Blog · 加载中</div>
     </div>
   </div>
-  <script defer src="app.min.js?v=2.10.99"></script>
+  <script defer src="app.min.js?v=2.10.100"></script>
   <script>
   // 首屏兜底：网络很卡时核心脚本可能迟迟不来，页面会一直停在「加载中」转圈，
   // 看起来像站点坏了。8 秒仍未完成首次渲染就提示「网络较慢」并给出重新加载按钮。
@@ -180,7 +180,7 @@
   (function () {
     function loadJs(src) {
       var s = document.createElement('script');
-      s.src = src + '?v=2.10.99';
+      s.src = src + '?v=2.10.100';
       s.defer = true;
       document.body.appendChild(s);
       return s;
@@ -188,7 +188,7 @@
     function loadCss(href) {
       var l = document.createElement('link');
       l.rel = 'stylesheet';
-      l.href = href + '?v=2.10.99';
+      l.href = href + '?v=2.10.100';
       document.head.appendChild(l);
       return l;
     }
@@ -214,7 +214,7 @@
   <script>
   if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
     window.addEventListener('load', function () {
-      navigator.serviceWorker.register('/sw.js?v=2.10.99').catch(function () {});
+      navigator.serviceWorker.register('/sw.js?v=2.10.100').catch(function () {});
     });
   }
   </script>
