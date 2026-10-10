@@ -1060,6 +1060,11 @@ function getConfig() {
   };
 }
 
+// 正文字号调节开关：后台「功能开关 → 阅读字号」。未设置时默认开启（向后兼容）。
+function readingFontEnabled() {
+  var f = getConfig().features || {};
+  return f.readingFont !== false;
+}
 // 站点名称：优先使用云端「站点基础信息 → 站点名称」，其次页脚版权署名，
 // 最后回退到 i18n 默认（site.title）。改完站点名称后，左上角品牌、
 // 浏览器标签页标题、页脚署名、OG/结构化数据都会实时跟随变化。
@@ -3129,10 +3134,13 @@ async function renderPost(id) {
   var minutes = Math.max(1, Math.ceil((stripMd(content || '').length / 400)));
   var seriesMeta = post.series ? '<a class="pin" href="' + esc(href(seriesUrl(post.series))) + '">' + svgIcon('list', 13) + ' ' + esc(post.series) + '</a>' : '';
   html += '<div class="post-header"><h1>' + esc(post.title || '') + '</h1><div class="meta"><span class="meta-date">' + esc(post.date || '') + '</span>' + (post.author ? '<span class="meta-author">' + esc(post.author) + '</span>' : '') + '<span>' + minutes + ' ' + t('post.minRead') + '</span><span class="meta-views">' + svgIcon('eye', 14) + ' <span id="viewCount">0</span> ' + t('post.views') + '</span>' + seriesMeta + (post.pinned ? '<span class="pin">' + svgIcon('pin', 13) + ' ' + t('post.pin') + '</span>' : '') + '</div></div>';
-  html += '<div class="reading-tools"><span class="rt-label">' + t('post.fontSize') + '</span>' +
-    '<button type="button" class="rt-btn" data-rs="-1" aria-label="' + t('post.fontSmaller') + '" title="' + t('post.fontSmaller') + '">A−</button>' +
-    '<button type="button" class="rt-btn" data-rs="0" aria-label="' + t('post.fontReset') + '" title="' + t('post.fontReset') + '">A</button>' +
-    '<button type="button" class="rt-btn" data-rs="1" aria-label="' + t('post.fontLarger') + '" title="' + t('post.fontLarger') + '">A+</button>' +
+  // 正文字号调节：后台「功能开关 → 阅读字号」可整体隐藏（默认开启）
+  html += '<div class="reading-tools">' + (readingFontEnabled()
+    ? '<span class="rt-label">' + t('post.fontSize') + '</span>' +
+      '<button type="button" class="rt-btn" data-rs="-1" aria-label="' + t('post.fontSmaller') + '" title="' + t('post.fontSmaller') + '">A−</button>' +
+      '<button type="button" class="rt-btn" data-rs="0" aria-label="' + t('post.fontReset') + '" title="' + t('post.fontReset') + '">A</button>' +
+      '<button type="button" class="rt-btn" data-rs="1" aria-label="' + t('post.fontLarger') + '" title="' + t('post.fontLarger') + '">A+</button>'
+    : '') +
     '</div>';
   html += aiPostSlot(post);
   html += toc;

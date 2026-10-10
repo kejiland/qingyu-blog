@@ -3087,6 +3087,32 @@ tests.push(['AI 摘要：游客不显示「重新生成」；页脚导航无间�
   assert.ok(/\.footer-nav \{[^}]*column-gap: 16px/.test(css), '改用间距分隔');
 }]);
 
+tests.push(['阅读字号：后台开关可隐藏/显示正文字号调节', async () => {
+  const appSrc = fs.readFileSync(path.join(PUB, 'app.js'), 'utf8');
+  const adminSrc = fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8');
+  // 1) 前台按开关渲染：关闭时整条字号控件都不输出
+  assert.ok(/function readingFontEnabled\(\) \{[\s\S]*?\.readingFont !== false/.test(appSrc), '读取后台开关，未设置时默认开启');
+  assert.ok(appSrc.includes("html += '<div class=\"reading-tools\">' + (readingFontEnabled()"), '字号控件由开关决定是否渲染');
+  const fn = appSrc.match(/function readingFontEnabled\(\) \{[\s\S]*?\n\}/)[0];
+  // 在沙箱里换三次配置，直接跑这个开关函数：未配置 / 开 / 关
+  var res = vm.runInNewContext('(function(){' + fn + '\nvar r = [], g;\nfunction getConfig() { return g; }'
+    + "\ng = { features: {} }; r.push(readingFontEnabled());"
+    + "\ng = { features: { readingFont: true } }; r.push(readingFontEnabled());"
+    + "\ng = { features: { readingFont: false } }; r.push(readingFontEnabled());"
+    + '\nreturn r; })()');
+  assert.strictEqual(JSON.stringify(res), '[true,true,false]', '未配置默认显示、开=显示、关=隐藏');   // 跨沙箱数组，用字符串比
+  // 2) 后台：功能开关里有这个勾选框，且读取/回填/保存三处都串起来了
+  assert.ok(adminSrc.includes('id="abFeatReadingFont"'), '功能开关里有「阅读字号」勾选框');
+  assert.ok(adminSrc.includes("t('admin.settings.featReading')"), '有独立的分区标题');
+  assert.ok(/readingFont: !\(settingsDraft\.features && settingsDraft\.features\.readingFont === false\)/.test(adminSrc), '保存时写回开关值');
+  assert.ok(adminSrc.includes("querySelector('#abFeatReadingFont').checked"), '勾选框状态被读入草稿并回填');
+  assert.ok(/readingFont: !\(feat && feat\.readingFont === false\)/.test(adminSrc), '从服务端配置初始化草稿');
+  ['zh-CN', 'en', 'ja', 'ko', 'hi'].forEach((loc) => {
+    const j = JSON.parse(fs.readFileSync(path.join(PUB, 'locales', loc + '.json'), 'utf8'));
+    assert.ok(j['admin.settings.featReading'] && j['admin.settings.featReadingFont'] && j['admin.settings.featReadingFontHint'], loc + ' 有对应文案');
+  });
+}]);
+
 tests.push(['博客设置：刷新后停留在上次标签页（不再跳回站点基础信息）', async () => {
   const b = await boot({ 'window.BLOG_CONFIG': { mode: 'static' } });
   vm.runInContext(fs.readFileSync(path.join(PUB, 'admin.js'), 'utf8'), b.ctx, { filename: 'admin.js' });
