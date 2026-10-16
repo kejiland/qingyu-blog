@@ -148,6 +148,10 @@ function r2Configured(env) {
 function randomId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
+/** 校验请求体必须是非数组的普通对象，拒绝数组/字符串/数字等非预期类型载荷。 */
+function isPlainBody(body) {
+  return !!body && typeof body === 'object' && !Array.isArray(body);
+}
 
 /* ---------- 删除对象（与上传同一桶，Worker 代发 SigV4 签名 DELETE） ---------- */
 /** 生成 SigV4 Authorization 头（供 r2DeleteObject 使用，导出便于交叉验证）
@@ -233,7 +237,9 @@ export async function handleMusic(request, env) {
 
   if (request.method === 'POST') {
     if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
-    const body = await request.json().catch(function () { return null; });
+    const rawBody = await request.json().catch(function () { return null; });
+    const body = isPlainBody(rawBody) ? rawBody : null;
+    if (!body) return json({ error: '请求体格式不正确' }, 400, request, env);
     const title = String((body && body.title) || '').trim().slice(0, 200);
     const url = String((body && body.url) || '').trim();
     if (!title || !url) return json({ error: '缺少 title / url' }, 400, request, env);
@@ -266,7 +272,9 @@ export async function handleMusicUploadUrl(request, env) {
     return json({ error: 'R2 未配置（缺少 R2 凭据 / R2_BUCKET），无法上传' }, 503, request, env);
   }
 
-  const body = await request.json().catch(function () { return null; });
+  const rawBody = await request.json().catch(function () { return null; });
+  const body = isPlainBody(rawBody) ? rawBody : null;
+  if (!body) return json({ error: '请求体格式不正确' }, 400, request, env);
   const filename = String((body && body.filename) || '').trim();
   const size = Number((body && body.size) || 0) || 0;
   const m = /\.([a-zA-Z0-9]+)$/.exec(filename);
@@ -293,7 +301,9 @@ export async function handleMusicId(request, env, id) {
   if (!(await isWriteAuthed(request, env))) return unauthorized(request, env);
 
   if (request.method === 'PUT') {
-    const body = await request.json().catch(function () { return null; });
+    const rawBody = await request.json().catch(function () { return null; });
+    const body = isPlainBody(rawBody) ? rawBody : null;
+    if (!body) return json({ error: '请求体格式不正确' }, 400, request, env);
     const title = String((body && body.title) || '').trim().slice(0, 200);
     const artist = String((body && body.artist) || '').trim().slice(0, 200);
     const cover = String((body && body.cover) || '').trim().slice(0, 500);
